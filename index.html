@@ -262,6 +262,92 @@ function rDash(){
   '</div></div>';
 }
 
+
+function rDeliverables(f){
+  var dlvs=f.deliverables||[];
+  var did=f._id||'new';
+  var suffix=did;
+
+  var html='<div style="border:1px solid #C8E6D4;border-radius:12px;overflow:hidden;margin-bottom:18px">';
+  // Header
+  html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128203; Deliverables Tracker</div>';
+  html+='<div style="font-size:11px;color:#F5E6C3">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+'</div>';
+  html+='</div>';
+
+  // Add row
+  html+='<div style="padding:14px 18px;background:#E8F5EE;border-bottom:1px solid #C8E6D4">';
+  html+='<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:8px;letter-spacing:.7px">ADD NEW DELIVERABLE</div>';
+  html+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 80px auto;gap:8px;align-items:end">';
+  html+='<div><div class="field-lbl" style="font-size:10px">Deliverable Name *</div><input id="dlv-name-'+suffix+'" placeholder="e.g. Financial Model"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">Owner</div><input id="dlv-owner-'+suffix+'" placeholder="e.g. Vincent"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">Start Date</div><input type="date" id="dlv-start-'+suffix+'"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">End Date</div><input type="date" id="dlv-end-'+suffix+'"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">% Done <span id="dlv-pct-lbl-'+suffix+'" style="color:#2D6A4F;font-weight:700">0%</span></div>';
+  html+='<input type="range" id="dlv-pct-'+suffix+'" min="0" max="100" value="0" class="new-pct-slider" data-suffix="'+suffix+'" style="width:100%;accent-color:#2D6A4F"/></div>';
+  html+='<button type="button" class="add-dlv-btn" data-did="'+suffix+'" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;align-self:end">+ Add</button>';
+  html+='</div></div>';
+
+  // Table
+  if(dlvs.length>0){
+    html+='<div style="overflow-x:auto"><table style="margin:0">';
+    html+='<thead><tr style="background:#1A4731">';
+    ['DELIVERABLE','OWNER','% DONE','PROGRESS','START','END',''].forEach(function(h){
+      html+='<th style="color:#F5E6C3;padding:9px 12px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap;text-align:left">'+h+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+
+    dlvs.forEach(function(d,idx){
+      var pct=d.progress||0;
+      var barCol=pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb';
+      var isEditing=S.editDlvId===d._id;
+
+      if(isEditing){
+        // Edit row
+        html+='<tr style="background:#FDF8EE;border-top:1px solid #F5E6C3">';
+        html+='<td style="padding:8px 10px"><input id="edit-dlv-name-'+d._id+'" value="'+e(d.name)+'" style="font-size:12px;padding:6px 8px"/></td>';
+        html+='<td style="padding:8px 10px"><input id="edit-dlv-owner-'+d._id+'" value="'+e(d.owner||'')+'" placeholder="Owner" style="font-size:12px;padding:6px 8px"/></td>';
+        html+='<td style="padding:8px 10px" colspan="1">';
+        html+='<div style="display:flex;align-items:center;gap:6px">';
+        html+='<input type="range" id="edit-dlv-pct-'+d._id+'" min="0" max="100" value="'+pct+'" class="edit-pct-slider" data-dlvid="'+d._id+'" style="width:80px;accent-color:'+barCol+'"/>';
+        html+='<span id="edit-pct-lbl-'+d._id+'" style="font-size:12px;font-weight:700;color:'+barCol+'">'+pct+'%</span>';
+        html+='</div></td>';
+        html+='<td></td>';
+        html+='<td style="padding:8px 10px"><input type="date" id="edit-dlv-start-'+d._id+'" value="'+e(d.start||'')+'" style="font-size:12px;padding:6px 8px"/></td>';
+        html+='<td style="padding:8px 10px"><input type="date" id="edit-dlv-end-'+d._id+'" value="'+e(d.end||'')+'" style="font-size:12px;padding:6px 8px"/></td>';
+        html+='<td style="padding:8px 10px;white-space:nowrap">';
+        html+='<button type="button" class="save-edit-dlv" data-did="'+suffix+'" data-dlvid="'+d._id+'" style="background:#2D6A4F;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;margin-right:4px">Save</button>';
+        html+='<button type="button" class="cancel-edit-dlv" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Cancel</button>';
+        html+='</td></tr>';
+      } else {
+        // View row
+        html+='<tr style="background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
+        html+='<td style="padding:9px 12px;font-weight:600;color:#1A4731;min-width:160px">'+e(d.name)+'</td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;white-space:nowrap">'+e(d.owner||'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;text-align:center">';
+        html+='<span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+barCol+'">'+pct+'%</span>';
+        html+='</td>';
+        html+='<td style="padding:9px 12px;min-width:140px">';
+        html+='<div style="display:flex;align-items:center;gap:8px">';
+        html+='<input type="range" min="0" max="100" value="'+pct+'" class="prog-slider" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="flex:1;accent-color:'+barCol+'"/>';
+        html+='<span id="prog-lbl-'+e(d._id)+'" style="font-size:11px;font-weight:700;color:'+barCol+';width:32px">'+pct+'%</span>';
+        html+='</div></td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.start||'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.end||'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;white-space:nowrap">';
+        html+='<button type="button" class="edit-dlv-btn" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-right:4px">Edit</button>';
+        html+='<button type="button" class="del-dlv-btn" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;font-weight:700;padding:0 4px">&#10005;</button>';
+        html+='</td></tr>';
+      }
+    });
+    html+='</tbody></table></div>';
+  } else {
+    html+='<div style="padding:20px;text-align:center;color:#5A7A65;font-size:13px;background:#fff">No deliverables yet. Add one above.</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
 function rDealForm(){
   var f=S.form||bDeal();var isE=S.eid!==null;
   var svc=f.serviceType||'';
@@ -313,6 +399,7 @@ function rDealForm(){
         '<div style="grid-column:1/-1"><div class="field-lbl">Key Deliverables Overview</div><textarea name="consultDeliverables" placeholder="What will be delivered at the end of this engagement?" style="min-height:70px">'+e(f.consultDeliverables||'')+'</textarea></div>'+
       '</div>'+
     '</div>';
+    svcSection+=rDeliverables(f);
   } else if(svc==='Business Brokerage'){
     svcSection='<div style="background:#FDF8EE;border:1px solid #F5E6C3;border-radius:12px;padding:18px;margin-bottom:18px">'+
       '<div style="font-size:13px;font-weight:800;color:#C8972A;margin-bottom:14px">&#127968; Business Brokerage Details</div>'+
@@ -326,6 +413,7 @@ function rDealForm(){
         '<div style="grid-column:1/-1"><div class="field-lbl">Business Description (for listing)</div><textarea name="bizDescription" placeholder="Describe the business for potential buyers..." style="min-height:70px">'+e(f.bizDescription||'')+'</textarea></div>'+
       '</div>'+
     '</div>';
+    svcSection+=rDeliverables(f);
   } else if(svc==='Business Funding'){
     svcSection='<div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:18px;margin-bottom:18px">'+
       '<div style="font-size:13px;font-weight:800;color:#7c3aed;margin-bottom:14px">&#128176; Business Funding Details</div>'+
@@ -339,87 +427,12 @@ function rDealForm(){
         '<div style="grid-column:1/-1"><div class="field-lbl">Investor Pitch Summary</div><textarea name="pitchSummary" placeholder="Brief summary of the investment opportunity..." style="min-height:70px">'+e(f.pitchSummary||'')+'</textarea></div>'+
       '</div>'+
     '</div>';
+    svcSection+=rDeliverables(f);
   }
 
-  /* Deliverables project tracker */
-  var dlvs=f.deliverables||[];
-  var delivSection='<div style="border:1px solid #C8E6D4;border-radius:12px;overflow:hidden;margin-bottom:18px">'+
-    '<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">'+
-      '<div style="color:#fff;font-size:14px;font-weight:800">&#128203; Deliverables Tracker</div>'+
-      '<div style="font-size:11px;color:#F5E6C3">'+(dlvs.length)+' deliverable'+(dlvs.length!==1?'s':'')+'</div>'+
-    '</div>'+
+  var delivSection='';
 
-    /* Add deliverable row */
-    '<div style="padding:14px 18px;background:#E8F5EE;border-bottom:1px solid #C8E6D4">'+
-      '<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:8px;letter-spacing:.7px">ADD DELIVERABLE</div>'+
-      '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end">'+
-        '<div><div class="field-lbl" style="font-size:10px">Deliverable Name</div><input id="dlv-name-'+e(f._id||'new')+'" placeholder="e.g. Financial Model"/></div>'+
-        '<div><div class="field-lbl" style="font-size:10px">Owner</div><input id="dlv-owner-'+e(f._id||'new')+'" placeholder="e.g. Vincent"/></div>'+
-        '<div><div class="field-lbl" style="font-size:10px">Start</div><input type="date" id="dlv-start-'+e(f._id||'new')+'"/></div>'+
-        '<div><div class="field-lbl" style="font-size:10px">End</div><input type="date" id="dlv-end-'+e(f._id||'new')+'"/></div>'+
-        '<button type="button" class="add-dlv" data-did="'+e(f._id||'new')+'" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">+ Add</button>'+
-      '</div>'+
-    '</div>'+
-
-    /* Deliverables table */
-    (dlvs.length>0?
-      '<div style="overflow-x:auto">'+
-      '<table style="margin:0">'+
-        '<thead><tr style="background:#1A4731">'+
-          '<th style="color:#F5E6C3;padding:10px 14px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">DELIVERABLE NAME</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px">OWNER</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">START</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">END</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">% DONE</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">PROGRESS</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">GANTT</th>'+
-          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700"></th>'+
-        '</tr></thead>'+
-        '<tbody>'+
-        dlvs.map(function(d,idx){
-          var pct=d.progress||0;
-          var barCol=pct===100?'#16a34a':pct>=50?'#2D6A4F':'#C8972A';
-          /* Simple Gantt: compute relative bar position if dates available */
-          var ganttBar='';
-          if(d.start&&d.end&&f.startDate){
-            var pStart=new Date(f.startDate).getTime(),pEnd=new Date(f.endDate||d.end).getTime();
-            var dStart=new Date(d.start).getTime(),dEnd=new Date(d.end).getTime();
-            var totalSpan=pEnd-pStart||1;
-            var left=Math.max(0,Math.min(100,Math.round((dStart-pStart)/totalSpan*100)));
-            var width=Math.max(4,Math.min(100-left,Math.round((dEnd-dStart)/totalSpan*100)));
-            ganttBar='<div style="position:relative;height:18px;background:#E8F5EE;border-radius:4px;overflow:hidden">'+
-              '<div style="position:absolute;left:'+left+'%;width:'+width+'%;height:100%;background:'+barCol+';border-radius:4px;opacity:.85"></div>'+
-              '<div style="position:absolute;left:'+left+'%;width:'+(width*pct/100)+'%;height:100%;background:'+barCol+';border-radius:4px"></div>'+
-            '</div>';
-          } else {
-            ganttBar='<div style="height:18px;background:#E8F5EE;border-radius:4px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+barCol+'"></div></div>';
-          }
-          return '<tr style="background:'+(idx%2===0?'#fff':'#fafdfb')+'">'+
-            '<td style="padding:10px 14px;font-weight:600;color:#1A4731;min-width:180px">'+e(d.name)+'</td>'+
-            '<td style="padding:10px 14px;color:#5A7A65;white-space:nowrap">'+e(d.owner||'&mdash;')+'</td>'+
-            '<td style="padding:10px 14px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.start||'&mdash;')+'</td>'+
-            '<td style="padding:10px 14px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.end||'&mdash;')+'</td>'+
-            '<td style="padding:10px 14px;text-align:center">'+
-              '<span style="display:inline-block;min-width:42px;padding:4px 8px;border-radius:20px;font-size:13px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+(pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb')+';border:1px solid '+(pct===100?'#86efac':pct>=65?'#C8E6D4':pct>=35?'#F5E6C3':'#bfdbfe')+'">'+pct+'%</span>'+
-              '</td>'+
-            '<td style="padding:10px 14px;min-width:160px">'+
-              '<div style="display:flex;align-items:center;gap:8px">'+
-                '<input type="range" min="0" max="100" value="'+pct+'" class="prog-slider" data-did="'+e(f._id||'new')+'" data-dlvid="'+e(d._id)+'" style="flex:1;accent-color:'+barCol+'"/>'+
-                '<span id="prog-lbl-'+e(d._id)+'" style="font-size:12px;font-weight:700;color:'+barCol+';width:36px">'+pct+'%</span>'+
-              '</div>'+
-            '</td>'+
-            '<td style="padding:10px 14px;min-width:180px">'+ganttBar+'</td>'+
-            '<td style="padding:10px 14px">'+
-              '<button type="button" class="del-dlv" data-did="'+e(f._id||'new')+'" data-dlvid="'+e(d._id)+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;font-weight:700">&#10005;</button>'+
-            '</td>'+
-          '</tr>';
-        }).join('')+
-        '</tbody>'+
-      '</table></div>'
-    :'<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px">No deliverables yet. Add one above.</div>')+
-  '</div>';
-
-  var bottomBtns=
+    var bottomBtns=
     '<div style="margin-top:20px;border-top:1px solid #C8E6D4;padding-top:18px">'+
       '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">'+
         '<span style="display:inline-flex;align-items:center;gap:5px"><span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">SAVE</span>Saves progress, can be revisited</span>'+
@@ -924,25 +937,86 @@ function rApprovalModal(){
   '</div>';
 }
 
+function getNewDlvData(suffix){
+  var name=(document.getElementById('dlv-name-'+suffix)||{}).value||'';
+  var owner=(document.getElementById('dlv-owner-'+suffix)||{}).value||'';
+  var start=(document.getElementById('dlv-start-'+suffix)||{}).value||'';
+  var end=(document.getElementById('dlv-end-'+suffix)||{}).value||'';
+  var pct=parseInt((document.getElementById('dlv-pct-'+suffix)||{}).value)||0;
+  return {name:name,owner:owner,start:start,end:end,progress:pct};
+}
+function clearDlvInputs(suffix){
+  ['dlv-name-','dlv-owner-','dlv-start-','dlv-end-'].forEach(function(id){var el=document.getElementById(id+suffix);if(el) el.value='';});
+  var pe=document.getElementById('dlv-pct-'+suffix);if(pe) pe.value='0';
+  var pl=document.getElementById('dlv-pct-lbl-'+suffix);if(pl) pl.textContent='0%';
+}
 function addDeliverable(dealId){
-  var name=(document.getElementById('dlv-name-'+dealId)||{}).value||'';
-  var owner=(document.getElementById('dlv-owner-'+dealId)||{}).value||'';
-  var start=(document.getElementById('dlv-start-'+dealId)||{}).value||'';
-  var end=(document.getElementById('dlv-end-'+dealId)||{}).value||'';
-  if(!name.trim()){flash('Deliverable name required.','err');return;}
-  var d={_id:'DLV'+Date.now(),name:name,owner:owner,start:start,end:end,progress:0};
-  S.deals=S.deals.map(function(x){return x._id===dealId?Object.assign({},x,{deliverables:(x.deliverables||[]).concat([d])}):x;});
+  var d=getNewDlvData(dealId);
+  if(!d.name.trim()){flash('Deliverable name is required.','err');return;}
+  var dlv={_id:'DLV'+Date.now(),name:d.name,owner:d.owner,start:d.start,end:d.end,progress:d.progress};
+  S.deals=S.deals.map(function(x){return x._id===dealId?Object.assign({},x,{deliverables:(x.deliverables||[]).concat([dlv])}):x;});
+  clearDlvInputs(dealId);
+  var updated=S.deals.filter(function(x){return x._id===dealId;})[0];
+  if(updated) syncDeal(updated);
   render();
 }
+function addDlvToNewForm(){
+  var d=getNewDlvData('new');
+  if(!d.name.trim()){flash('Deliverable name is required.','err');return;}
+  var cur=Object.assign({},S.form||bDeal(),gDF());
+  cur.deliverables=(cur.deliverables||[]).concat([{_id:'DLV'+Date.now(),name:d.name,owner:d.owner,start:d.start,end:d.end,progress:d.progress}]);
+  S.form=cur;
+  render();
+}
+function startEditDlv(dealId,dId){
+  S.editDlvId=dId;S.editDlvDealId=dealId;render();
+}
+function saveEditDlv(dealId,dId){
+  var name=(document.getElementById('edit-dlv-name-'+dId)||{}).value||'';
+  var owner=(document.getElementById('edit-dlv-owner-'+dId)||{}).value||'';
+  var start=(document.getElementById('edit-dlv-start-'+dId)||{}).value||'';
+  var end=(document.getElementById('edit-dlv-end-'+dId)||{}).value||'';
+  var pct=parseInt((document.getElementById('edit-dlv-pct-'+dId)||{}).value)||0;
+  if(!name.trim()){flash('Name required.','err');return;}
+  if(dealId==='new'){
+    var cur=Object.assign({},S.form||bDeal());
+    cur.deliverables=(cur.deliverables||[]).map(function(d){return d._id===dId?Object.assign({},d,{name:name,owner:owner,start:start,end:end,progress:pct}):d;});
+    S.form=cur;
+  } else {
+    S.deals=S.deals.map(function(x){
+      if(x._id!==dealId) return x;
+      var updated=Object.assign({},x,{deliverables:(x.deliverables||[]).map(function(d){return d._id===dId?Object.assign({},d,{name:name,owner:owner,start:start,end:end,progress:pct}):d;})});
+      syncDeal(updated);return updated;
+    });
+  }
+  S.editDlvId=null;S.editDlvDealId=null;render();
+}
+function cancelEditDlv(){S.editDlvId=null;S.editDlvDealId=null;render();}
 function updateProgress(dealId,dId,val){
-  S.deals=S.deals.map(function(x){
-    if(x._id!==dealId) return x;
-    return Object.assign({},x,{deliverables:(x.deliverables||[]).map(function(d){return d._id===dId?Object.assign({},d,{progress:parseInt(val)||0}):d;})});
-  });
+  if(dealId==='new'){
+    var cur=Object.assign({},S.form||bDeal());
+    cur.deliverables=(cur.deliverables||[]).map(function(d){return d._id===dId?Object.assign({},d,{progress:parseInt(val)||0}):d;});
+    S.form=cur;
+  } else {
+    S.deals=S.deals.map(function(x){
+      if(x._id!==dealId) return x;
+      return Object.assign({},x,{deliverables:(x.deliverables||[]).map(function(d){return d._id===dId?Object.assign({},d,{progress:parseInt(val)||0}):d;})});
+    });
+  }
   var lbl=document.getElementById('prog-lbl-'+dId);if(lbl) lbl.textContent=val+'%';
 }
 function deleteDeliverable(dealId,dId){
-  S.deals=S.deals.map(function(x){return x._id===dealId?Object.assign({},x,{deliverables:(x.deliverables||[]).filter(function(d){return d._id!==dId;})}):x;});
+  if(dealId==='new'){
+    var cur=Object.assign({},S.form||bDeal());
+    cur.deliverables=(cur.deliverables||[]).filter(function(d){return d._id!==dId;});
+    S.form=cur;
+  } else {
+    S.deals=S.deals.map(function(x){
+      if(x._id!==dealId) return x;
+      var updated=Object.assign({},x,{deliverables:(x.deliverables||[]).filter(function(d){return d._id!==dId;})});
+      syncDeal(updated);return updated;
+    });
+  }
   render();
 }
 
@@ -1284,6 +1358,57 @@ function bind(){
   var gwPrev=document.getElementById('gw-prev');if(gwPrev) gwPrev.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)-1;render();});
   var gwNext=document.getElementById('gw-next');if(gwNext) gwNext.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)+1;render();});
   var gwToday=document.getElementById('gw-today');if(gwToday) gwToday.addEventListener('click',function(){S.ganttWeek=0;render();});
+  // Service type selector
+  document.querySelectorAll('.svc-sel').forEach(function(el){
+    el.addEventListener('click',function(){
+      var cur=Object.assign({},S.form||bDeal(),gDF());
+      cur.serviceType=el.dataset.svc;
+      S.form=cur;render();
+    });
+  });
+  // Add deliverable buttons
+  document.querySelectorAll('.add-dlv-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      var did=el.dataset.did;
+      if(did==='new'){addDlvToNewForm();}else{addDeliverable(did);}
+    });
+  });
+  // New deliverable % slider live update
+  document.querySelectorAll('.new-pct-slider').forEach(function(el){
+    el.addEventListener('input',function(){
+      var lbl=document.getElementById('dlv-pct-lbl-'+el.dataset.suffix);
+      if(lbl) lbl.textContent=el.value+'%';
+    });
+  });
+  // Edit deliverable % slider live update
+  document.querySelectorAll('.edit-pct-slider').forEach(function(el){
+    el.addEventListener('input',function(){
+      var lbl=document.getElementById('edit-pct-lbl-'+el.dataset.dlvid);
+      if(lbl) lbl.textContent=el.value+'%';
+    });
+  });
+  // Edit/Save/Cancel deliverable
+  document.querySelectorAll('.edit-dlv-btn').forEach(function(el){
+    el.addEventListener('click',function(){startEditDlv(el.dataset.did,el.dataset.dlvid);});
+  });
+  document.querySelectorAll('.save-edit-dlv').forEach(function(el){
+    el.addEventListener('click',function(){saveEditDlv(el.dataset.did,el.dataset.dlvid);});
+  });
+  document.querySelectorAll('.cancel-edit-dlv').forEach(function(el){
+    el.addEventListener('click',function(){cancelEditDlv();});
+  });
+  // Delete deliverable
+  document.querySelectorAll('.del-dlv-btn').forEach(function(el){
+    el.addEventListener('click',function(){deleteDeliverable(el.dataset.did,el.dataset.dlvid);});
+  });
+  // Progress sliders on existing deliverables
+  document.querySelectorAll('.prog-slider').forEach(function(el){
+    el.addEventListener('input',function(){
+      updateProgress(el.dataset.did,el.dataset.dlvid,el.value);
+      var found=el.dataset.did!=='new'?S.deals.filter(function(x){return x._id===el.dataset.did;})[0]:null;
+      if(found) setTimeout(function(){syncDeal(found);},800);
+    });
+  });
 }
 
 function bRF(){
