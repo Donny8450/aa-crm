@@ -118,10 +118,10 @@ function loadFromSupabase(){
 }
 
 function syncDeal(deal){
-  sbUpsert('deals', deal._id, deal).catch(function(){flash('Sync error — check connection.','err');});
+  sbUpsert('deals', deal._id, deal).catch(function(){flash('Sync error - check connection.','err');});
 }
 function syncLead(lead){
-  sbUpsert('leads', lead._id, lead).catch(function(){flash('Sync error — check connection.','err');});
+  sbUpsert('leads', lead._id, lead).catch(function(){flash('Sync error - check connection.','err');});
 }
 function syncNote(note){
   sbUpsert('notes', note._id, note).catch(function(){flash('Sync error.','err');});
@@ -1092,7 +1092,7 @@ function rGantt(){
   });
   html+='</div></div>';
 
-  // ── If a specific project is selected — show detail view ─────────────────
+  // ── If a specific project is selected - show detail view ─────────────────
   if(S.ganttDeal!==null){
     var selDeal=S.deals.filter(function(x){return x._id===S.ganttDeal;})[0];
     if(selDeal){
@@ -1107,9 +1107,10 @@ function rGantt(){
       html+='<div style="color:#ffffff99;font-size:12px;margin-top:2px">'+e(selDeal.serviceType||'')+(selDeal.startDate?' &nbsp;&middot;&nbsp; '+selDeal.startDate+' to '+(selDeal.endDate||'TBD'):'')+'</div></div>';
       html+='<div style="display:flex;align-items:center;gap:12px">';
       html+='<div style="text-align:center"><div style="font-size:28px;font-weight:900;color:#fff">'+avgPct+'%</div><div style="font-size:10px;color:#ffffff99;font-weight:600">OVERALL</div></div>';
-      html+='<div style="width:60px;height:60px;border-radius:50%;background:#ffffff20;display:flex;align-items:center;justify-content:center;position:relative">';
-      html+='<svg width="60" height="60" style="position:absolute;top:0;left:0;transform:rotate(-90deg)"><circle cx="30" cy="30" r="24" fill="none" stroke="#ffffff30" stroke-width="6"/><circle cx="30" cy="30" r="24" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="'+Math.round(150.8*avgPct/100)+' 150.8" stroke-linecap="round"/></svg>';
+      html+='<div style="width:60px;height:60px;border-radius:50%;background:conic-gradient(#ffffff '+avgPct+'%,rgba(255,255,255,.2) '+avgPct+'%);display:flex;align-items:center;justify-content:center;position:relative">';
+      html+='<div style="width:44px;height:44px;border-radius:50%;background:'+col+';display:flex;align-items:center;justify-content:center">';
       html+='<span style="font-size:11px;font-weight:800;color:#fff">'+avgPct+'%</span></div>';
+      html+='</div>';
       html+='</div></div>';
 
       // ── Horizontal bar chart per deliverable ─────────────────────────────
@@ -1144,7 +1145,7 @@ function rGantt(){
 
       // ── Mini weekly Gantt for this deal ───────────────────────────────────
       html+='<div style="padding:0 20px 20px">';
-      html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:10px">&#128197; This Week's Schedule</div>';
+      html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:10px">&#128197; This Week Schedule</div>';
       html+='<div style="border-radius:10px;border:1px solid #C8E6D4;overflow:hidden">';
       html+='<div style="display:grid;grid-template-columns:160px repeat(7,1fr);background:'+col+'">';
       html+='<div style="padding:8px 12px;color:#fff;font-size:11px;font-weight:700">DELIVERABLE</div>';
@@ -1375,7 +1376,7 @@ function bind(){
     var t=(document.getElementById('nt')||{}).value;if(!t||!t.trim()){flash('Note empty.','err');return;}
     var lid=(document.getElementById('nl')||{}).value;
     var lead=S.leads.filter(function(l){return l._id===lid;})[0];
-    var newNote={_id:'N'+S.nid++,leadName:lead?lead.contactPerson+(lead.organization?' — '+lead.organization:''):null,text:t,date:new Date().toLocaleString()};
+    var newNote={_id:'N'+S.nid++,leadName:lead?lead.contactPerson+(lead.organization?' - '+lead.organization:''):null,text:t,date:new Date().toLocaleString()};
     S.notes=S.notes.concat([newNote]);
     syncNote(newNote);
     flash('Note saved!');render();
