@@ -215,13 +215,13 @@ function rApp(){
       '</div>'+
     '</div>'+
     '<div style="display:flex;margin-top:2px">'+
-      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')']].map(function(x){
+      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt']].map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
       }).join('')+
     '</div>'+
   '</div>'+
   '<div style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
-    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():''))+
+    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   '</div>';
@@ -370,6 +370,7 @@ function rDealForm(){
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px">OWNER</th>'+
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">START</th>'+
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">END</th>'+
+          '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">% DONE</th>'+
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">PROGRESS</th>'+
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.7px;white-space:nowrap">GANTT</th>'+
           '<th style="color:#F5E6C3;padding:10px 14px;font-size:11px;font-weight:700"></th>'+
@@ -398,6 +399,9 @@ function rDealForm(){
             '<td style="padding:10px 14px;color:#5A7A65;white-space:nowrap">'+e(d.owner||'&mdash;')+'</td>'+
             '<td style="padding:10px 14px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.start||'&mdash;')+'</td>'+
             '<td style="padding:10px 14px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.end||'&mdash;')+'</td>'+
+            '<td style="padding:10px 14px;text-align:center">'+
+              '<span style="display:inline-block;min-width:42px;padding:4px 8px;border-radius:20px;font-size:13px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+(pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb')+';border:1px solid '+(pct===100?'#86efac':pct>=65?'#C8E6D4':pct>=35?'#F5E6C3':'#bfdbfe')+'">'+pct+'%</span>'+
+              '</td>'+
             '<td style="padding:10px 14px;min-width:160px">'+
               '<div style="display:flex;align-items:center;gap:8px">'+
                 '<input type="range" min="0" max="100" value="'+pct+'" class="prog-slider" data-did="'+e(f._id||'new')+'" data-dlvid="'+e(d._id)+'" style="flex:1;accent-color:'+barCol+'"/>'+
@@ -947,6 +951,194 @@ function dcsv(rows,fn){
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn;a.click();
 }
 
+function rGantt(){
+  // Gather all deliverables across all deals
+  var allRows=[];
+  S.deals.forEach(function(d){
+    var dlvs=d.deliverables||[];
+    dlvs.forEach(function(dlv){
+      allRows.push({
+        dealId:d.dealId||'',
+        bizName:d.bizName||'Unknown',
+        serviceType:d.serviceType||'',
+        name:dlv.name||'',
+        owner:dlv.owner||'',
+        start:dlv.start||'',
+        end:dlv.end||'',
+        progress:dlv.progress||0,
+        dealStart:d.startDate||'',
+        dealEnd:d.endDate||''
+      });
+    });
+  });
+
+  // Compute overall date range across all deliverables
+  var allDates=allRows.filter(function(r){return r.start&&r.end;});
+  var minDate=allDates.length?allDates.reduce(function(m,r){return r.start<m?r.start:m;},allDates[0].start):'';
+  var maxDate=allDates.length?allDates.reduce(function(m,r){return r.end>m?r.end:m;},allDates[0].end):'';
+
+  // Week filter state
+  var weekOffset=S.ganttWeek||0;
+
+  // Compute week range (Monday to Sunday)
+  var today=new Date();
+  today.setHours(0,0,0,0);
+  var dayOfWeek=today.getDay();
+  var monday=new Date(today);
+  monday.setDate(today.getDate()-((dayOfWeek+6)%7)+(weekOffset*7));
+  var weekDays=[];
+  for(var i=0;i<7;i++){
+    var d2=new Date(monday);
+    d2.setDate(monday.getDate()+i);
+    weekDays.push(d2);
+  }
+  var wStart=weekDays[0];
+  var wEnd=weekDays[6];
+
+  function fmt(d){return d.toISOString().slice(0,10);}
+  function fmtDisp(d){return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay()===0?6:d.getDay()-1]+' '+d.getDate()+'/'+('0'+(d.getMonth()+1)).slice(-2);}
+  function fmtMonth(d){return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();}
+
+  // Filter rows relevant to this week (overlapping)
+  var weekRows=allRows.filter(function(r){
+    if(!r.start||!r.end) return true; // show undated ones too
+    return r.start<=fmt(wEnd)&&r.end>=fmt(wStart);
+  });
+
+  var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
+
+  var html='<div>';
+
+  // Header
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">';
+  html+='<div><div style="font-size:20px;font-weight:900;color:#1A4731">&#128197; Gantt Chart</div>';
+  html+='<div style="font-size:12px;color:#5A7A65;margin-top:2px">Deliverable tracking across all deals</div></div>';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<button id="gw-prev" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">&#8592; Prev Week</button>';
+  html+='<div style="text-align:center;min-width:160px"><div style="font-size:14px;font-weight:800;color:#1A4731">'+fmtMonth(wStart)+'</div>';
+  html+='<div style="font-size:12px;color:#5A7A65">'+wStart.getDate()+'/'+('0'+(wStart.getMonth()+1)).slice(-2)+' &mdash; '+wEnd.getDate()+'/'+('0'+(wEnd.getMonth()+1)).slice(-2)+'</div></div>';
+  html+='<button id="gw-next" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Next Week &#8594;</button>';
+  html+='<button id="gw-today" style="background:#1A4731;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Today</button>';
+  html+='</div></div>';
+
+  // Summary cards
+  var totalDlvs=allRows.length;
+  var doneDlvs=allRows.filter(function(r){return r.progress===100;}).length;
+  var inProgDlvs=allRows.filter(function(r){return r.progress>0&&r.progress<100;}).length;
+  var notStarted=allRows.filter(function(r){return r.progress===0;}).length;
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">';
+  [['Total Deliverables',totalDlvs,'#5A7A65','#E8F5EE'],['Completed',doneDlvs,'#16a34a','#f0fdf4'],['In Progress',inProgDlvs,'#C8972A','#FDF8EE'],['Not Started',notStarted,'#2563eb','#eff6ff']].forEach(function(x){
+    html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'40;border-radius:10px;padding:12px 16px"><div style="font-size:11px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[0].toUpperCase()+'</div><div style="font-size:26px;font-weight:900;color:'+x[2]+'">'+x[1]+'</div></div>';
+  });
+  html+='</div>';
+
+  if(allRows.length===0){
+    html+='<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#128197;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">No deliverables yet</div><div style="font-size:13px;color:#5A7A65">Add deliverables to your deals to see them here.</div></div>';
+    html+='</div>';
+    return html;
+  }
+
+  // ── Weekly Gantt Grid ────────────────────────────────────────────────────
+  html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden;margin-bottom:24px">';
+
+  // Column headers row
+  html+='<div style="display:grid;grid-template-columns:220px 80px 80px repeat(7,1fr);background:#1A4731">';
+  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">DELIVERABLE</div>';
+  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">OWNER</div>';
+  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">DONE</div>';
+  weekDays.forEach(function(d){
+    var isToday=fmt(d)===fmt(today);
+    var isWeekend=d.getDay()===0||d.getDay()===6;
+    html+='<div style="padding:10px 6px;text-align:center;color:'+(isToday?'#F5E6C3':'#C8E6D490')+';font-size:11px;font-weight:'+(isToday?'800':'600')+';border-left:1px solid #2D6A4F40;background:'+(isToday?'#2D6A4F30':isWeekend?'#1A473180':'')+'">'+fmtDisp(d)+'</div>';
+  });
+  html+='</div>';
+
+  // Rows
+  if(weekRows.length===0){
+    html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px;background:#fff">No deliverables active this week.</div>';
+  } else {
+    weekRows.forEach(function(r,idx){
+      var col=svcColors[r.serviceType]||'#2D6A4F';
+      var pct=r.progress||0;
+      var barCol=pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb';
+      html+='<div style="display:grid;grid-template-columns:220px 80px 80px repeat(7,1fr);background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
+      // Deliverable name + deal
+      html+='<div style="padding:10px 14px;border-right:1px solid #E8F5EE">';
+      html+='<div style="font-size:12px;font-weight:700;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.name)+'</div>';
+      html+='<div style="font-size:10px;color:'+col+';font-weight:600;margin-top:2px">'+e(r.bizName)+'</div>';
+      html+='</div>';
+      // Owner
+      html+='<div style="padding:10px 8px;font-size:11px;color:#5A7A65;border-right:1px solid #E8F5EE;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.owner||'&mdash;')+'</div>';
+      // % done badge
+      html+='<div style="padding:10px 6px;text-align:center;border-right:1px solid #E8F5EE"><span style="display:inline-block;padding:3px 7px;border-radius:20px;font-size:11px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+barCol+'">'+pct+'%</span></div>';
+      // Day cells
+      weekDays.forEach(function(d){
+        var ds=fmt(d);
+        var isToday=ds===fmt(today);
+        var isWeekend=d.getDay()===0||d.getDay()===6;
+        var inRange=r.start&&r.end&&ds>=r.start&&ds<=r.end;
+        var isStart=r.start===ds;
+        var isEnd=r.end===ds;
+        var bg=isToday?'#E8F5EE40':isWeekend?'#fafdfb':'';
+        html+='<div style="padding:6px 3px;border-left:1px solid #E8F5EE;background:'+bg+';position:relative">';
+        if(inRange){
+          var fillW=pct+'%';
+          var radius=isStart&&isEnd?'6px':isStart?'6px 0 0 6px':isEnd?'0 6px 6px 0':'0';
+          html+='<div style="height:22px;background:'+barCol+'22;border-radius:'+radius+';overflow:hidden;position:relative">';
+          html+='<div style="width:'+fillW+';height:100%;background:'+barCol+';opacity:.8"></div>';
+          if(isStart) html+='<div style="position:absolute;left:3px;top:3px;font-size:9px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;max-width:90%">'+e(r.name.split(' ')[0])+'</div>';
+          html+='</div>';
+        }
+        html+='</div>';
+      });
+      html+='</div>';
+    });
+  }
+  html+='</div>';
+
+  // ── Horizontal bar chart — all deliverables progress ────────────────────
+  html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden">';
+  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Overall Progress — All Deliverables</div></div>';
+  html+='<div style="padding:16px 18px;background:#fff">';
+
+  // Group by deal
+  var dealGroups={};
+  var dealOrder=[];
+  allRows.forEach(function(r){
+    if(!dealGroups[r.bizName]){dealGroups[r.bizName]={svc:r.serviceType,rows:[]};dealOrder.push(r.bizName);}
+    dealGroups[r.bizName].rows.push(r);
+  });
+
+  dealOrder.forEach(function(bizName){
+    var grp=dealGroups[bizName];
+    var col=svcColors[grp.svc]||'#2D6A4F';
+    var avgPct=Math.round(grp.rows.reduce(function(a,r){return a+(r.progress||0);},0)/grp.rows.length);
+    html+='<div style="margin-bottom:18px">';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    html+='<div><div style="font-size:13px;font-weight:800;color:#1A4731">'+e(bizName)+'</div>';
+    html+='<div style="font-size:11px;color:'+col+';font-weight:600">'+e(grp.svc)+'</div></div>';
+    html+='<span style="font-size:15px;font-weight:900;color:'+(avgPct===100?'#16a34a':avgPct>=65?'#2D6A4F':avgPct>=35?'#C8972A':'#2563eb')+'">'+avgPct+'%</span>';
+    html+='</div>';
+    grp.rows.forEach(function(r){
+      var pct=r.progress||0;
+      var barCol=pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb';
+      html+='<div style="display:grid;grid-template-columns:180px 1fr 48px;gap:10px;align-items:center;margin-bottom:6px">';
+      html+='<div style="font-size:12px;color:#1A4731;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e(r.name)+'">'+e(r.name)+'</div>';
+      html+='<div style="height:18px;background:#E8F5EE;border-radius:9px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'cc);border-radius:9px;transition:width .4s"></div></div>';
+      html+='<div style="font-size:12px;font-weight:800;color:'+barCol+';text-align:right">'+pct+'%</div>';
+      html+='</div>';
+    });
+    // Deal average bar
+    html+='<div style="height:4px;background:'+col+'30;border-radius:2px;margin-top:4px"><div style="width:'+avgPct+'%;height:100%;background:'+col+';border-radius:2px"></div></div>';
+    html+='</div>';
+  });
+
+  html+='</div></div>';
+  html+='</div>';
+  return html;
+}
+
+
 function bind(){
   // tabs
   document.querySelectorAll('[data-tab]').forEach(function(el){
@@ -1089,6 +1281,9 @@ function bind(){
   var soo=document.getElementById('soo');if(soo) soo.addEventListener('click',function(){var to=(document.getElementById('eto')||{}).value,sub=(document.getElementById('esb')||{}).value,body=(document.getElementById('ebo')||{}).value;if(!to){flash('No email.','err');return;}window.open('https://outlook.office.com/mail/deeplink/compose?to='+encodeURIComponent(to)+'&subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body),'_blank');});
   var smo=document.getElementById('smo');if(smo) smo.addEventListener('click',function(){var to=(document.getElementById('eto')||{}).value,sub=(document.getElementById('esb')||{}).value,body=(document.getElementById('ebo')||{}).value;if(!to){flash('No email.','err');return;}window.location.href='mailto:'+to+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);});
   bRF();
+  var gwPrev=document.getElementById('gw-prev');if(gwPrev) gwPrev.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)-1;render();});
+  var gwNext=document.getElementById('gw-next');if(gwNext) gwNext.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)+1;render();});
+  var gwToday=document.getElementById('gw-today');if(gwToday) gwToday.addEventListener('click',function(){S.ganttWeek=0;render();});
 }
 
 function bRF(){
