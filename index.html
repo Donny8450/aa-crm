@@ -152,6 +152,7 @@ var S={
   expId:null,
   did:1,lid:1,nid:1,aid:1,
   SB_LOADING:true,
+  ganttDeal:null,
   approvalModal:false,
   approvalTargetId:null,
   approvalAction:null,
@@ -872,8 +873,8 @@ function cvt(id){
   var convertedLead=Object.assign({},l,{converted:true});
   S.leads=S.leads.map(function(x){return x._id===id?convertedLead:x;});
   syncLead(convertedLead);
-  flash('"'+l.contactPerson+'" is now a Pipeline deal!');
-  setTimeout(function(){S.tab='pipeline';render();},1200);render();
+  flash('"'+l.contactPerson+'" converted to Pipeline!');
+  S.tab='pipeline';render();
 }
 
 function openApprovalModal(leadId, action){
@@ -1026,188 +1027,231 @@ function dcsv(rows,fn){
 }
 
 function rGantt(){
-  // Gather all deliverables across all deals
+  var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
+
+  // ── Collect all deliverable rows ─────────────────────────────────────────
   var allRows=[];
   S.deals.forEach(function(d){
-    var dlvs=d.deliverables||[];
-    dlvs.forEach(function(dlv){
-      allRows.push({
-        dealId:d.dealId||'',
-        bizName:d.bizName||'Unknown',
-        serviceType:d.serviceType||'',
-        name:dlv.name||'',
-        owner:dlv.owner||'',
-        start:dlv.start||'',
-        end:dlv.end||'',
-        progress:dlv.progress||0,
-        dealStart:d.startDate||'',
-        dealEnd:d.endDate||''
-      });
+    (d.deliverables||[]).forEach(function(dlv){
+      allRows.push({dealId:d._id,dealRef:d.dealId||'',bizName:d.bizName||'Unknown',serviceType:d.serviceType||'',name:dlv.name||'',owner:dlv.owner||'',start:dlv.start||'',end:dlv.end||'',progress:dlv.progress||0,dealStart:d.startDate||'',dealEnd:d.endDate||''});
     });
   });
 
-  // Compute overall date range across all deliverables
-  var allDates=allRows.filter(function(r){return r.start&&r.end;});
-  var minDate=allDates.length?allDates.reduce(function(m,r){return r.start<m?r.start:m;},allDates[0].start):'';
-  var maxDate=allDates.length?allDates.reduce(function(m,r){return r.end>m?r.end:m;},allDates[0].end):'';
-
-  // Week filter state
+  // ── Week navigation ──────────────────────────────────────────────────────
   var weekOffset=S.ganttWeek||0;
-
-  // Compute week range (Monday to Sunday)
-  var today=new Date();
-  today.setHours(0,0,0,0);
+  var today=new Date();today.setHours(0,0,0,0);
   var dayOfWeek=today.getDay();
   var monday=new Date(today);
   monday.setDate(today.getDate()-((dayOfWeek+6)%7)+(weekOffset*7));
   var weekDays=[];
-  for(var i=0;i<7;i++){
-    var d2=new Date(monday);
-    d2.setDate(monday.getDate()+i);
-    weekDays.push(d2);
-  }
-  var wStart=weekDays[0];
-  var wEnd=weekDays[6];
-
+  for(var i=0;i<7;i++){var d2=new Date(monday);d2.setDate(monday.getDate()+i);weekDays.push(d2);}
+  var wStart=weekDays[0],wEnd=weekDays[6];
   function fmt(d){return d.toISOString().slice(0,10);}
   function fmtDisp(d){return ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay()===0?6:d.getDay()-1]+' '+d.getDate()+'/'+('0'+(d.getMonth()+1)).slice(-2);}
   function fmtMonth(d){return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();}
 
-  // Filter rows relevant to this week (overlapping)
   var weekRows=allRows.filter(function(r){
-    if(!r.start||!r.end) return true; // show undated ones too
+    if(!r.start||!r.end) return false;
     return r.start<=fmt(wEnd)&&r.end>=fmt(wStart);
   });
 
-  var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
+  // ── Summary counts ───────────────────────────────────────────────────────
+  var total=allRows.length,done=allRows.filter(function(r){return r.progress===100;}).length;
+  var inProg=allRows.filter(function(r){return r.progress>0&&r.progress<100;}).length;
+  var notStart=allRows.filter(function(r){return r.progress===0;}).length;
 
   var html='<div>';
 
-  // Header
+  // ── Header + week nav ────────────────────────────────────────────────────
   html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">';
-  html+='<div><div style="font-size:20px;font-weight:900;color:#1A4731">&#128197; Gantt Chart</div>';
-  html+='<div style="font-size:12px;color:#5A7A65;margin-top:2px">Deliverable tracking across all deals</div></div>';
-  html+='<div style="display:flex;align-items:center;gap:10px">';
-  html+='<button id="gw-prev" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">&#8592; Prev Week</button>';
-  html+='<div style="text-align:center;min-width:160px"><div style="font-size:14px;font-weight:800;color:#1A4731">'+fmtMonth(wStart)+'</div>';
-  html+='<div style="font-size:12px;color:#5A7A65">'+wStart.getDate()+'/'+('0'+(wStart.getMonth()+1)).slice(-2)+' &mdash; '+wEnd.getDate()+'/'+('0'+(wEnd.getMonth()+1)).slice(-2)+'</div></div>';
-  html+='<button id="gw-next" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Next Week &#8594;</button>';
+  html+='<div><div style="font-size:20px;font-weight:900;color:#1A4731">&#128197; Gantt Chart</div><div style="font-size:12px;color:#5A7A65;margin-top:2px">Deliverable tracking across all deals &mdash; click a project to see details</div></div>';
+  html+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  html+='<button id="gw-prev" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">&#8592; Prev</button>';
+  html+='<div style="text-align:center;min-width:140px"><div style="font-size:13px;font-weight:800;color:#1A4731">'+fmtMonth(wStart)+'</div><div style="font-size:11px;color:#5A7A65">'+fmt(wStart)+' &mdash; '+fmt(wEnd)+'</div></div>';
+  html+='<button id="gw-next" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Next &#8594;</button>';
   html+='<button id="gw-today" style="background:#1A4731;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">Today</button>';
   html+='</div></div>';
 
-  // Summary cards
-  var totalDlvs=allRows.length;
-  var doneDlvs=allRows.filter(function(r){return r.progress===100;}).length;
-  var inProgDlvs=allRows.filter(function(r){return r.progress>0&&r.progress<100;}).length;
-  var notStarted=allRows.filter(function(r){return r.progress===0;}).length;
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">';
-  [['Total Deliverables',totalDlvs,'#5A7A65','#E8F5EE'],['Completed',doneDlvs,'#16a34a','#f0fdf4'],['In Progress',inProgDlvs,'#C8972A','#FDF8EE'],['Not Started',notStarted,'#2563eb','#eff6ff']].forEach(function(x){
-    html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'40;border-radius:10px;padding:12px 16px"><div style="font-size:11px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[0].toUpperCase()+'</div><div style="font-size:26px;font-weight:900;color:'+x[2]+'">'+x[1]+'</div></div>';
+  // ── Summary cards ────────────────────────────────────────────────────────
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px">';
+  [['Total',total,'#5A7A65','#E8F5EE'],['Completed',done,'#16a34a','#f0fdf4'],['In Progress',inProg,'#C8972A','#FDF8EE'],['Not Started',notStart,'#2563eb','#eff6ff'],['Deals',S.deals.length,'#7c3aed','#faf5ff']].forEach(function(x){
+    html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'40;border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[0].toUpperCase()+'</div><div style="font-size:26px;font-weight:900;color:'+x[2]+'">'+x[1]+'</div></div>';
   });
   html+='</div>';
 
-  if(allRows.length===0){
-    html+='<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#128197;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">No deliverables yet</div><div style="font-size:13px;color:#5A7A65">Add deliverables to your deals to see them here.</div></div>';
-    html+='</div>';
-    return html;
-  }
-
-  // ── Weekly Gantt Grid ────────────────────────────────────────────────────
-  html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden;margin-bottom:24px">';
-
-  // Column headers row
-  html+='<div style="display:grid;grid-template-columns:220px 80px 80px repeat(7,1fr);background:#1A4731">';
-  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">DELIVERABLE</div>';
-  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">OWNER</div>';
-  html+='<div style="padding:10px 14px;color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px">DONE</div>';
-  weekDays.forEach(function(d){
-    var isToday=fmt(d)===fmt(today);
-    var isWeekend=d.getDay()===0||d.getDay()===6;
-    html+='<div style="padding:10px 6px;text-align:center;color:'+(isToday?'#F5E6C3':'#C8E6D490')+';font-size:11px;font-weight:'+(isToday?'800':'600')+';border-left:1px solid #2D6A4F40;background:'+(isToday?'#2D6A4F30':isWeekend?'#1A473180':'')+'">'+fmtDisp(d)+'</div>';
+  // ── Project selector ─────────────────────────────────────────────────────
+  html+='<div style="margin-bottom:20px">';
+  html+='<div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:8px">SELECT PROJECT TO VIEW DETAILS</div>';
+  html+='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  html+='<button class="gantt-proj-btn'+(S.ganttDeal===null?' gp-active':'')+'" data-proj="all" style="padding:8px 16px;border-radius:8px;border:2px solid '+(S.ganttDeal===null?'#1A4731':'#C8E6D4')+';background:'+(S.ganttDeal===null?'#1A4731':'#fff')+';color:'+(S.ganttDeal===null?'#fff':'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">All Projects</button>';
+  S.deals.filter(function(d){return (d.deliverables||[]).length>0;}).forEach(function(d){
+    var col=svcColors[d.serviceType]||'#2D6A4F';
+    var on=S.ganttDeal===d._id;
+    html+='<button class="gantt-proj-btn" data-proj="'+e(d._id)+'" style="padding:8px 16px;border-radius:8px;border:2px solid '+(on?col:'#C8E6D4')+';background:'+(on?col+'18':'#fff')+';color:'+(on?col:'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">';
+    html+=e(d.bizName||d.dealId||'Deal')+'<span style="font-size:10px;font-weight:400;margin-left:5px;opacity:.7">('+d.deliverables.length+' dlvs)</span></button>';
   });
-  html+='</div>';
+  html+='</div></div>';
 
-  // Rows
-  if(weekRows.length===0){
-    html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px;background:#fff">No deliverables active this week.</div>';
-  } else {
-    weekRows.forEach(function(r,idx){
-      var col=svcColors[r.serviceType]||'#2D6A4F';
-      var pct=r.progress||0;
-      var barCol=pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb';
-      html+='<div style="display:grid;grid-template-columns:220px 80px 80px repeat(7,1fr);background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
-      // Deliverable name + deal
-      html+='<div style="padding:10px 14px;border-right:1px solid #E8F5EE">';
-      html+='<div style="font-size:12px;font-weight:700;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.name)+'</div>';
-      html+='<div style="font-size:10px;color:'+col+';font-weight:600;margin-top:2px">'+e(r.bizName)+'</div>';
-      html+='</div>';
-      // Owner
-      html+='<div style="padding:10px 8px;font-size:11px;color:#5A7A65;border-right:1px solid #E8F5EE;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.owner||'&mdash;')+'</div>';
-      // % done badge
-      html+='<div style="padding:10px 6px;text-align:center;border-right:1px solid #E8F5EE"><span style="display:inline-block;padding:3px 7px;border-radius:20px;font-size:11px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+barCol+'">'+pct+'%</span></div>';
-      // Day cells
-      weekDays.forEach(function(d){
-        var ds=fmt(d);
-        var isToday=ds===fmt(today);
-        var isWeekend=d.getDay()===0||d.getDay()===6;
-        var inRange=r.start&&r.end&&ds>=r.start&&ds<=r.end;
-        var isStart=r.start===ds;
-        var isEnd=r.end===ds;
-        var bg=isToday?'#E8F5EE40':isWeekend?'#fafdfb':'';
-        html+='<div style="padding:6px 3px;border-left:1px solid #E8F5EE;background:'+bg+';position:relative">';
-        if(inRange){
-          var fillW=pct+'%';
-          var radius=isStart&&isEnd?'6px':isStart?'6px 0 0 6px':isEnd?'0 6px 6px 0':'0';
-          html+='<div style="height:22px;background:'+barCol+'22;border-radius:'+radius+';overflow:hidden;position:relative">';
-          html+='<div style="width:'+fillW+';height:100%;background:'+barCol+';opacity:.8"></div>';
-          if(isStart) html+='<div style="position:absolute;left:3px;top:3px;font-size:9px;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;max-width:90%">'+e(r.name.split(' ')[0])+'</div>';
+  // ── If a specific project is selected — show detail view ─────────────────
+  if(S.ganttDeal!==null){
+    var selDeal=S.deals.filter(function(x){return x._id===S.ganttDeal;})[0];
+    if(selDeal){
+      var dlvs=selDeal.deliverables||[];
+      var col=svcColors[selDeal.serviceType]||'#2D6A4F';
+      var avgPct=dlvs.length?Math.round(dlvs.reduce(function(a,d){return a+(d.progress||0);},0)/dlvs.length):0;
+
+      html+='<div style="border-radius:14px;border:2px solid '+col+'40;overflow:hidden;margin-bottom:20px">';
+      // Deal header
+      html+='<div style="background:'+col+';padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">';
+      html+='<div><div style="color:#fff;font-size:16px;font-weight:900">'+e(selDeal.bizName||'Unknown')+'</div>';
+      html+='<div style="color:#ffffff99;font-size:12px;margin-top:2px">'+e(selDeal.serviceType||'')+(selDeal.startDate?' &nbsp;&middot;&nbsp; '+selDeal.startDate+' to '+(selDeal.endDate||'TBD'):'')+'</div></div>';
+      html+='<div style="display:flex;align-items:center;gap:12px">';
+      html+='<div style="text-align:center"><div style="font-size:28px;font-weight:900;color:#fff">'+avgPct+'%</div><div style="font-size:10px;color:#ffffff99;font-weight:600">OVERALL</div></div>';
+      html+='<div style="width:60px;height:60px;border-radius:50%;background:#ffffff20;display:flex;align-items:center;justify-content:center;position:relative">';
+      html+='<svg width="60" height="60" style="position:absolute;top:0;left:0;transform:rotate(-90deg)"><circle cx="30" cy="30" r="24" fill="none" stroke="#ffffff30" stroke-width="6"/><circle cx="30" cy="30" r="24" fill="none" stroke="#fff" stroke-width="6" stroke-dasharray="'+Math.round(150.8*avgPct/100)+' 150.8" stroke-linecap="round"/></svg>';
+      html+='<span style="font-size:11px;font-weight:800;color:#fff">'+avgPct+'%</span></div>';
+      html+='</div></div>';
+
+      // ── Horizontal bar chart per deliverable ─────────────────────────────
+      html+='<div style="padding:20px;background:#fff">';
+      html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:8px">&#128202; Deliverable Progress</div>';
+      if(dlvs.length===0){
+        html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables for this project yet.</div>';
+      } else {
+        dlvs.forEach(function(d){
+          var pct=d.progress||0;
+          var barCol=pct===100?'#16a34a':pct>=65?col:pct>=35?'#C8972A':'#94a3b8';
+          html+='<div style="margin-bottom:14px">';
+          html+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px">';
+          html+='<div><div style="font-size:13px;font-weight:700;color:#1A4731">'+e(d.name)+'</div>';
+          if(d.owner||d.start||d.end){
+            html+='<div style="font-size:11px;color:#5A7A65;margin-top:1px">';
+            if(d.owner) html+=e(d.owner);
+            if(d.start&&d.end) html+=(d.owner?' &nbsp;&middot;&nbsp; ':'')+e(d.start)+' &rarr; '+e(d.end);
+            html+='</div>';
+          }
           html+='</div>';
-        }
-        html+='</div>';
+          html+='<span style="font-size:16px;font-weight:900;color:'+barCol+'">'+pct+'%</span>';
+          html+='</div>';
+          html+='<div style="position:relative;height:22px;background:#E8F5EE;border-radius:11px;overflow:hidden">';
+          html+='<div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'bb);border-radius:11px;transition:width .5s;position:relative">';
+          if(pct>12) html+='<span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;color:#fff">'+pct+'%</span>';
+          html+='</div></div>';
+          html+='</div>';
+        });
+      }
+      html+='</div>';
+
+      // ── Mini weekly Gantt for this deal ───────────────────────────────────
+      html+='<div style="padding:0 20px 20px">';
+      html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:10px">&#128197; This Week's Schedule</div>';
+      html+='<div style="border-radius:10px;border:1px solid #C8E6D4;overflow:hidden">';
+      html+='<div style="display:grid;grid-template-columns:160px repeat(7,1fr);background:'+col+'">';
+      html+='<div style="padding:8px 12px;color:#fff;font-size:11px;font-weight:700">DELIVERABLE</div>';
+      weekDays.forEach(function(d){
+        var isToday=fmt(d)===fmt(today);
+        var isWknd=d.getDay()===0||d.getDay()===6;
+        html+='<div style="padding:8px 4px;text-align:center;color:'+(isToday?'#fff':'rgba(255,255,255,.6)')+';font-size:10px;font-weight:'+(isToday?'800':'500')+';border-left:1px solid rgba(255,255,255,.2);background:'+(isToday?'rgba(255,255,255,.15)':isWknd?'rgba(0,0,0,.08)':'')+'">'+fmtDisp(d)+'</div>';
       });
       html+='</div>';
-    });
-  }
-  html+='</div>';
-
-  // ── Horizontal bar chart — all deliverables progress ────────────────────
-  html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden">';
-  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Overall Progress — All Deliverables</div></div>';
-  html+='<div style="padding:16px 18px;background:#fff">';
-
-  // Group by deal
-  var dealGroups={};
-  var dealOrder=[];
-  allRows.forEach(function(r){
-    if(!dealGroups[r.bizName]){dealGroups[r.bizName]={svc:r.serviceType,rows:[]};dealOrder.push(r.bizName);}
-    dealGroups[r.bizName].rows.push(r);
-  });
-
-  dealOrder.forEach(function(bizName){
-    var grp=dealGroups[bizName];
-    var col=svcColors[grp.svc]||'#2D6A4F';
-    var avgPct=Math.round(grp.rows.reduce(function(a,r){return a+(r.progress||0);},0)/grp.rows.length);
-    html+='<div style="margin-bottom:18px">';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-    html+='<div><div style="font-size:13px;font-weight:800;color:#1A4731">'+e(bizName)+'</div>';
-    html+='<div style="font-size:11px;color:'+col+';font-weight:600">'+e(grp.svc)+'</div></div>';
-    html+='<span style="font-size:15px;font-weight:900;color:'+(avgPct===100?'#16a34a':avgPct>=65?'#2D6A4F':avgPct>=35?'#C8972A':'#2563eb')+'">'+avgPct+'%</span>';
-    html+='</div>';
-    grp.rows.forEach(function(r){
-      var pct=r.progress||0;
-      var barCol=pct===100?'#16a34a':pct>=65?'#2D6A4F':pct>=35?'#C8972A':'#2563eb';
-      html+='<div style="display:grid;grid-template-columns:180px 1fr 48px;gap:10px;align-items:center;margin-bottom:6px">';
-      html+='<div style="font-size:12px;color:#1A4731;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e(r.name)+'">'+e(r.name)+'</div>';
-      html+='<div style="height:18px;background:#E8F5EE;border-radius:9px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'cc);border-radius:9px;transition:width .4s"></div></div>';
-      html+='<div style="font-size:12px;font-weight:800;color:'+barCol+';text-align:right">'+pct+'%</div>';
+      var dealRows=allRows.filter(function(r){return r.dealId===selDeal._id;});
+      if(dealRows.length===0){
+        html+='<div style="padding:16px;text-align:center;color:#5A7A65;font-size:12px;background:#fff">No deliverables with dates.</div>';
+      } else {
+        dealRows.forEach(function(r,ri){
+          html+='<div style="display:grid;grid-template-columns:160px repeat(7,1fr);background:'+(ri%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
+          html+='<div style="padding:8px 12px;font-size:11px;font-weight:600;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e(r.name)+'">'+e(r.name)+'</div>';
+          weekDays.forEach(function(d){
+            var ds=fmt(d);
+            var isToday=ds===fmt(today);
+            var isWknd=d.getDay()===0||d.getDay()===6;
+            var inRange=r.start&&r.end&&ds>=r.start&&ds<=r.end;
+            var barCol=r.progress===100?'#16a34a':r.progress>=65?col:r.progress>=35?'#C8972A':'#94a3b8';
+            html+='<div style="padding:4px 2px;border-left:1px solid #E8F5EE;background:'+(isToday?'#E8F5EE50':isWknd?'#fafdfb':'')+'">';
+            if(inRange){
+              html+='<div style="height:20px;background:'+barCol+'22;border-radius:4px;overflow:hidden">';
+              html+='<div style="width:'+r.progress+'%;height:100%;background:'+barCol+'99"></div>';
+              html+='</div>';
+            }
+            html+='</div>';
+          });
+          html+='</div>';
+        });
+      }
+      html+='</div></div>';
       html+='</div>';
+    }
+  } else {
+    // ── All projects: weekly Gantt grid ──────────────────────────────────────
+    html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden;margin-bottom:20px">';
+    html+='<div style="display:grid;grid-template-columns:200px 70px 60px repeat(7,1fr);background:#1A4731">';
+    ['DELIVERABLE','OWNER','%','MON','TUE','WED','THU','FRI','SAT','SUN'].forEach(function(h,hi){
+      html+='<div style="padding:10px '+(hi<3?'14px':'6px')+';color:#F5E6C3;font-size:11px;font-weight:700;letter-spacing:.7px;'+(hi>=3?'text-align:center;border-left:1px solid #2D6A4F40':'')+'">'+h+'</div>';
     });
-    // Deal average bar
-    html+='<div style="height:4px;background:'+col+'30;border-radius:2px;margin-top:4px"><div style="width:'+avgPct+'%;height:100%;background:'+col+';border-radius:2px"></div></div>';
     html+='</div>';
-  });
 
-  html+='</div></div>';
+    if(weekRows.length===0){
+      html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px;background:#fff">No deliverables active this week.</div>';
+    } else {
+      weekRows.forEach(function(r,idx){
+        var col2=svcColors[r.serviceType]||'#2D6A4F';
+        var barCol=r.progress===100?'#16a34a':r.progress>=65?'#2D6A4F':r.progress>=35?'#C8972A':'#94a3b8';
+        html+='<div style="display:grid;grid-template-columns:200px 70px 60px repeat(7,1fr);background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
+        html+='<div style="padding:9px 14px;border-right:1px solid #E8F5EE"><div style="font-size:12px;font-weight:700;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.name)+'</div><div style="font-size:10px;color:'+col2+';font-weight:600;margin-top:1px">'+e(r.bizName)+'</div></div>';
+        html+='<div style="padding:9px 8px;font-size:11px;color:#5A7A65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:1px solid #E8F5EE">'+e(r.owner||'&mdash;')+'</div>';
+        html+='<div style="padding:9px 6px;text-align:center;border-right:1px solid #E8F5EE"><span style="display:inline-block;padding:2px 6px;border-radius:20px;font-size:11px;font-weight:800;background:'+barCol+'18;color:'+barCol+'">'+r.progress+'%</span></div>';
+        weekDays.forEach(function(d){
+          var ds=fmt(d);
+          var isToday=ds===fmt(today);
+          var isWknd=d.getDay()===0||d.getDay()===6;
+          var inRange=r.start&&r.end&&ds>=r.start&&ds<=r.end;
+          html+='<div style="padding:5px 3px;border-left:1px solid #E8F5EE;background:'+(isToday?'#E8F5EE50':isWknd?'#fafdfb':'')+'">';
+          if(inRange){
+            html+='<div style="height:22px;background:'+barCol+'22;border-radius:4px;overflow:hidden">';
+            html+='<div style="width:'+r.progress+'%;height:100%;background:'+barCol+'aa"></div>';
+            html+='</div>';
+          }
+          html+='</div>';
+        });
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+
+    // ── All projects: horizontal bar charts grouped by deal ───────────────
+    html+='<div style="border-radius:14px;border:1px solid #C8E6D4;overflow:hidden">';
+    html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Progress Overview &mdash; All Projects</div></div>';
+    html+='<div style="padding:20px;background:#fff">';
+    if(allRows.length===0){
+      html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables yet. Add some in the deals page.</div>';
+    } else {
+      S.deals.forEach(function(d){
+        var dlvs2=d.deliverables||[];if(!dlvs2.length) return;
+        var col3=svcColors[d.serviceType]||'#2D6A4F';
+        var avg=Math.round(dlvs2.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs2.length);
+        html+='<div style="margin-bottom:22px">';
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+        html+='<div><div style="font-size:14px;font-weight:800;color:#1A4731">'+e(d.bizName||d.dealId||'Deal')+'</div>';
+        html+='<div style="font-size:11px;color:'+col3+';font-weight:600;margin-top:1px">'+e(d.serviceType||'')+'</div></div>';
+        html+='<button class="gantt-proj-btn" data-proj="'+e(d._id)+'" style="background:'+col3+';color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">View Detail &#8594;</button>';
+        html+='</div>';
+        dlvs2.forEach(function(dlv){
+          var pct=dlv.progress||0;
+          var bc=pct===100?'#16a34a':pct>=65?col3:pct>=35?'#C8972A':'#94a3b8';
+          html+='<div style="display:grid;grid-template-columns:160px 1fr 44px;gap:10px;align-items:center;margin-bottom:7px">';
+          html+='<div style="font-size:12px;color:#1A4731;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e(dlv.name)+'">'+e(dlv.name)+'</div>';
+          html+='<div style="height:18px;background:#E8F5EE;border-radius:9px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,'+bc+','+bc+'bb);border-radius:9px;transition:width .4s"></div></div>';
+          html+='<div style="font-size:12px;font-weight:800;color:'+bc+';text-align:right">'+pct+'%</div>';
+          html+='</div>';
+        });
+        html+='<div style="height:3px;background:'+col3+'30;border-radius:2px;margin-top:6px"><div style="width:'+avg+'%;height:100%;background:'+col3+';border-radius:2px"></div></div>';
+        html+='<div style="font-size:11px;color:'+col3+';font-weight:700;text-align:right;margin-top:3px">Average: '+avg+'%</div>';
+        html+='</div>';
+      });
+    }
+    html+='</div></div>';
+  }
+
   html+='</div>';
   return html;
 }
@@ -1358,6 +1402,12 @@ function bind(){
   var gwPrev=document.getElementById('gw-prev');if(gwPrev) gwPrev.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)-1;render();});
   var gwNext=document.getElementById('gw-next');if(gwNext) gwNext.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)+1;render();});
   var gwToday=document.getElementById('gw-today');if(gwToday) gwToday.addEventListener('click',function(){S.ganttWeek=0;render();});
+  document.querySelectorAll('.gantt-proj-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      S.ganttDeal=el.dataset.proj==='all'?null:el.dataset.proj;
+      render();
+    });
+  });
   // Service type selector
   document.querySelectorAll('.svc-sel').forEach(function(el){
     el.addEventListener('click',function(){
