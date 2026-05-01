@@ -42,9 +42,15 @@ tr:hover td{background:#E8F5EE}
 .ccard{border-radius:14px;border:1px solid #C8E6D4;overflow:hidden;box-shadow:0 2px 8px #1A47310a}
 .fbtn{border:1px solid #C8E6D4;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;background:#fff;color:#5A7A65}
 .fbtn.on{border-color:#C8972A;background:#FDF8EE;color:#C8972A}
-.ynb button{flex:1;padding:10px;border-radius:10px;border:2px solid #C8E6D4;background:#f8fafc;color:#5A7A65;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
-.ynb .ya{border-color:#16a34a;background:#f0fdf4;color:#15803d}
-.ynb .na{border-color:#dc2626;background:#fef2f2;color:#dc2626}
+.ynb{display:flex;gap:16px;margin-top:6px;align-items:center}
+.ynb label{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1A2820;padding:10px 18px;border-radius:10px;border:2px solid #C8E6D4;background:#f8fafc;transition:all .2s;flex:1;justify-content:center}
+.ynb label:hover{border-color:#2D6A4F;background:#E8F5EE}
+.ynb input[type=radio]{width:17px;height:17px;accent-color:#2D6A4F;cursor:pointer;flex-shrink:0}
+.ynb input[type=radio]:checked+span{font-weight:700}
+.ynb label.ynb-yes:has(input:checked){border-color:#16a34a;background:#f0fdf4;color:#15803d}
+.ynb label.ynb-no:has(input:checked){border-color:#dc2626;background:#fef2f2;color:#dc2626}
+.ynb label.checked-yes{border-color:#16a34a;background:#f0fdf4;color:#15803d}
+.ynb label.checked-no{border-color:#dc2626;background:#fef2f2;color:#dc2626}
 .pbar{height:4px;border-radius:4px;background:#C8E6D4;flex:1}
 .pbar.filled{background:#2D6A4F}
 .ll{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #C8E6D4;border-radius:8px;text-decoration:none;margin-bottom:8px}
@@ -142,6 +148,7 @@ var S={
   tab:'dashboard',lsub:'list',
   deals:[],leads:[],notes:[],acts:[],
   auditLog:[],auditUser:'Ona',
+  auditFilter:'all',
   form:null,lform:null,
   eid:null,leid:null,
   dfiles:[],lfiles:[],
@@ -177,7 +184,7 @@ var LBLS=['Hot','Warm','Cold'];
 var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
-var FL={bizName:'Business Name',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure'};
+var FL={bizName:'Business Name',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -191,7 +198,7 @@ function flash(msg,t){
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
-function bLead(){return{leadId:'',bizName:'',serviceType:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   document.getElementById('app').innerHTML=rApp();
@@ -325,7 +332,7 @@ function rDeliverables(f){
         // View row
         html+='<tr style="background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
         html+='<td style="padding:9px 12px;font-weight:600;color:#1A4731;min-width:160px">'+e(d.name)+'</td>';
-        html+='<td style="padding:9px 12px;color:#5A7A65;white-space:nowrap">'+e(d.owner||'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;white-space:nowrap">'+(d.owner?e(d.owner):'&mdash;')+'</td>';
         html+='<td style="padding:9px 12px;text-align:center">';
         html+='<span style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:13px;font-weight:800;background:'+(pct===100?'#f0fdf4':pct>=65?'#E8F5EE':pct>=35?'#FDF8EE':'#eff6ff')+';color:'+barCol+'">'+pct+'%</span>';
         html+='</td>';
@@ -336,8 +343,8 @@ function rDeliverables(f){
         html+='</select>';
         html+='<div style="flex:1;height:6px;border-radius:3px;background:#E8F5EE;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+barCol+';border-radius:3px"></div></div>';
         html+='</div></td>';
-        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.start||'&mdash;')+'</td>';
-        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+e(d.end||'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+(d.start?e(d.start):'&mdash;')+'</td>';
+        html+='<td style="padding:9px 12px;color:#5A7A65;font-size:12px;white-space:nowrap">'+(d.end?e(d.end):'&mdash;')+'</td>';
         html+='<td style="padding:9px 12px;white-space:nowrap">';
         html+='<button type="button" class="edit-dlv-btn" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;margin-right:4px">Edit</button>';
         html+='<button type="button" class="del-dlv-btn" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:13px;font-weight:700;padding:0 4px">&#10005;</button>';
@@ -424,6 +431,12 @@ function rDealForm(){
         '<div><div class="field-lbl">SDE / EBITDA (GHS)</div><input name="sdeEbitda" value="'+e(f.sdeEbitda||'')+'" placeholder="e.g. 200,000"/></div>'+
         '<div><div class="field-lbl">Broker Commission (%)</div><input type="number" name="commission" value="'+e(f.commission||'')+'" placeholder="e.g. 8"/></div>'+
         '<div><div class="field-lbl">Listing Status</div><select name="listingStatus"><option value="">Select...</option>'+['Not Listed','Listed on TBA','Listed on BizBuySell','Listed on BusinessesForsale','Under NDA','LOI Signed','Due Diligence','Closed'].map(function(x){return '<option'+(f.listingStatus===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>'+
+        '<div><div class="field-lbl">Year of Incorporation</div><input type="number" name="yearIncorp" value="'+e(f.yearIncorp||'')+'" placeholder="e.g. 2010"/></div>'+
+        '<div><div class="field-lbl">No. of Employees</div><input type="number" name="numEmployees" value="'+e(f.numEmployees||'')+'" placeholder="e.g. 25"/></div>'+
+        '<div><div class="field-lbl">Annual Sales (GHS)</div><input name="annualSalesBrok" value="'+e(f.annualSalesBrok||'')+'" placeholder="e.g. 500,000"/></div>'+
+        '<div><div class="field-lbl">Seller Discretionary Earnings *</div><input name="sde" value="'+e(f.sde||'')+'" placeholder="e.g. 120,000"/></div>'+
+        '<div><div class="field-lbl">Buyer Down Payment</div><input name="buyerDown" value="'+e(f.buyerDown||'')+'" placeholder="e.g. 80,000"/></div>'+
+        '<div><div class="field-lbl">Total Sales Price</div><input name="totalSalePrice" value="'+e(f.totalSalePrice||'')+'" placeholder="e.g. 400,000"/></div>'+
         '<div style="grid-column:1/-1"><div class="field-lbl">Business Description (for listing)</div><textarea name="bizDescription" placeholder="Describe the business for potential buyers..." style="min-height:70px">'+e(f.bizDescription||'')+'</textarea></div>'+
       '</div>'+
     '</div>';
@@ -497,11 +510,11 @@ function rPipe(){
       '<td style="font-weight:600;color:#1A4731">'+e(d.companyName)+(d.website?'<div style="font-size:11px;color:#5A7A65">'+e(d.website)+'</div>':'')+'</td>'+
       '<td><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:'+(SBG[d.status]||'#f8fafc')+';color:'+(SCOL[d.status]||'#666')+';border:1px solid '+(SCOL[d.status]||'#ccc')+'30"><span style="width:6px;height:6px;border-radius:50%;background:'+(SCOL[d.status]||'#999')+'"></span>'+e(d.status)+'</span></td>'+
       '<td><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;background:'+(d.currentStage==='Close 1'?'#f0fdf4':'#E8F5EE')+';color:'+(d.currentStage==='Close 1'?'#15803d':'#5A7A65')+';border:1px solid #C8E6D4">'+e(d.currentStage||'Stage 0')+'</span></td>'+
-      '<td style="color:#5A7A65">'+e(d.businessType||'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+e(d.serviceType||'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+e(d.sector||'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+e(d.owner||'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+e(d.salesSource||'&mdash;')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.businessType?e(d.businessType):'&mdash;')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.serviceType?e(d.serviceType):'&mdash;')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.sector?e(d.sector):'&mdash;')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.owner?e(d.owner):'&mdash;')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.salesSource?e(d.salesSource):'&mdash;')+'</td>'+
       '<td>'+(d.files&&d.files.length>0?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700">&#128206; '+d.files.length+'</span>':'<span style="color:#5A7A65;font-size:12px">None</span>')+'</td>'+
       '<td><div style="display:flex;gap:7px">'+
         '<button class="btn btn-pale btn-sm edl" data-id="'+d._id+'">Edit</button>'+
@@ -530,7 +543,7 @@ function rLeads(){
 
 function rLL(){
   var lf=S.lform||bLead();var isE=S.leid!==null;
-  var ac=lf.bizName&&lf.yearIncorp&&lf.annualSales&&lf.sde&&lf.buyerDown&&lf.totalSalePrice&&lf.numEmployees;
+  var ac=lf.bizName;
   var req=S.biz==='limited'?2:1;var met=S.lfiles.length>=req;
   var leads=[].concat(S.leads);
   if(S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
@@ -546,6 +559,17 @@ function rLL(){
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
+          '<div>'+
+            '<div class="field-lbl">Business Structure</div>'+
+            '<div class="ynb">'+
+              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Sole Source"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Sole Source"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Sole Source"?'#1A4731':'#5A7A65')+'">'+
+                '<input type="radio" name="bizStructure" value="Sole Source" class="bstr-r"'+(lf.bizStructure==="Sole Source"?' checked':'')+'/><span>Sole Source</span>'+
+              '</label>'+
+              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Limited Liability"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Limited Liability"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Limited Liability"?'#1A4731':'#5A7A65')+'">'+
+                '<input type="radio" name="bizStructure" value="Limited Liability" class="bstr-r"'+(lf.bizStructure==="Limited Liability"?' checked':'')+'/><span>Limited Liability</span>'+
+              '</label>'+
+            '</div>'+
+          '</div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
           '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
           '<div class="grid2">'+
@@ -569,27 +593,21 @@ function rLL(){
       '</div>'+
 
       '<button class="shdr'+(S.sec.at?' on':'')+'" data-sec="at"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:800">&#127991;&#65039; Attributes</span>'+
-        (ac?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">Complete</span>':'<span style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">Required</span>')+
+        (ac?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">Complete</span>':'')+
       '</div><span style="font-size:12px;color:#5A7A65">'+(S.sec.at?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.at?' on':'')+'">'+
-        '<div style="font-size:11px;color:#c2410c;font-weight:600;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:5px 9px;margin-bottom:12px">All fields below are required before saving.</div>'+
+        
         '<form id="af"><div style="display:flex;flex-direction:column;gap:11px">'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="e.g. Mensah Holdings" style="'+(lf.bizName?'':'border-color:#fca5a5')+'"/></div>'+
           '<div class="grid2">'+
-            '<div><div class="field-lbl">Year of Incorporation *</div><input type="number" name="yearIncorp" value="'+e(lf.yearIncorp)+'" placeholder="e.g. 2010" style="'+(lf.yearIncorp?'':'border-color:#fca5a5')+'"/></div>'+
-            '<div><div class="field-lbl">No. of Employees *</div><input type="number" name="numEmployees" value="'+e(lf.numEmployees)+'" placeholder="e.g. 25" style="'+(lf.numEmployees?'':'border-color:#fca5a5')+'"/></div>'+
-            '<div><div class="field-lbl">Annual Sales (GHS) *</div><input name="annualSales" value="'+e(lf.annualSales)+'" placeholder="e.g. 500,000" style="'+(lf.annualSales?'':'border-color:#fca5a5')+'"/></div>'+
-            '<div><div class="field-lbl">Seller\'s Discretionary Earnings *</div><input name="sde" value="'+e(lf.sde)+'" placeholder="e.g. 120,000" style="'+(lf.sde?'':'border-color:#fca5a5')+'"/></div>'+
-            '<div><div class="field-lbl">Buyer\'s Down Payment *</div><input name="buyerDown" value="'+e(lf.buyerDown)+'" placeholder="e.g. 80,000" style="'+(lf.buyerDown?'':'border-color:#fca5a5')+'"/></div>'+
-            '<div><div class="field-lbl">Total Sales Price *</div><input name="totalSalePrice" value="'+e(lf.totalSalePrice)+'" placeholder="e.g. 400,000" style="'+(lf.totalSalePrice?'':'border-color:#fca5a5')+'"/></div>'+
-          '</div>'+
-          '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb" style="display:flex;gap:10px;margin-top:4px">'+
-            '<button type="button" class="kbtn'+(lf.kickoffMeeting==='Yes'?' ya':'')+'" data-v="Yes">Yes</button>'+
-            '<button type="button" class="kbtn'+(lf.kickoffMeeting==='No'?' na':'')+'" data-v="No">No</button>'+
+                      '</div>'+
+          '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb">'+
+            '<label class="ynb-yes"><input type="radio" name="kickoffMeeting" value="Yes" class="kbtn-r"'+(lf.kickoffMeeting==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
+            '<label class="ynb-no"><input type="radio" name="kickoffMeeting" value="No" class="kbtn-r"'+(lf.kickoffMeeting==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
           '</div></div>'+
-          '<div><div class="field-lbl">Has MA been signed?</div><div class="ynb" style="display:flex;gap:10px;margin-top:4px">'+
-            '<button type="button" class="mbtn'+(lf.maSigned==='Yes'?' ya':'')+'" data-v="Yes">Yes</button>'+
-            '<button type="button" class="mbtn'+(lf.maSigned==='No'?' na':'')+'" data-v="No">No</button>'+
+          '<div><div class="field-lbl">Has MA been signed?</div><div class="ynb">'+
+            '<label class="ynb-yes"><input type="radio" name="maSigned" value="Yes" class="mbtn-r"'+(lf.maSigned==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
+            '<label class="ynb-no"><input type="radio" name="maSigned" value="No" class="mbtn-r"'+(lf.maSigned==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
           '</div>'+
           (lf.maSigned==='Yes'?
             '<div style="margin-top:12px;background:#E8F5EE;border:1px solid #C8E6D4;border-radius:10px;padding:12px 14px">'+
@@ -648,17 +666,17 @@ function rLL(){
     '</div>'+
     (leads.length===0?'<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#127807;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">Plant your first seed</div><div style="font-size:13px;color:#5A7A65">Capture your first prospect to begin.</div></div>':
     '<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4">'+
-    '<table><thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>OWNER / CONTACT</th><th>PRIORITY</th><th>STAGE</th><th>LABEL</th><th>SOURCE</th><th>FILES</th><th>ACTIONS</th></tr></thead><tbody>'+
+    '<table><thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>STRUCTURE</th><th>OWNER / CONTACT</th><th>PRIORITY</th><th>STAGE</th><th>LABEL</th><th>SOURCE</th><th>FILES</th><th>ACTIONS</th></tr></thead><tbody>'+
     leads.map(function(l){
       var lr=l.bizStructure==='limited'?2:1;
       var lm=l.bizStructure&&(l.files||[]).length>=lr;
       return '<tr>'+
         '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='submitted'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">SUBMITTED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
         '<td style="font-weight:600;color:#1A4731">'+e(l.contactPerson)+'</td>'+
-        '<td style="color:#5A7A65">'+e(l.organization||'&mdash;')+'</td>'+
-        '<td style="color:#2D6A4F;font-weight:600">'+e(l.expectedValue||'&mdash;')+'</td>'+
+        '<td style="color:#5A7A65">'+(l.organization?e(l.organization):'&mdash;')+'</td>'+
+        '<td style="color:#2D6A4F;font-weight:600">'+(l.expectedValue?e(l.expectedValue):'&mdash;')+'</td>'+
         '<td>'+e(LMOJI[l.label]||'')+' '+e(l.label)+'</td>'+
-        '<td style="color:#5A7A65;font-size:12px">'+e(l.prospectSource==='Other'&&l.prospectSourceOther?l.prospectSourceOther:l.prospectSource||'&mdash;')+'</td>'+
+        '<td style="color:#5A7A65;font-size:12px">'+(l.prospectSource==='Other'&&l.prospectSourceOther?l.prospectSourceOther:l.prospectSource?e(l.prospectSource==='Other'&&l.prospectSourceOther?l.prospectSourceOther:l.prospectSource):'&mdash;')+'</td>'+
         '<td>'+(lm?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700">&#128206; '+(l.files||[]).length+'</span>':'<span style="color:#dc2626;font-size:12px">Pending</span>')+'</td>'+
 
         '<td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
@@ -675,28 +693,41 @@ function rLL(){
 
     '<div class="card" style="margin-top:24px;border-top:4px solid #2D6A4F">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">'+
-        '<div><div style="font-size:14px;font-weight:800;color:#1A4731">&#128203; Lead Activity Log</div><div style="font-size:12px;color:#5A7A65;margin-top:2px">Every view, edit and field change across all leads</div></div>'+
-        '<div style="display:flex;align-items:center;gap:10px">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:800;color:#1A4731">&#128203; Lead Activity Log</div>'+
+          '<div style="font-size:12px;color:#5A7A65;margin-top:2px">Select a lead below to view its specific activity &mdash; or view all</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
           '<span style="font-size:12px;color:#5A7A65;font-weight:600">Logged as:</span>'+
           '<input id="au" value="'+e(S.auditUser)+'" placeholder="Your name..." style="padding:6px 12px;font-size:12px;width:140px"/>'+
-          (S.auditLog.length>0?'<button class="btn btn-red btn-sm" id="cla">Clear</button>':'')+
+          '<select id="audit-filter" style="padding:6px 10px;font-size:12px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit">'+
+            '<option value="all">All Leads</option>'+
+            S.leads.map(function(l){return '<option value="'+e(l.leadId||l._id)+'"'+(S.auditFilter===l.leadId?'selected':'')+'>'+e(l.leadId||'?')+' - '+e(l.bizName||l.ownerContact||'Lead')+'</option>';}).join('')+
+          '</select>'+
+          (S.auditLog.length>0?'<button class="btn btn-red btn-sm" id="cla">Clear All</button>':'')+
         '</div>'+
       '</div>'+
-      (S.auditLog.length===0?'<div style="text-align:center;padding:24px;color:#5A7A65;font-size:13px"><div style="font-weight:600;margin-bottom:4px">No activity yet</div><div style="font-size:12px">Activity appears here when leads are viewed or edited</div></div>':
-      '<div style="overflow-x:auto;border-radius:10px;border:1px solid #C8E6D4"><table>'+
-        '<thead><tr><th>LEAD ID</th><th>USER</th><th>FIELD CHANGED</th><th>PREVIOUS VALUE</th><th>NEW VALUE</th><th>TIME</th><th></th></tr></thead><tbody>'+
-        [].concat(S.auditLog).reverse().map(function(en,i){
-          return '<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">'+
-            '<td><span class="badge-id">'+e(en.leadId)+'</span></td>'+
-            '<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+e((en.user||'?').charAt(0).toUpperCase())+'</span><span style="font-weight:600;color:#1A4731">'+e(en.user)+'</span></div></td>'+
-            '<td>'+(en.field==='n/a'?'<span style="color:#5A7A65;font-size:11px">n/a</span>':'<span style="background:#FDF8EE;color:#C8972A;border:1px solid #F5E6C3;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap">'+e(en.field)+'</span>')+'</td>'+
-            '<td style="color:#5A7A65;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(en.prev)+'</td>'+
-            '<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(en.next)+'</td>'+
-            '<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>'+
-            '<td><button class="dau btn-sm" data-id="'+en._id+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:700">x</button></td>'+
-          '</tr>';
-        }).join('')+
-      '</tbody></table></div>')+
+      function(){
+        var filt=S.auditFilter||'all';
+        var filtered=filt==='all'?[].concat(S.auditLog):S.auditLog.filter(function(en){return en.leadId===filt;});
+        if(filtered.length===0) return '<div style="text-align:center;padding:24px;color:#5A7A65;font-size:13px"><div style="font-weight:600;margin-bottom:4px">No activity'+(filt!=='all'?' for this lead':'')+' yet</div><div style="font-size:12px">Activity appears here when leads are viewed or edited</div></div>';
+        return '<div style="overflow-x:auto;border-radius:10px;border:1px solid #C8E6D4"><table>'+
+          '<thead><tr>'+
+          (filt==='all'?'<th>LEAD ID</th>':'')+
+          '<th>USER</th><th>ACTION / FIELD</th><th>PREVIOUS VALUE</th><th>NEW VALUE</th><th>TIME</th><th></th></tr></thead><tbody>'+
+          filtered.reverse().map(function(en,i){
+            return '<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">'+
+              (filt==='all'?'<td><span class="badge-id">'+e(en.leadId)+'</span></td>':'')+
+              '<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+e((en.user||'?').charAt(0).toUpperCase())+'</span><span style="font-weight:600;color:#1A4731">'+e(en.user)+'</span></div></td>'+
+              '<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border:1px solid #F5E6C3;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap">'+e(en.field)+'</span>')+'</td>'+
+              '<td style="color:#5A7A65;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.prev))+'</td>'+
+              '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.next))+'</td>'+
+              '<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>'+
+              '<td><button class="dau btn-sm" data-id="'+en._id+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:700">x</button></td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody></table></div>';
+      }()+
     '</div>'+
   '</div></div>';
 }
@@ -739,8 +770,8 @@ function rActs(){
     [].concat(S.acts).reverse().map(function(a){
       return '<tr style="'+(a.done?'opacity:.4;text-decoration:line-through':'')+'">'+
         '<td style="font-weight:600;color:#2D6A4F">'+e(a.type)+'</td>'+
-        '<td style="color:#5A7A65">'+e(a.leadName||'&mdash;')+'</td>'+
-        '<td style="color:#5A7A65;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(a.note||'&mdash;')+'</td>'+
+        '<td style="color:#5A7A65">'+(a.leadName?e(a.leadName):'&mdash;')+'</td>'+
+        '<td style="color:#5A7A65;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.note?e(a.note):'&mdash;')+'</td>'+
         '<td style="color:#5A7A65;font-size:12px">'+e(a.date)+'</td>'+
         '<td><button class="tdn btn-sm" data-id="'+a._id+'" style="background:'+(a.done?'#E8F5EE':'#f8fafc')+';color:'+(a.done?'#2D6A4F':'#5A7A65')+';border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">'+(a.done?'Done':'Mark Done')+'</button></td>'+
         '<td><button class="dac btn-sm" data-id="'+a._id+'" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:12px;color:#dc2626;cursor:pointer">&#10005;</button></td>'+
@@ -767,7 +798,7 @@ function rEmail(){
 function gDF(){
   var f=S.form||bDeal(),form=document.getElementById('df');
   if(!form) return f;
-  ['bizName','serviceType','owner','email','phone','source','status','projectBrief','startDate','endDate','consultFocus','engagementType','consultFee','sessions','consultDeliverables','txType','askingPrice','annualRevenue','sdeEbitda','commission','listingStatus','bizDescription','fundingType','fundingAmount','equityOffered','useOfFunds','currRevenue','fundingStage','pitchSummary'].forEach(function(k){
+  ['bizName','serviceType','owner','email','phone','source','status','projectBrief','startDate','endDate','consultFocus','engagementType','consultFee','sessions','consultDeliverables','txType','askingPrice','annualRevenue','sdeEbitda','commission','listingStatus','bizDescription','yearIncorp','numEmployees','annualSalesBrok','sde','buyerDown','totalSalePrice','fundingType','fundingAmount','equityOffered','useOfFunds','currRevenue','fundingStage','pitchSummary'].forEach(function(k){
     var el=form.querySelector('[name="'+k+'"]');if(el) f[k]=el.value;
   });
   return f;
@@ -776,7 +807,13 @@ function gDF(){
 function gLF(){
   var lf=S.lform||bLead(),f1=document.getElementById('lf1'),f2=document.getElementById('af');
   if(f1){['bizName','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
-  if(f2){['bizName','yearIncorp','numEmployees','annualSales','sde','buyerDown','totalSalePrice'].forEach(function(k){var el=f2.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});}
+  if(f2){['bizName'].forEach(function(k){var el=f2.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});}
+  var kr=document.querySelector('input[name="kickoffMeeting"]:checked');
+  if(kr) lf.kickoffMeeting=kr.value;
+  var mr=document.querySelector('input[name="maSigned"]:checked');
+  if(mr) lf.maSigned=mr.value;
+  var br=document.querySelector('input[name="bizStructure"]:checked');
+  if(br) lf.bizStructure=br.value;
   return lf;
 }
 
@@ -785,13 +822,13 @@ function persistDeal(status,msg){
   f.dealStatus=status;
   if(S.eid!==null){
     var existing=S.deals.filter(function(x){return x._id===S.eid;})[0]||{};
-    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:existing.deliverables||[]});
+    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:f.deliverables&&f.deliverables.length>0?f.deliverables:existing.deliverables||[]});
     S.deals=S.deals.map(function(x){return x._id===S.eid?updated:x;});
     syncDeal(updated);
     flash(msg);S.eid=null;
   } else {
     var nid=fid('D',S.did++);
-    var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:[]});
+    var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:f.deliverables||[]});
     S.deals=S.deals.concat([newDeal]);
     syncDeal(newDeal);
     flash(msg+' ID: '+nid);
@@ -969,8 +1006,10 @@ function addDeliverable(dealId){
   var dlv={_id:'DLV'+Date.now(),name:d.name,owner:d.owner,start:d.start,end:d.end,progress:d.progress};
   S.deals=S.deals.map(function(x){return x._id===dealId?Object.assign({},x,{deliverables:(x.deliverables||[]).concat([dlv])}):x;});
   clearDlvInputs(dealId);
-  var updated=S.deals.filter(function(x){return x._id===dealId;})[0];
-  if(updated) syncDeal(updated);
+  var updatedD=S.deals.filter(function(x){return x._id===dealId;})[0];
+  if(updatedD) syncDeal(updatedD);
+  // Also update S.form if we are editing this deal
+  if(S.eid===dealId){S.form=Object.assign({},S.form,{deliverables:updatedD.deliverables||[]});}
   render();
 }
 function addDlvToNewForm(){
@@ -1226,7 +1265,7 @@ function rGantt(){
         var barCol=r.progress===100?'#16a34a':r.progress>=65?'#2D6A4F':r.progress>=35?'#C8972A':'#94a3b8';
         html+='<div style="display:grid;grid-template-columns:200px 70px 60px repeat(7,1fr);background:'+(idx%2===0?'#fff':'#fafdfb')+';border-top:1px solid #E8F5EE">';
         html+='<div style="padding:9px 14px;border-right:1px solid #E8F5EE"><div style="font-size:12px;font-weight:700;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(r.name)+'</div><div style="font-size:10px;color:'+col2+';font-weight:600;margin-top:1px">'+e(r.bizName)+'</div></div>';
-        html+='<div style="padding:9px 8px;font-size:11px;color:#5A7A65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:1px solid #E8F5EE">'+e(r.owner||'&mdash;')+'</div>';
+        html+='<div style="padding:9px 8px;font-size:11px;color:#5A7A65;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-right:1px solid #E8F5EE">'+(r.owner?e(r.owner):'&mdash;')+'</div>';
         html+='<div style="padding:9px 6px;text-align:center;border-right:1px solid #E8F5EE"><span style="display:inline-block;padding:2px 6px;border-radius:20px;font-size:11px;font-weight:800;background:'+barCol+'18;color:'+barCol+'">'+r.progress+'%</span></div>';
         weekDays.forEach(function(d){
           var ds=fmt(d);
@@ -1360,8 +1399,9 @@ function bind(){
       if(errEl){errEl.style.display=(lf2.startDate&&edEl.value&&edEl.value<lf2.startDate)?'block':'none';}
     });
   }
-  document.querySelectorAll('.kbtn').forEach(function(el){el.addEventListener('click',function(){S.lform=Object.assign({},gLF(),{kickoffMeeting:el.dataset.v});render();});});
-  document.querySelectorAll('.mbtn').forEach(function(el){el.addEventListener('click',function(){S.lform=Object.assign({},gLF(),{maSigned:el.dataset.v});render();});});
+  document.querySelectorAll('.kbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{kickoffMeeting:el.value});render();});});
+  document.querySelectorAll('.mbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{maSigned:el.value});render();});});
+  document.querySelectorAll('.bstr-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{bizStructure:el.value});render();});});
   document.querySelectorAll('.bsbtn').forEach(function(el){el.addEventListener('click',function(){S.biz=el.dataset.v;S.lfiles=[];render();});});
   var lfi=document.getElementById('lfi');
   if(lfi) lfi.addEventListener('change',function(){
@@ -1396,6 +1436,7 @@ function bind(){
   });
   // audit
   var au=document.getElementById('au');if(au) au.addEventListener('input',function(){S.auditUser=au.value;});
+  var af=document.getElementById('audit-filter');if(af) af.addEventListener('change',function(){S.auditFilter=af.value;render();});
   var cla=document.getElementById('cla');if(cla) cla.addEventListener('click',function(){S.auditLog=[];render();});
   document.querySelectorAll('.dau').forEach(function(el){el.addEventListener('click',function(){S.auditLog=S.auditLog.filter(function(x){return String(x._id)!==el.dataset.id;});render();});});
   // notes
