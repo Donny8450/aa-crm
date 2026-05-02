@@ -184,7 +184,7 @@ var LBLS=['Hot','Warm','Cold'];
 var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
-var FL={bizName:'Business Name',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',serviceType:'Service Type'};
+var FL={bizName:'Business Name',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Sales Lead',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -198,7 +198,7 @@ function flash(msg,t){
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
-function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   document.getElementById('app').innerHTML=rApp();
@@ -560,15 +560,8 @@ function rLL(){
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
           '<div>'+
-            '<div class="field-lbl">Business Structure</div>'+
-            '<div class="ynb">'+
-              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Sole Source"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Sole Source"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Sole Source"?'#1A4731':'#5A7A65')+'">'+
-                '<input type="radio" name="bizStructure" value="Sole Source" class="bstr-r"'+(lf.bizStructure==="Sole Source"?' checked':'')+'/><span>Sole Source</span>'+
-              '</label>'+
-              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Limited Liability"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Limited Liability"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Limited Liability"?'#1A4731':'#5A7A65')+'">'+
-                '<input type="radio" name="bizStructure" value="Limited Liability" class="bstr-r"'+(lf.bizStructure==="Limited Liability"?' checked':'')+'/><span>Limited Liability</span>'+
-              '</label>'+
-            '</div>'+
+            '<div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div>'+
+            '<input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/>'+
           '</div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
           '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
@@ -621,12 +614,6 @@ function rLL(){
       '<button class="shdr'+(S.sec.doc?' on':'')+'" data-sec="doc"><span style="font-weight:800">&#128193; General Information &amp; Documents</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.doc?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
         '<div style="display:flex;flex-direction:column;gap:13px">'+
-          '<div><div class="field-lbl">Business Structure</div><div style="display:flex;gap:10px;margin-top:4px">'+
-            [['sole','Sole Proprietorship','1 doc required'],['limited','Limited Liability','2 docs required']].map(function(x){
-              return '<button type="button" class="bsbtn" data-v="'+x[0]+'" style="flex:1;background:'+(S.biz===x[0]?'#E8F5EE':'#f8fafc')+';border:2px solid '+(S.biz===x[0]?'#2D6A4F':'#C8E6D4')+';border-radius:10px;padding:10px 8px;text-align:left;cursor:pointer;font-family:inherit;transition:all .2s"><div style="font-size:11px;font-weight:700;color:'+(S.biz===x[0]?'#1A4731':'#5A7A65')+'">'+x[1]+'</div><div style="font-size:10px;color:'+(S.biz===x[0]?'#2D6A4F':'#94a3b8')+';margin-top:2px">'+x[2]+'</div></button>';
-            }).join('')+
-          '</div>'+(!S.biz?'<div style="margin-top:6px;font-size:11px;color:#dc2626;font-weight:600">Select a business structure to continue</div>':'')+'</div>'+
-          (S.biz?
             '<div><div class="field-lbl">'+(S.biz==='limited'?'Upload Documents (2 required)':'Upload Document (1 required)')+'</div>'+
             '<label style="display:inline-flex;align-items:center;gap:8px;background:'+(met?'#E8F5EE':'#fff7ed')+';color:'+(met?'#2D6A4F':'#c2410c')+';border:1px dashed '+(met?'#C8E6D4':'#fed7aa')+';border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;width:100%;justify-content:center">'+
               '&#128206; Upload Files<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+
@@ -637,7 +624,7 @@ function rLL(){
             '</div>'+
             '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
             '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'All required documents uploaded':'&#9888; '+(req-S.lfiles.length)+' more document'+(req-S.lfiles.length===1?'':'s')+' needed')+'</div>'+
-            '</div>':'')+''+
+          ''+
           '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
           '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
           '<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SAVE</span>Saves progress even if incomplete &nbsp;&nbsp;'+
@@ -806,7 +793,7 @@ function gDF(){
 
 function gLF(){
   var lf=S.lform||bLead(),f1=document.getElementById('lf1'),f2=document.getElementById('af');
-  if(f1){['bizName','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
+  if(f1){['bizName','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
   if(f2){['bizName'].forEach(function(k){var el=f2.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});}
   var kr=document.querySelector('input[name="kickoffMeeting"]:checked');
   if(kr) lf.kickoffMeeting=kr.value;
@@ -941,13 +928,12 @@ function closeApprovalModal(){
 
 function confirmApproval(){
   var u=(document.getElementById('apr-user')||{}).value||'';
-  var p=(document.getElementById('apr-pass')||{}).value||'';
-  var match=S.approvers.filter(function(a){return a.username===u&&a.password===p;})[0];
-  if(!match){
+  if(!u.trim()){
     var errEl=document.getElementById('apr-err');
-    if(errEl){errEl.style.display='block';errEl.textContent='Invalid credentials. Please try again.';}
+    if(errEl){errEl.style.display='block';errEl.textContent='Please enter your name to approve.';}
     return;
   }
+  var match={name:u};
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
   S.leads=S.leads.map(function(l){
@@ -968,18 +954,18 @@ function rApprovalModal(){
   var lead=S.leads.filter(function(l){return l._id===S.approvalTargetId;})[0]||{};
   return '<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px">'+
     '<div style="background:#fff;border-radius:16px;padding:32px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border-top:4px solid #2D6A4F">'+
-      '<div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:4px">&#128272; Authorisation Required</div>'+
-      '<div style="font-size:13px;color:#5A7A65;margin-bottom:22px;line-height:1.6">This action requires approval from an authorised user. Please enter your credentials to proceed.</div>'+
+      '<div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:4px">&#9989; Approve Lead</div>'+
+      '<div style="font-size:13px;color:#5A7A65;margin-bottom:22px;line-height:1.6">Enter your name below to approve this lead and unlock submission and conversion.</div>'+
       '<div style="background:#E8F5EE;border:1px solid #C8E6D4;border-radius:10px;padding:12px 14px;margin-bottom:18px">'+
         '<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">LEAD BEING APPROVED</div>'+
         '<div style="font-size:14px;font-weight:700;color:#1A4731">'+e(lead.bizName||lead.contactPerson||'Unknown')+'</div>'+
         '<div style="font-size:12px;color:#5A7A65">'+e(lead.serviceType||'')+'</div>'+
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
-        '<div><div class="field-lbl">Username</div><input id="apr-user" placeholder="Enter your username" autocomplete="off"/></div>'+
-        '<div><div class="field-lbl">Password</div><input id="apr-pass" type="password" placeholder="Enter your password"/></div>'+
-        '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600"></div>'+
-      '</div>'+
+       '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
+         '<div><div class="field-lbl">Your Name</div><input id="apr-user" placeholder="Enter your name to approve this lead" autocomplete="off"/></div>'+
+         '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600"></div>'+
+       '</div>'+
       '<div style="display:flex;gap:10px">'+
         '<button id="apr-cancel" style="flex:1;padding:12px;border-radius:10px;border:1px solid #C8E6D4;background:#E8F5EE;color:#5A7A65;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>'+
         '<button id="apr-confirm" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">&#10003; Approve Lead</button>'+
