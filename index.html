@@ -198,7 +198,7 @@ function flash(msg,t){
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
-function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   document.getElementById('app').innerHTML=rApp();
@@ -559,7 +559,17 @@ function rLL(){
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
-          '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
+          '<div>'+
+            '<div class="field-lbl">Business Structure</div>'+
+            '<div class="ynb">'+
+              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Sole Source"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Sole Source"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Sole Source"?'#1A4731':'#5A7A65')+'">'+
+                '<input type="radio" name="bizStructure" value="Sole Source" class="bstr-r"'+(lf.bizStructure==="Sole Source"?' checked':'')+'/><span>Sole Source</span>'+
+              '</label>'+
+              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Limited Liability"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Limited Liability"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Limited Liability"?'#1A4731':'#5A7A65')+'">'+
+                '<input type="radio" name="bizStructure" value="Limited Liability" class="bstr-r"'+(lf.bizStructure==="Limited Liability"?' checked':'')+'/><span>Limited Liability</span>'+
+              '</label>'+
+            '</div>'+
+          '</div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
           '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
           '<div class="grid2">'+
@@ -925,12 +935,13 @@ function closeApprovalModal(){
 
 function confirmApproval(){
   var u=(document.getElementById('apr-user')||{}).value||'';
-  if(!u.trim()){
+  var p=(document.getElementById('apr-pass')||{}).value||'';
+  var match=S.approvers.filter(function(a){return a.username===u&&a.password===p;})[0];
+  if(!match){
     var errEl=document.getElementById('apr-err');
-    if(errEl){errEl.style.display='block';errEl.textContent='Please enter your name to approve.';}
+    if(errEl){errEl.style.display='block';errEl.textContent='Invalid credentials. Please try again.';}
     return;
   }
-  var match={name:u};
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
   S.leads=S.leads.map(function(l){
@@ -960,7 +971,8 @@ function rApprovalModal(){
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
        '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
-         '<div><div class="field-lbl">Your Name</div><input id="apr-user" placeholder="Enter your name to approve" autocomplete="off"/></div>'+
+         '<div><div class="field-lbl">Username</div><input id="apr-user" placeholder="Enter your username" autocomplete="off"/></div>'+
+         '<div><div class="field-lbl">Password</div><input id="apr-pass" type="password" placeholder="Enter your password"/></div>'+
          '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600"></div>'+
        '</div>'+
       '<div style="display:flex;gap:10px">'+
