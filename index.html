@@ -198,7 +198,7 @@ function flash(msg,t){
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
-function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   document.getElementById('app').innerHTML=rApp();
@@ -224,13 +224,13 @@ function rApp(){
       '</div>'+
     '</div>'+
     '<div style="display:flex;margin-top:2px">'+
-      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt']].map(function(x){
+      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['overview','&#128200; Management Overview']].map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
       }).join('')+
     '</div>'+
   '</div>'+
   '<div style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
-    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():''))+
+    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='overview'?rOverview():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   '</div>';
@@ -559,17 +559,7 @@ function rLL(){
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
-          '<div>'+
-            '<div class="field-lbl">Business Structure</div>'+
-            '<div class="ynb">'+
-              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Sole Source"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Sole Source"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Sole Source"?'#1A4731':'#5A7A65')+'">'+
-                '<input type="radio" name="bizStructure" value="Sole Source" class="bstr-r"'+(lf.bizStructure==="Sole Source"?' checked':'')+'/><span>Sole Source</span>'+
-              '</label>'+
-              '<label class="ynb-yes" style="border-color:'+(lf.bizStructure==="Limited Liability"?'#2D6A4F':'#C8E6D4')+';background:'+(lf.bizStructure==="Limited Liability"?'#E8F5EE':'#f8fafc')+';color:'+(lf.bizStructure==="Limited Liability"?'#1A4731':'#5A7A65')+'">'+
-                '<input type="radio" name="bizStructure" value="Limited Liability" class="bstr-r"'+(lf.bizStructure==="Limited Liability"?' checked':'')+'/><span>Limited Liability</span>'+
-              '</label>'+
-            '</div>'+
-          '</div>'+
+          '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
           '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
           '<div class="grid2">'+
@@ -935,13 +925,12 @@ function closeApprovalModal(){
 
 function confirmApproval(){
   var u=(document.getElementById('apr-user')||{}).value||'';
-  var p=(document.getElementById('apr-pass')||{}).value||'';
-  var match=S.approvers.filter(function(a){return a.username===u&&a.password===p;})[0];
-  if(!match){
+  if(!u.trim()){
     var errEl=document.getElementById('apr-err');
-    if(errEl){errEl.style.display='block';errEl.textContent='Invalid credentials. Please try again.';}
+    if(errEl){errEl.style.display='block';errEl.textContent='Please enter your name to approve.';}
     return;
   }
+  var match={name:u};
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
   S.leads=S.leads.map(function(l){
@@ -971,8 +960,7 @@ function rApprovalModal(){
       '</div>'+
       '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
        '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
-         '<div><div class="field-lbl">Username</div><input id="apr-user" placeholder="Enter your username" autocomplete="off"/></div>'+
-         '<div><div class="field-lbl">Password</div><input id="apr-pass" type="password" placeholder="Enter your password"/></div>'+
+         '<div><div class="field-lbl">Your Name</div><input id="apr-user" placeholder="Enter your name to approve" autocomplete="off"/></div>'+
          '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600"></div>'+
        '</div>'+
       '<div style="display:flex;gap:10px">'+
@@ -1071,6 +1059,289 @@ function dcsv(rows,fn){
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn;a.click();
 }
+
+function rOverview(){
+  // ── Computed metrics ───────────────────────────────────────────────────────
+  var totalDeals=S.deals.length;
+  var totalLeads=S.leads.length;
+  var activeDeals=S.deals.filter(function(d){return d.status==='Active';}).length;
+  var completedDeals=S.deals.filter(function(d){return d.status==='Completed';}).length;
+  var onHoldDeals=S.deals.filter(function(d){return d.status==='On Hold';}).length;
+
+  // Leads by label
+  var hotLeads=S.leads.filter(function(l){return l.label==='Hot';}).length;
+  var warmLeads=S.leads.filter(function(l){return l.label==='Warm';}).length;
+  var coldLeads=S.leads.filter(function(l){return l.label==='Cold';}).length;
+
+  // Leads by status
+  var submittedLeads=S.leads.filter(function(l){return l.leadStatus==='submitted';}).length;
+  var draftLeads=S.leads.filter(function(l){return l.leadStatus==='draft';}).length;
+  var approvedLeads=S.leads.filter(function(l){return l.approved;}).length;
+  var convertedLeads=S.leads.filter(function(l){return l.converted;}).length;
+
+  // Deals by service type
+  var svcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Other':0};
+  S.deals.forEach(function(d){
+    if(svcCounts[d.serviceType]!==undefined) svcCounts[d.serviceType]++;
+    else svcCounts['Other']++;
+  });
+
+  // Leads by service type
+  var leadSvcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Other':0};
+  S.leads.forEach(function(l){
+    if(leadSvcCounts[l.serviceType]!==undefined) leadSvcCounts[l.serviceType]++;
+    else leadSvcCounts['Other']++;
+  });
+
+  // Deliverables progress
+  var allDlvs=[];
+  S.deals.forEach(function(d){(d.deliverables||[]).forEach(function(dlv){allDlvs.push(dlv);});});
+  var totalDlvs=allDlvs.length;
+  var doneDlvs=allDlvs.filter(function(d){return d.progress===100;}).length;
+  var avgProgress=totalDlvs?Math.round(allDlvs.reduce(function(a,d){return a+(d.progress||0);},0)/totalDlvs):0;
+
+  // Conversion rate
+  var convRate=totalLeads>0?Math.round(convertedLeads/totalLeads*100):0;
+  var approvalRate=totalLeads>0?Math.round(approvedLeads/totalLeads*100):0;
+
+  // Service colours
+  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed','Other':'#94a3b8'};
+
+  // Donut chart helper — pure CSS/HTML
+  function donut(segments,size){
+    // segments = [{label, value, color}]
+    var total=segments.reduce(function(a,s){return a+s.value;},0);
+    if(!total) return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:#E8F5EE;display:flex;align-items:center;justify-content:center"><span style="font-size:12px;color:#5A7A65">No data</span></div>';
+    // Build conic-gradient
+    var gradient='conic-gradient(';
+    var cum=0;
+    var parts=segments.map(function(s){
+      var pct=total>0?s.value/total*100:0;
+      var from=cum;cum+=pct;
+      return s.color+' '+from.toFixed(1)+'% '+cum.toFixed(1)+'%';
+    });
+    gradient+=parts.join(',')+')';
+    var inner=Math.round(size*0.6);
+    return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+gradient+';display:flex;align-items:center;justify-content:center">'+
+      '<div style="width:'+inner+'px;height:'+inner+'px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
+        '<div style="font-size:'+(size>140?22:16)+'px;font-weight:900;color:#1A4731">'+total+'</div>'+
+        '<div style="font-size:10px;color:#5A7A65;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  // Bar chart helper
+  function barChart(items,maxVal,height,accentCol){
+    if(!items.length||!maxVal) return '<div style="color:#5A7A65;font-size:12px;padding:20px;text-align:center">No data yet</div>';
+    return '<div style="display:flex;align-items:flex-end;gap:6px;height:'+height+'px;padding-top:10px">'+
+      items.map(function(item){
+        var pct=maxVal>0?item.value/maxVal*100:0;
+        var barH=Math.max(4,Math.round(pct*(height-30)/100));
+        var col=item.color||accentCol||'#2D6A4F';
+        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end">'+
+          '<div style="font-size:10px;font-weight:700;color:'+col+'">'+item.value+'</div>'+
+          '<div style="width:100%;height:'+barH+'px;background:'+col+';border-radius:4px 4px 0 0;min-height:4px"></div>'+
+          '<div style="font-size:9px;color:#5A7A65;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;word-break:break-word">'+e(item.label)+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  var html='<div>';
+
+  // ── Page Header ──────────────────────────────────────────────────────────
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden">';
+  html+='<div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(200,151,42,.12)"></div>';
+  html+='<div style="position:absolute;bottom:-60px;left:200px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.05)"></div>';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:var(--goldL);margin-bottom:8px">MANAGEMENT OVERVIEW &nbsp;&middot;&nbsp; AFRICAN ASPIRATIONS</div>';
+  html+='<div style="font-size:28px;font-weight:900;color:#fff;margin-bottom:4px">Pipeline Summary</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:20px">Real-time view of deals, leads and deliverable progress</div>';
+  html+='<div style="display:flex;gap:24px;flex-wrap:wrap">';
+  [
+    [totalDeals,'Total Deals','#C8972A'],
+    [totalLeads,'Total Leads','#fff'],
+    [approvedLeads,'Approved Leads','#86efac'],
+    [convertedLeads,'Converted','#F5E6C3'],
+    [convRate+'%','Conversion Rate','#a5b4fc']
+  ].forEach(function(x){
+    html+='<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div><div style="font-size:11px;color:rgba(255,255,255,.55);font-weight:600;letter-spacing:.7px;margin-top:2px">'+x[1].toUpperCase()+'</div></div>';
+  });
+  html+='</div></div>';
+
+  // ── Row 1: 4 KPI cards ───────────────────────────────────────────────────
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px">';
+  [
+    ['Active Deals',activeDeals,'#2D6A4F','#E8F5EE','&#9889;'],
+    ['Completed',completedDeals,'#16a34a','#f0fdf4','&#9989;'],
+    ['On Hold',onHoldDeals,'#C8972A','#FDF8EE','&#9208;'],
+    ['Draft Leads',draftLeads,'#2563eb','#eff6ff','&#128221;'],
+    ['Submitted Leads',submittedLeads,'#7c3aed','#faf5ff','&#128228;'],
+    ['Total Deliverables',totalDlvs,'#1A4731','#E8F5EE','&#128203;'],
+    ['Completed Dlvs',doneDlvs,'#16a34a','#f0fdf4','&#10003;'],
+    ['Avg Progress',avgProgress+'%','#C8972A','#FDF8EE','&#128200;']
+  ].forEach(function(x){
+    html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'30;border-radius:12px;padding:16px 18px;border-top:3px solid '+x[2]+'">';
+    html+='<div style="font-size:22px;margin-bottom:6px">'+x[4]+'</div>';
+    html+='<div style="font-size:28px;font-weight:900;color:'+x[2]+';line-height:1">'+x[1]+'</div>';
+    html+='<div style="font-size:11px;font-weight:700;color:'+x[2]+';opacity:.7;margin-top:4px;letter-spacing:.5px">'+x[0].toUpperCase()+'</div>';
+    html+='</div>';
+  });
+  html+='</div>';
+
+  // ── Row 2: Deal Mix + Lead Mix donuts ────────────────────────────────────
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+
+  // Deal mix by service type
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
+  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deal Mix by Service Type</div>';
+  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalDeals+' deal'+(totalDeals!==1?'s':'')+' total</div>';
+  var dealSegs=[
+    {label:'Business Consulting',value:svcCounts['Business Consulting'],color:'#2D6A4F'},
+    {label:'Business Brokerage',value:svcCounts['Business Brokerage'],color:'#C8972A'},
+    {label:'Business Funding',value:svcCounts['Business Funding'],color:'#7c3aed'},
+    {label:'Other',value:svcCounts['Other'],color:'#94a3b8'}
+  ].filter(function(s){return s.value>0;});
+  html+='<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+  html+=donut(dealSegs,140);
+  html+='<div style="display:flex;flex-direction:column;gap:8px">';
+  dealSegs.forEach(function(s){
+    var pct=totalDeals>0?Math.round(s.value/totalDeals*100):0;
+    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+e(s.label)+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
+  });
+  if(!dealSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No deals yet</div>';
+  html+='</div></div></div>';
+
+  // Lead mix by label (Hot/Warm/Cold)
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
+  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Lead Temperature Mix</div>';
+  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalLeads+' lead'+(totalLeads!==1?'s':'')+' total</div>';
+  var leadSegs=[
+    {label:'Hot &#128293;',value:hotLeads,color:'#2D6A4F'},
+    {label:'Warm &#9728;',value:warmLeads,color:'#C8972A'},
+    {label:'Cold &#10052;',value:coldLeads,color:'#2563eb'}
+  ].filter(function(s){return s.value>0;});
+  html+='<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+  html+=donut(leadSegs,140);
+  html+='<div style="display:flex;flex-direction:column;gap:8px">';
+  leadSegs.forEach(function(s){
+    var pct=totalLeads>0?Math.round(s.value/totalLeads*100):0;
+    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+s.label+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
+  });
+  if(!leadSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No leads yet</div>';
+  html+='</div></div></div>';
+
+  html+='</div>';
+
+  // ── Row 3: Bar charts ─────────────────────────────────────────────────────
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+
+  // Deals by status bar chart
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
+  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deals by Status</div>';
+  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Current distribution</div>';
+  var statusItems=[
+    {label:'Active',value:activeDeals,color:'#2D6A4F'},
+    {label:'Completed',value:completedDeals,color:'#16a34a'},
+    {label:'On Hold',value:onHoldDeals,color:'#C8972A'},
+    {label:'Cancelled',value:S.deals.filter(function(d){return d.status==='Cancelled';}).length,color:'#dc2626'}
+  ].filter(function(x){return x.value>0;});
+  var maxStatus=Math.max.apply(null,statusItems.map(function(x){return x.value;})||[1]);
+  html+=barChart(statusItems,maxStatus,160,'#2D6A4F');
+  html+='</div>';
+
+  // Leads by service type bar chart
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
+  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Leads by Service Type</div>';
+  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Enquiry breakdown</div>';
+  var leadSvcItems=[
+    {label:'Consulting',value:leadSvcCounts['Business Consulting'],color:'#2D6A4F'},
+    {label:'Brokerage',value:leadSvcCounts['Business Brokerage'],color:'#C8972A'},
+    {label:'Funding',value:leadSvcCounts['Business Funding'],color:'#7c3aed'},
+    {label:'Other',value:leadSvcCounts['Other'],color:'#94a3b8'}
+  ].filter(function(x){return x.value>0;});
+  var maxLeadSvc=Math.max.apply(null,leadSvcItems.map(function(x){return x.value;})||[1]);
+  html+=barChart(leadSvcItems,maxLeadSvc,160,'#2D6A4F');
+  html+='</div>';
+
+  html+='</div>';
+
+  // ── Row 4: Pipeline snapshot table + Deliverables progress ───────────────
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+
+  // Lead pipeline snapshot
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
+  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128203; Lead Pipeline Snapshot</div></div>';
+  html+='<div style="padding:0">';
+  var snapRows=[
+    ['Total Leads',totalLeads,'#1A4731'],
+    ['Approved',approvedLeads,'#16a34a'],
+    ['Submitted',submittedLeads,'#7c3aed'],
+    ['Drafts',draftLeads,'#C8972A'],
+    ['Converted to Deal',convertedLeads,'#2D6A4F'],
+    ['Conversion Rate',convRate+'%','#C8972A'],
+    ['Approval Rate',approvalRate+'%','#2D6A4F']
+  ];
+  snapRows.forEach(function(row,i){
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px;border-bottom:1px solid #E8F5EE;background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+    html+='<div style="font-size:13px;color:#5A7A65;font-weight:500">'+row[0]+'</div>';
+    html+='<div style="font-size:16px;font-weight:900;color:'+row[2]+'">'+row[1]+'</div>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+
+  // Deliverables by deal
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
+  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Deliverable Progress by Deal</div></div>';
+  html+='<div style="padding:16px 18px">';
+  if(!S.deals.length||!allDlvs.length){
+    html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables yet. Add them in the deals tab.</div>';
+  } else {
+    S.deals.forEach(function(d){
+      var dlvs=d.deliverables||[];if(!dlvs.length) return;
+      var avg=Math.round(dlvs.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs.length);
+      var col=svcCol[d.serviceType]||'#2D6A4F';
+      var barCol=avg===100?'#16a34a':avg>=65?col:avg>=35?'#C8972A':'#94a3b8';
+      html+='<div style="margin-bottom:14px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">';
+      html+='<div><div style="font-size:12px;font-weight:700;color:#1A4731">'+e(d.bizName||d.dealId||'Deal')+'</div>';
+      html+='<div style="font-size:10px;color:'+col+';font-weight:600">'+e(d.serviceType||'')+'</div></div>';
+      html+='<span style="font-size:14px;font-weight:900;color:'+barCol+'">'+avg+'%</span>';
+      html+='</div>';
+      html+='<div style="height:10px;background:#E8F5EE;border-radius:5px;overflow:hidden">';
+      html+='<div style="width:'+avg+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'bb);border-radius:5px;transition:width .4s"></div>';
+      html+='</div>';
+      html+='<div style="font-size:10px;color:#5A7A65;margin-top:3px">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+' &nbsp;&middot;&nbsp; '+dlvs.filter(function(x){return x.progress===100;}).length+' completed</div>';
+      html+='</div>';
+    });
+  }
+  html+='</div></div>';
+
+  html+='</div>';
+
+  // ── Row 5: Recent activity ────────────────────────────────────────────────
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128336; Recent Activity Log</div></div>';
+  var recentAudit=[].concat(S.auditLog).reverse().slice(0,8);
+  if(!recentAudit.length){
+    html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px">No activity recorded yet.</div>';
+  } else {
+    html+='<div style="overflow-x:auto"><table><thead><tr><th>LEAD ID</th><th>USER</th><th>ACTION</th><th>TIME</th></tr></thead><tbody>';
+    recentAudit.forEach(function(en,i){
+      html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+      html+='<td><span class="badge-id">'+e(en.leadId)+'</span></td>';
+      html+='<td style="font-weight:600;color:#1A4731">'+e(en.user||'?')+'</td>';
+      html+='<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.field)+'</span>')+'</td>';
+      html+='<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+
+  html+='</div>';
+  return html;
+}
+
 
 function rGantt(){
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
