@@ -886,11 +886,6 @@ function subLead(){
   if(!lf.serviceType){flash('Service Type is required.','err');return;}
   if(!lf.ownerContact||!lf.ownerContact.trim()){flash('Owner / Main Contact is required.','err');return;}
   if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('End date cannot be before start date.','err');return;}
-  var existing=S.leid!==null?S.leads.filter(function(x){return x._id===S.leid;})[0]:null;
-  if(!existing||!existing.approved){
-    flash('This lead must be approved by an authorised user before it can be submitted.','err');
-    return;
-  }
   persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
 }
 
