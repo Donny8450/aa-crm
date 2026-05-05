@@ -543,7 +543,7 @@ function rLeads(){
 
 function rLL(){
   var lf=S.lform||bLead();var isE=S.leid!==null;
-  var ac=lf.bizName;
+  var ac=true;
   var req=S.biz==='limited'?2:1;var met=S.lfiles.length>=req;
   var leads=[].concat(S.leads);
   if(S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
@@ -588,7 +588,7 @@ function rLL(){
       '<div class="sbody'+(S.sec.at?' on':'')+'">'+
         
         '<form id="af"><div style="display:flex;flex-direction:column;gap:11px">'+
-          '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="e.g. Mensah Holdings" style="'+(lf.bizName?'':'border-color:#fca5a5')+'"/></div>'+
+          
           '<div class="grid2">'+
                       '</div>'+
           '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb">'+
@@ -665,11 +665,11 @@ function rLL(){
 
         '<td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
           (l.converted?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">Converted</span>':
-            !l.approved?'<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:not-allowed" title="Awaiting approval">&#128274; Awaiting Approval</span>':
-            lm?'<button class="btn btn-sm cnv" data-id="'+l._id+'" style="background:#FDF8EE;color:#1A4731;border:1px solid #C8972A;font-weight:700">Convert</button>':
-            '<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:not-allowed" title="Upload required docs first">&#128274; Locked</span>')+
+            l.approved?'<button class="btn btn-sm cnv" data-id="'+l._id+'" style="background:#FDF8EE;color:#1A4731;border:1px solid #C8972A;font-weight:700">&#9889; Convert</button>':
+            l.leadStatus==='pending'?'<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#9203; Pending Approval</span>':
+            '<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#128274; Awaiting Approval</span>')+
           '<button class="btn btn-pale btn-sm ell" data-id="'+l._id+'">Edit</button>'+
-          (!l.approved?'<button class="aprbtn btn-sm" data-id="'+l._id+'" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#128272; Approve</button>':'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:700;white-space:nowrap">&#10003; '+e(l.approvedBy)+'</span>')+
+
           '<button class="btn btn-red btn-sm dll" data-id="'+l._id+'">&#10005;</button>'+
       '</tr>';
     }).join('')+
@@ -791,7 +791,7 @@ function gDF(){
 function gLF(){
   var lf=S.lform||bLead(),f1=document.getElementById('lf1'),f2=document.getElementById('af');
   if(f1){['bizName','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
-  if(f2){['bizName'].forEach(function(k){var el=f2.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});}
+  // bizName read from Customer Overview form (f1) only
   var kr=document.querySelector('input[name="kickoffMeeting"]:checked');
   if(kr) lf.kickoffMeeting=kr.value;
   var mr=document.querySelector('input[name="maSigned"]:checked');
@@ -897,9 +897,7 @@ function subLead(){
 function cvt(id){
   var l=S.leads.filter(function(x){return x._id===id;})[0];if(!l) return;
   if(!l.approved){flash('This lead must be approved by an authorised user before it can be converted to a deal.','err');return;}
-  var r=l.bizStructure==='limited'?2:1;
-  if(!l.bizStructure){flash('Select a business structure first.','err');return;}
-  if((l.files||[]).length<r){flash('Need '+r+' document'+(r>1?'s':'')+' to convert.','err');return;}
+
   var nid=fid('D',S.did++);
   var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[]});
   S.deals=S.deals.concat([newDeal2]);
