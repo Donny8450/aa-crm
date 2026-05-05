@@ -224,13 +224,13 @@ function rApp(){
       '</div>'+
     '</div>'+
     '<div style="display:flex;margin-top:2px">'+
-      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['overview','&#128200; Management Overview']].map(function(x){
+      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']].map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
       }).join('')+
     '</div>'+
   '</div>'+
   '<div style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
-    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='overview'?rOverview():''))+
+    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?rApprovals():'')+(S.tab==='overview'?rOverview():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   '</div>';
@@ -655,7 +655,7 @@ function rLL(){
       var lr=l.bizStructure==='limited'?2:1;
       var lm=l.bizStructure&&(l.files||[]).length>=lr;
       return '<tr>'+
-        '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='submitted'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">SUBMITTED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
+        '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='pending'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">PENDING APPROVAL</span>':l.leadStatus==='approved'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">APPROVED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
         '<td style="font-weight:600;color:#1A4731">'+e(l.contactPerson)+'</td>'+
         '<td style="color:#5A7A65">'+(l.organization?e(l.organization):'&mdash;')+'</td>'+
         '<td style="color:#2D6A4F;font-weight:600">'+(l.expectedValue?e(l.expectedValue):'&mdash;')+'</td>'+
@@ -891,7 +891,7 @@ function subLead(){
     flash('This lead must be approved by an authorised user before it can be submitted.','err');
     return;
   }
-  persistLead(lf,'submitted',S.leid!==null?'Lead updated!':'Lead submitted!');
+  persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
 }
 
 function cvt(id){
@@ -935,7 +935,7 @@ function confirmApproval(){
   var ts=new Date().toLocaleString();
   S.leads=S.leads.map(function(l){
     if(l._id!==leadId) return l;
-    var updated=Object.assign({},l,{approved:true,approvedBy:match.name,approvedAt:ts});
+    var updated=Object.assign({},l,{approved:true,approvedBy:match.name,approvedAt:ts,leadStatus:'approved'});
     syncLead(updated);
     return updated;
   });
@@ -1332,6 +1332,106 @@ function rOverview(){
       html+='<td style="font-weight:600;color:#1A4731">'+e(en.user||'?')+'</td>';
       html+='<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.field)+'</span>')+'</td>';
       html+='<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+
+  html+='</div>';
+  return html;
+}
+
+
+function rApprovals(){
+  var pending=S.leads.filter(function(l){return l.leadStatus==='pending';});
+  var approved=S.leads.filter(function(l){return l.leadStatus==='approved';});
+  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
+
+  var html='<div>';
+
+  // Header
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">APPROVALS</div>';
+  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Lead Approval Queue</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Submitted leads awaiting review and approval before conversion to deals</div>';
+  html+='<div style="display:flex;gap:20px;margin-top:18px">';
+  [
+    [pending.length,'Pending Approval','#fed7aa','#c2410c'],
+    [approved.length,'Approved','#86efac','#16a34a'],
+    [S.leads.filter(function(l){return l.converted;}).length,'Converted to Deal','#c4b5fd','#7c3aed']
+  ].forEach(function(x){
+    html+='<div style="background:'+x[2]+'30;border:1px solid '+x[2]+'60;border-radius:10px;padding:12px 20px;text-align:center">';
+    html+='<div style="font-size:28px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div>';
+    html+='<div style="font-size:10px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[1].toUpperCase()+'</div>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+
+  // Pending queue
+  html+='<div style="margin-bottom:24px">';
+  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#9203; Pending Approval <span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+pending.length+'</span></div>';
+
+  if(pending.length===0){
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:40px;text-align:center">';
+    html+='<div style="font-size:40px;margin-bottom:12px">&#10003;</div>';
+    html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:6px">All clear!</div>';
+    html+='<div style="font-size:13px;color:#5A7A65">No leads pending approval. Submit a lead to see it here.</div>';
+    html+='</div>';
+  } else {
+    pending.forEach(function(l){
+      var col=svcCol[l.serviceType]||'#2D6A4F';
+      html+='<div style="background:#fff;border:1px solid #fed7aa;border-left:5px solid #c2410c;border-radius:12px;padding:20px 24px;margin-bottom:14px">';
+      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px">';
+
+      // Left: lead info
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
+      html+='<span class="badge-id">'+e(l.leadId||'n/a')+'</span>';
+      html+='<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">PENDING APPROVAL</span>';
+      if(l.serviceType) html+='<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>';
+      html+='</div>';
+      html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:4px">'+e(l.bizName||l.ownerContact||'Unnamed Lead')+'</div>';
+      if(l.ownerContact) html+='<div style="font-size:13px;color:#5A7A65;margin-bottom:8px">Contact: '+e(l.ownerContact)+'</div>';
+      html+='<div style="display:flex;gap:16px;flex-wrap:wrap">';
+      if(l.phone) html+='<span style="font-size:12px;color:#5A7A65">&#128222; '+e(l.phone)+'</span>';
+      if(l.email) html+='<span style="font-size:12px;color:#5A7A65">&#9993; '+e(l.email)+'</span>';
+      if(l.source) html+='<span style="font-size:12px;color:#5A7A65">Source: '+e(l.source)+'</span>';
+      if(l.priority) html+='<span style="font-size:12px;font-weight:700;color:'+(l.priority==='High Priority'?'#dc2626':l.priority==='Medium'?'#C8972A':'#2D6A4F')+'">'+e(l.priority)+'</span>';
+      html+='</div>';
+      if(l.projectBrief) html+='<div style="margin-top:10px;font-size:12px;color:#5A7A65;background:#f8fafc;border-radius:8px;padding:10px 12px;line-height:1.6;max-width:500px">'+e(l.projectBrief)+'</div>';
+      html+='</div>';
+
+      // Right: Approve button
+      html+='<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">';
+      html+='<button class="aprbtn btn" data-id="'+e(l._id)+'" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#128272; Approve Lead</button>';
+      html+='<div style="font-size:11px;color:#5A7A65;text-align:right">'+e(l.label||'')+' lead</div>';
+      html+='</div>';
+
+      html+='</div></div>';
+    });
+  }
+  html+='</div>';
+
+  // Approved leads
+  html+='<div>';
+  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#10003; Approved Leads <span style="background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+approved.length+'</span></div>';
+
+  if(approved.length===0){
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:32px;text-align:center;color:#5A7A65;font-size:13px">No approved leads yet.</div>';
+  } else {
+    html+='<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4"><table>';
+    html+='<thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>CONTACT</th><th>APPROVED BY</th><th>APPROVED AT</th><th>STATUS</th></tr></thead><tbody>';
+    approved.forEach(function(l,i){
+      var col=svcCol[l.serviceType]||'#2D6A4F';
+      html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+      html+='<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span></td>';
+      html+='<td style="font-weight:600;color:#1A4731">'+e(l.bizName||l.ownerContact||'&mdash;')+'</td>';
+      html+='<td>'+(l.serviceType?'<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>':'&mdash;')+'</td>';
+      html+='<td style="color:#5A7A65">'+e(l.ownerContact||'&mdash;')+'</td>';
+      html+='<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+(l.approvedBy||'?').charAt(0).toUpperCase()+'</span><span style="font-weight:600;color:#1A4731">'+e(l.approvedBy||'&mdash;')+'</span></div></td>';
+      html+='<td style="color:#5A7A65;font-size:12px;white-space:nowrap">'+e(l.approvedAt||'&mdash;')+'</td>';
+      html+='<td>'+(!l.converted?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Ready to Convert</span>':'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Converted</span>')+'</td>';
       html+='</tr>';
     });
     html+='</tbody></table></div>';
