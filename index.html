@@ -184,7 +184,7 @@ var LBLS=['Hot','Warm','Cold'];
 var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
-var FL={bizName:'Business Name',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Sales Lead',serviceType:'Service Type'};
+var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Sales Lead',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -198,7 +198,7 @@ function flash(msg,t){
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
-function bLead(){return{leadId:'',bizName:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   document.getElementById('app').innerHTML=rApp();
@@ -559,6 +559,7 @@ function rLL(){
       '<div class="sbody'+(S.sec.ov?' on':'')+'">'+
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
+          '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
@@ -791,7 +792,7 @@ function gDF(){
 
 function gLF(){
   var lf=S.lform||bLead(),f1=document.getElementById('lf1'),f2=document.getElementById('af');
-  if(f1){['bizName','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
+  if(f1){['bizName','ownershipStructure','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
   // bizName read from Customer Overview form (f1) only
   var kr=document.querySelector('input[name="kickoffMeeting"]:checked');
   if(kr) lf.kickoffMeeting=kr.value;
