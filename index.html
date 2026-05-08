@@ -187,6 +187,23 @@ var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':
 var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Sales Lead',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
+function nextLeadId(serviceType){
+  // Determine prefix from service type
+  var prefix='L';
+  if(serviceType==='Business Consulting') prefix='C';
+  else if(serviceType==='Business Funding') prefix='F';
+  else if(serviceType==='Business Brokerage') prefix='B';
+  // Find highest existing number for this prefix
+  var max=0;
+  S.leads.forEach(function(l){
+    var id=l.leadId||'';
+    if(id.charAt(0)===prefix){
+      var num=parseInt(id.slice(1),10);
+      if(!isNaN(num)&&num>max) max=num;
+    }
+  });
+  return prefix+('0000'+(max+1)).slice(-5);
+}
 function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function flash(msg,t){
@@ -862,7 +879,7 @@ function persistLead(lf, status, msg){
     syncLead(updated);
     flash(msg);S.leid=null;
   } else {
-    var nid=fid('L',S.lid++);
+    var nid=nextLeadId(lf.serviceType);
     var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz});
     S.leads=S.leads.concat([newLead]);
     var auditEntry={_id:Date.now(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
