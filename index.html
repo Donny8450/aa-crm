@@ -185,6 +185,9 @@ function loadFromSupabase(){
     if(Array.isArray(notes)) S.notes = notes.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(acts)) S.acts = acts.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(audit)) S.auditLog = audit.map(function(r){return Object.assign({_id:r.id},r.data);});
+    // Load deal audit from same table (dealId field distinguishes them)
+    S.dealAuditLog = S.auditLog.filter(function(e){return e.dealId;});
+    S.auditLog = S.auditLog.filter(function(e){return e.leadId&&!e.dealId;});
     SB_CONNECTED = true; SB_ERROR = '';
     S.SB_LOADING = false;
     loadUsers();
@@ -220,7 +223,7 @@ function deleteAct(id){sbDelete('activities', id);}
 var S={
   tab:'dashboard',lsub:'list',
   deals:[],leads:[],notes:[],acts:[],
-  auditLog:[],auditUser:'Ona',
+  auditLog:[],dealAuditLog:[],auditUser:'Ona',
   auditFilter:'all',
   form:null,lform:null,
   eid:null,leid:null,
@@ -270,6 +273,7 @@ var LBLS=['Hot','Warm','Cold'];
 var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
+var FLD={bizName:'Business Name',serviceType:'Service Type',owner:'Owner',email:'Email',phone:'Phone',source:'Source',status:'Status',projectBrief:'Project Brief',startDate:'Start Date',endDate:'End Date',consultFocus:'Consulting Focus',engagementType:'Engagement Type',consultFee:'Consulting Fee',sessions:'Sessions',consultDeliverables:'Deliverables Overview',txType:'Transaction Type',askingPrice:'Asking Price',annualRevenue:'Annual Revenue',sdeEbitda:'SDE/EBITDA',commission:'Commission %',listingStatus:'Listing Status',bizDescription:'Business Description',yearIncorp:'Year of Incorporation',numEmployees:'No. of Employees',annualSalesBrok:'Annual Sales',sde:'Seller Discretionary Earnings',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',fundingType:'Funding Type',fundingAmount:'Funding Amount',equityOffered:'Equity Offered %',useOfFunds:'Use of Funds',currRevenue:'Current Revenue',fundingStage:'Funding Stage',pitchSummary:'Pitch Summary',dealStatus:'Deal Status'};
 var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Owner/Main Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Sales Lead',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
@@ -661,10 +665,33 @@ function rPipe(){
         '<button class="btn btn-red btn-sm dld" data-id="'+d._id+'" style="font-size:13px">&#10005;</button>'+
       '</div></td>'+
     '</tr>'+
-    (exp?'<tr style="background:#E8F5EE"><td colspan="9" style="padding:14px 20px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">'+
-      [['Email',d.email],['Phone',d.phoneNumber],['Referred By',d.referredBy],['Location',d.location]].filter(function(x){return x[1];}).map(function(x){return '<div><div style="font-size:10px;color:#5A7A65;font-weight:700;letter-spacing:1px;margin-bottom:2px">'+x[0].toUpperCase()+'</div><div style="font-size:13px">'+e(x[1])+'</div></div>';}).join('')+
-      [['Next Steps',d.nextSteps],['Context',d.context],['Notes',d.notes]].filter(function(x){return x[1];}).map(function(x){return '<div style="grid-column:span 2"><div style="font-size:10px;color:#5A7A65;font-weight:700;letter-spacing:1px;margin-bottom:2px">'+x[0].toUpperCase()+'</div><div style="font-size:13px;line-height:1.5">'+e(x[1])+'</div></div>';}).join('')+
-    '</div></td></tr>':'');
+    (exp?function(){
+      var dealLog=S.dealAuditLog.filter(function(en){return en.dealRef===d._id||en.dealId===d.dealId;}).reverse();
+      var logHtml='<tr style="background:#fafdfb"><td colspan="10" style="padding:0">';
+      logHtml+='<div style="padding:16px 20px;border-top:2px solid #C8E6D4">';
+      logHtml+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      logHtml+='<div style="font-size:13px;font-weight:800;color:#1A4731">&#128203; Deal Activity Log &mdash; '+e(d.bizName||d.dealId)+'</div>';
+      logHtml+='<div style="font-size:11px;color:#5A7A65">'+dealLog.length+' entr'+(dealLog.length===1?'y':'ies')+'</div>';
+      logHtml+='</div>';
+      if(!dealLog.length){
+        logHtml+='<div style="text-align:center;padding:16px;color:#5A7A65;font-size:12px">No activity recorded yet. Save or edit this deal to start tracking changes.</div>';
+      } else {
+        logHtml+='<div style="overflow-x:auto;border-radius:8px;border:1px solid #E8F5EE">';
+        logHtml+='<table style="font-size:12px"><thead><tr><th>USER</th><th>FIELD CHANGED</th><th>PREVIOUS VALUE</th><th>NEW VALUE</th><th>TIME</th></tr></thead><tbody>';
+        dealLog.forEach(function(en,i){
+          logHtml+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+          logHtml+='<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+e((en.user||'?').charAt(0).toUpperCase())+'</span><span style="font-weight:600;color:#1A4731">'+e(en.user||'?')+'</span></div></td>';
+          logHtml+='<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap">'+e(en.field)+'</span>')+'</td>';
+          logHtml+='<td style="color:#5A7A65;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.prev||''))+'</td>';
+          logHtml+='<td style="font-weight:600;color:#1A4731;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.next||''))+'</td>';
+          logHtml+='<td style="color:#5A7A65;white-space:nowrap;font-size:11px">'+e(en.ts||'')+'</td>';
+          logHtml+='</tr>';
+        });
+        logHtml+='</tbody></table></div>';
+      }
+      logHtml+='</div></td></tr>';
+      return logHtml;
+    }():'');
   }).join('')+
   '</tbody></table></div>')+
   '</div>';
@@ -964,11 +991,17 @@ function nextDealId(serviceType){
 function persistDeal(status,msg){
   S.form=gDF();var f=S.form;
   f.dealStatus=status;
+  var ts2=new Date().toLocaleString();
+  var actor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
   if(S.eid!==null){
     var existing=S.deals.filter(function(x){return x._id===S.eid;})[0]||{};
-    // Always use the live deliverables from S.deals (updated by add/edit/delete actions)
     var liveDelivs=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];
     var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:liveDelivs.length>0?liveDelivs:(f.deliverables||[])});
+    // Track changed fields
+    var changedFields=Object.keys(FLD).filter(function(k){return String(f[k]||'')!==String(existing[k]||'')&&k!=='dealStatus';});
+    var dealEntries=changedFields.map(function(k){return {_id:'DA'+Date.now()+Math.random(),dealId:updated.dealId,dealRef:S.eid,user:actor,field:FLD[k],prev:String(existing[k]||'n/a'),next:String(f[k]||'n/a'),ts:ts2};});
+    if(status!==existing.dealStatus) dealEntries.push({_id:'DA'+Date.now()+Math.random(),dealId:updated.dealId,dealRef:S.eid,user:actor,field:'Status',prev:existing.dealStatus||'draft',next:status,ts:ts2});
+    if(dealEntries.length>0){S.dealAuditLog=S.dealAuditLog.concat(dealEntries);dealEntries.forEach(function(en){syncAudit(en);});}
     S.deals=S.deals.map(function(x){return x._id===S.eid?updated:x;});
     syncDeal(updated);
     flash(msg);S.eid=null;
@@ -977,6 +1010,10 @@ function persistDeal(status,msg){
     var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:f.deliverables||[]});
     S.deals=S.deals.concat([newDeal]);
     syncDeal(newDeal);
+    // Log deal creation
+    var createEntry={_id:'DA'+Date.now(),dealId:nid,dealRef:newDeal._id,user:actor,field:'n/a',prev:'n/a',next:'Deal created ('+nid+')',ts:ts2};
+    S.dealAuditLog=S.dealAuditLog.concat([createEntry]);
+    syncAudit(createEntry);
     flash(msg+' ID: '+nid);
   }
   S.form=bDeal();S.dfiles=[];S.tab='pipeline';render();
