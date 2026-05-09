@@ -944,6 +944,23 @@ function gLF(){
   return lf;
 }
 
+function nextDealId(serviceType){
+  var prefix='D';
+  if(serviceType==='Business Consulting') prefix='C';
+  else if(serviceType==='Business Brokerage') prefix='B';
+  else if(serviceType==='Business Funding') prefix='F';
+  else if(serviceType==='Business Valuation') prefix='V';
+  var max=0;
+  S.deals.forEach(function(d){
+    var id=d.dealId||'';
+    if(id.charAt(0)===prefix){
+      var num=parseInt(id.slice(1),10);
+      if(!isNaN(num)&&num>max) max=num;
+    }
+  });
+  return prefix+('0000'+(max+1)).slice(-5);
+}
+
 function persistDeal(status,msg){
   S.form=gDF();var f=S.form;
   f.dealStatus=status;
@@ -956,7 +973,7 @@ function persistDeal(status,msg){
     syncDeal(updated);
     flash(msg);S.eid=null;
   } else {
-    var nid=fid('D',S.did++);
+    var nid=nextDealId(f.serviceType);
     var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:f.deliverables||[]});
     S.deals=S.deals.concat([newDeal]);
     syncDeal(newDeal);
@@ -1045,7 +1062,7 @@ function cvt(id){
   var l=S.leads.filter(function(x){return x._id===id;})[0];if(!l) return;
   if(!l.approved){flash('This lead must be approved by an authorised user before it can be converted to a deal.','err');return;}
 
-  var nid=fid('D',S.did++);
+  var nid=nextDealId(l.serviceType);
   var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[]});
   S.deals=S.deals.concat([newDeal2]);
   syncDeal(newDeal2);
@@ -1233,33 +1250,35 @@ function dcsv(rows,fn){
 }
 
 function rOverview(){
-  // ── Computed metrics ───────────────────────────────────────────────────────
+  // ── Computed metrics ──────────────────────────────────────────────────────
   var totalDeals=S.deals.length;
   var totalLeads=S.leads.length;
   var activeDeals=S.deals.filter(function(d){return d.status==='Active';}).length;
   var completedDeals=S.deals.filter(function(d){return d.status==='Completed';}).length;
   var onHoldDeals=S.deals.filter(function(d){return d.status==='On Hold';}).length;
+  var cancelledDeals=S.deals.filter(function(d){return d.status==='Cancelled';}).length;
 
   // Leads by label
   var hotLeads=S.leads.filter(function(l){return l.label==='Hot';}).length;
   var warmLeads=S.leads.filter(function(l){return l.label==='Warm';}).length;
   var coldLeads=S.leads.filter(function(l){return l.label==='Cold';}).length;
 
-  // Leads by status
-  var submittedLeads=S.leads.filter(function(l){return l.leadStatus==='submitted';}).length;
+  // Leads by status — 'pending' = submitted awaiting approval
+  var pendingLeads=S.leads.filter(function(l){return l.leadStatus==='pending';}).length;
   var draftLeads=S.leads.filter(function(l){return l.leadStatus==='draft';}).length;
-  var approvedLeads=S.leads.filter(function(l){return l.approved;}).length;
-  var convertedLeads=S.leads.filter(function(l){return l.converted;}).length;
+  var approvedLeads=S.leads.filter(function(l){return l.leadStatus==='approved';}).length;
+  // Converted leads are deleted from leads table when converted — track via deals created from leads
+  var convertedDeals=S.deals.filter(function(d){return d.source&&d.source!=='';}).length;
 
-  // Deals by service type
-  var svcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Other':0};
+  // Deals by service type (including Valuation)
+  var svcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Business Valuation':0,'Other':0};
   S.deals.forEach(function(d){
     if(svcCounts[d.serviceType]!==undefined) svcCounts[d.serviceType]++;
     else svcCounts['Other']++;
   });
 
-  // Leads by service type
-  var leadSvcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Other':0};
+  // Leads by service type (including Valuation)
+  var leadSvcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Business Valuation':0,'Other':0};
   S.leads.forEach(function(l){
     if(leadSvcCounts[l.serviceType]!==undefined) leadSvcCounts[l.serviceType]++;
     else leadSvcCounts['Other']++;
@@ -1270,21 +1289,20 @@ function rOverview(){
   S.deals.forEach(function(d){(d.deliverables||[]).forEach(function(dlv){allDlvs.push(dlv);});});
   var totalDlvs=allDlvs.length;
   var doneDlvs=allDlvs.filter(function(d){return d.progress===100;}).length;
+  var inProgDlvs=allDlvs.filter(function(d){return d.progress>0&&d.progress<100;}).length;
   var avgProgress=totalDlvs?Math.round(allDlvs.reduce(function(a,d){return a+(d.progress||0);},0)/totalDlvs):0;
 
-  // Conversion rate
-  var convRate=totalLeads>0?Math.round(convertedLeads/totalLeads*100):0;
+  // Rates
   var approvalRate=totalLeads>0?Math.round(approvedLeads/totalLeads*100):0;
+  var totalProcessed=totalLeads+S.deals.length;
 
   // Service colours
-  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed','Other':'#94a3b8'};
+  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed','Business Valuation':'#0e7490','Other':'#94a3b8'};
 
-  // Donut chart helper — pure CSS/HTML
+  // Donut chart helper
   function donut(segments,size){
-    // segments = [{label, value, color}]
     var total=segments.reduce(function(a,s){return a+s.value;},0);
     if(!total) return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:#E8F5EE;display:flex;align-items:center;justify-content:center"><span style="font-size:12px;color:#5A7A65">No data</span></div>';
-    // Build conic-gradient
     var gradient='conic-gradient(';
     var cum=0;
     var parts=segments.map(function(s){
@@ -1292,7 +1310,7 @@ function rOverview(){
       var from=cum;cum+=pct;
       return s.color+' '+from.toFixed(1)+'% '+cum.toFixed(1)+'%';
     });
-    gradient+=parts.join(',')+')';
+    gradient+=parts.join(',')+')'
     var inner=Math.round(size*0.6);
     return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+gradient+';display:flex;align-items:center;justify-content:center">'+
       '<div style="width:'+inner+'px;height:'+inner+'px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
@@ -1311,9 +1329,9 @@ function rOverview(){
         var barH=Math.max(4,Math.round(pct*(height-30)/100));
         var col=item.color||accentCol||'#2D6A4F';
         return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end">'+
-          '<div style="font-size:10px;font-weight:700;color:'+col+'">'+item.value+'</div>'+
+          '<div style="font-size:11px;font-weight:700;color:'+col+'">'+item.value+'</div>'+
           '<div style="width:100%;height:'+barH+'px;background:'+col+';border-radius:4px 4px 0 0;min-height:4px"></div>'+
-          '<div style="font-size:9px;color:#5A7A65;text-align:center;line-height:1.2;max-width:100%;overflow:hidden;word-break:break-word">'+e(item.label)+'</div>'+
+          '<div style="font-size:9px;color:#5A7A65;text-align:center;line-height:1.3;max-width:100%;overflow:hidden;word-break:break-word">'+e(item.label)+'</div>'+
         '</div>';
       }).join('')+
     '</div>';
@@ -1321,35 +1339,39 @@ function rOverview(){
 
   var html='<div>';
 
-  // ── Page Header ──────────────────────────────────────────────────────────
+  // ── Page Header ───────────────────────────────────────────────────────────
   html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden">';
   html+='<div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(200,151,42,.12)"></div>';
   html+='<div style="position:absolute;bottom:-60px;left:200px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.05)"></div>';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:var(--goldL);margin-bottom:8px">MANAGEMENT OVERVIEW &nbsp;&middot;&nbsp; AFRICAN ASPIRATIONS</div>';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">MANAGEMENT OVERVIEW &nbsp;&middot;&nbsp; AFRICAN ASPIRATIONS</div>';
   html+='<div style="font-size:28px;font-weight:900;color:#fff;margin-bottom:4px">Pipeline Summary</div>';
   html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:20px">Real-time view of deals, leads and deliverable progress</div>';
   html+='<div style="display:flex;gap:24px;flex-wrap:wrap">';
   [
     [totalDeals,'Total Deals','#C8972A'],
-    [totalLeads,'Total Leads','#fff'],
+    [totalLeads,'Active Leads','#fff'],
+    [pendingLeads,'Pending Approval','#fed7aa'],
     [approvedLeads,'Approved Leads','#86efac'],
-    [convertedLeads,'Converted','#F5E6C3'],
-    [convRate+'%','Conversion Rate','#a5b4fc']
+    [approvalRate+'%','Approval Rate','#a5b4fc']
   ].forEach(function(x){
     html+='<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div><div style="font-size:11px;color:rgba(255,255,255,.55);font-weight:600;letter-spacing:.7px;margin-top:2px">'+x[1].toUpperCase()+'</div></div>';
   });
   html+='</div></div>';
 
-  // ── Row 1: 4 KPI cards ───────────────────────────────────────────────────
+  // ── KPI Cards ─────────────────────────────────────────────────────────────
   html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px">';
   [
     ['Active Deals',activeDeals,'#2D6A4F','#E8F5EE','&#9889;'],
-    ['Completed',completedDeals,'#16a34a','#f0fdf4','&#9989;'],
+    ['Completed Deals',completedDeals,'#16a34a','#f0fdf4','&#9989;'],
     ['On Hold',onHoldDeals,'#C8972A','#FDF8EE','&#9208;'],
+    ['Cancelled',cancelledDeals,'#dc2626','#fef2f2','&#10060;'],
     ['Draft Leads',draftLeads,'#2563eb','#eff6ff','&#128221;'],
-    ['Submitted Leads',submittedLeads,'#7c3aed','#faf5ff','&#128228;'],
+    ['Pending Approval',pendingLeads,'#c2410c','#fff7ed','&#9203;'],
+    ['Approved Leads',approvedLeads,'#16a34a','#f0fdf4','&#128505;'],
+    ['Hot Leads',hotLeads,'#2D6A4F','#E8F5EE','&#128293;'],
+    ['Warm Leads',warmLeads,'#C8972A','#FDF8EE','&#9728;'],
+    ['Cold Leads',coldLeads,'#2563eb','#eff6ff','&#10052;'],
     ['Total Deliverables',totalDlvs,'#1A4731','#E8F5EE','&#128203;'],
-    ['Completed Dlvs',doneDlvs,'#16a34a','#f0fdf4','&#10003;'],
     ['Avg Progress',avgProgress+'%','#C8972A','#FDF8EE','&#128200;']
   ].forEach(function(x){
     html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'30;border-radius:12px;padding:16px 18px;border-top:3px solid '+x[2]+'">';
@@ -1360,7 +1382,7 @@ function rOverview(){
   });
   html+='</div>';
 
-  // ── Row 2: Deal Mix + Lead Mix donuts ────────────────────────────────────
+  // ── Donuts: Deal Mix + Lead Temperature ───────────────────────────────────
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
 
   // Deal mix by service type
@@ -1368,9 +1390,10 @@ function rOverview(){
   html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deal Mix by Service Type</div>';
   html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalDeals+' deal'+(totalDeals!==1?'s':'')+' total</div>';
   var dealSegs=[
-    {label:'Business Consulting',value:svcCounts['Business Consulting'],color:'#2D6A4F'},
-    {label:'Business Brokerage',value:svcCounts['Business Brokerage'],color:'#C8972A'},
-    {label:'Business Funding',value:svcCounts['Business Funding'],color:'#7c3aed'},
+    {label:'Consulting',value:svcCounts['Business Consulting'],color:'#2D6A4F'},
+    {label:'Brokerage',value:svcCounts['Business Brokerage'],color:'#C8972A'},
+    {label:'Funding',value:svcCounts['Business Funding'],color:'#7c3aed'},
+    {label:'Valuation',value:svcCounts['Business Valuation'],color:'#0e7490'},
     {label:'Other',value:svcCounts['Other'],color:'#94a3b8'}
   ].filter(function(s){return s.value>0;});
   html+='<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
@@ -1378,15 +1401,15 @@ function rOverview(){
   html+='<div style="display:flex;flex-direction:column;gap:8px">';
   dealSegs.forEach(function(s){
     var pct=totalDeals>0?Math.round(s.value/totalDeals*100):0;
-    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+e(s.label)+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
+    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+e(s.label)+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto;padding-left:8px">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
   });
   if(!dealSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No deals yet</div>';
   html+='</div></div></div>';
 
-  // Lead mix by label (Hot/Warm/Cold)
+  // Lead temperature donut
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
   html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Lead Temperature Mix</div>';
-  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalLeads+' lead'+(totalLeads!==1?'s':'')+' total</div>';
+  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalLeads+' lead'+(totalLeads!==1?'s':'')+' in pipeline</div>';
   var leadSegs=[
     {label:'Hot &#128293;',value:hotLeads,color:'#2D6A4F'},
     {label:'Warm &#9728;',value:warmLeads,color:'#C8972A'},
@@ -1397,17 +1420,15 @@ function rOverview(){
   html+='<div style="display:flex;flex-direction:column;gap:8px">';
   leadSegs.forEach(function(s){
     var pct=totalLeads>0?Math.round(s.value/totalLeads*100):0;
-    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+s.label+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
+    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+s.label+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto;padding-left:8px">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
   });
   if(!leadSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No leads yet</div>';
   html+='</div></div></div>';
-
   html+='</div>';
 
-  // ── Row 3: Bar charts ─────────────────────────────────────────────────────
+  // ── Bar Charts: Deals by Status + Leads by Service Type ──────────────────
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
 
-  // Deals by status bar chart
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
   html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deals by Status</div>';
   html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Current distribution</div>';
@@ -1415,13 +1436,12 @@ function rOverview(){
     {label:'Active',value:activeDeals,color:'#2D6A4F'},
     {label:'Completed',value:completedDeals,color:'#16a34a'},
     {label:'On Hold',value:onHoldDeals,color:'#C8972A'},
-    {label:'Cancelled',value:S.deals.filter(function(d){return d.status==='Cancelled';}).length,color:'#dc2626'}
+    {label:'Cancelled',value:cancelledDeals,color:'#dc2626'}
   ].filter(function(x){return x.value>0;});
-  var maxStatus=Math.max.apply(null,statusItems.map(function(x){return x.value;})||[1]);
+  var maxStatus=Math.max.apply(null,[1].concat(statusItems.map(function(x){return x.value;})));
   html+=barChart(statusItems,maxStatus,160,'#2D6A4F');
   html+='</div>';
 
-  // Leads by service type bar chart
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
   html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Leads by Service Type</div>';
   html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Enquiry breakdown</div>';
@@ -1429,29 +1449,28 @@ function rOverview(){
     {label:'Consulting',value:leadSvcCounts['Business Consulting'],color:'#2D6A4F'},
     {label:'Brokerage',value:leadSvcCounts['Business Brokerage'],color:'#C8972A'},
     {label:'Funding',value:leadSvcCounts['Business Funding'],color:'#7c3aed'},
+    {label:'Valuation',value:leadSvcCounts['Business Valuation'],color:'#0e7490'},
     {label:'Other',value:leadSvcCounts['Other'],color:'#94a3b8'}
   ].filter(function(x){return x.value>0;});
-  var maxLeadSvc=Math.max.apply(null,leadSvcItems.map(function(x){return x.value;})||[1]);
+  var maxLeadSvc=Math.max.apply(null,[1].concat(leadSvcItems.map(function(x){return x.value;})));
   html+=barChart(leadSvcItems,maxLeadSvc,160,'#2D6A4F');
   html+='</div>';
-
   html+='</div>';
 
-  // ── Row 4: Pipeline snapshot table + Deliverables progress ───────────────
+  // ── Lead Pipeline Snapshot + Deliverable Progress ─────────────────────────
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
 
-  // Lead pipeline snapshot
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
   html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128203; Lead Pipeline Snapshot</div></div>';
-  html+='<div style="padding:0">';
   var snapRows=[
-    ['Total Leads',totalLeads,'#1A4731'],
+    ['Total Leads in Pipeline',totalLeads,'#1A4731'],
+    ['Draft',draftLeads,'#2563eb'],
+    ['Pending Approval',pendingLeads,'#c2410c'],
     ['Approved',approvedLeads,'#16a34a'],
-    ['Submitted',submittedLeads,'#7c3aed'],
-    ['Drafts',draftLeads,'#C8972A'],
-    ['Converted to Deal',convertedLeads,'#2D6A4F'],
-    ['Conversion Rate',convRate+'%','#C8972A'],
-    ['Approval Rate',approvalRate+'%','#2D6A4F']
+    ['Hot Leads',hotLeads,'#2D6A4F'],
+    ['Warm Leads',warmLeads,'#C8972A'],
+    ['Cold Leads',coldLeads,'#2563eb'],
+    ['Approval Rate',approvalRate+'%','#7c3aed']
   ];
   snapRows.forEach(function(row,i){
     html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px;border-bottom:1px solid #E8F5EE;background:'+(i%2===0?'#fff':'#fafdfb')+'">';
@@ -1459,14 +1478,13 @@ function rOverview(){
     html+='<div style="font-size:16px;font-weight:900;color:'+row[2]+'">'+row[1]+'</div>';
     html+='</div>';
   });
-  html+='</div></div>';
+  html+='</div>';
 
-  // Deliverables by deal
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
   html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Deliverable Progress by Deal</div></div>';
   html+='<div style="padding:16px 18px">';
   if(!S.deals.length||!allDlvs.length){
-    html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables yet. Add them in the deals tab.</div>';
+    html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables yet.</div>';
   } else {
     S.deals.forEach(function(d){
       var dlvs=d.deliverables||[];if(!dlvs.length) return;
@@ -1474,23 +1492,22 @@ function rOverview(){
       var col=svcCol[d.serviceType]||'#2D6A4F';
       var barCol=avg===100?'#16a34a':avg>=65?col:avg>=35?'#C8972A':'#94a3b8';
       html+='<div style="margin-bottom:14px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px">';
       html+='<div><div style="font-size:12px;font-weight:700;color:#1A4731">'+e(d.bizName||d.dealId||'Deal')+'</div>';
       html+='<div style="font-size:10px;color:'+col+';font-weight:600">'+e(d.serviceType||'')+'</div></div>';
       html+='<span style="font-size:14px;font-weight:900;color:'+barCol+'">'+avg+'%</span>';
       html+='</div>';
       html+='<div style="height:10px;background:#E8F5EE;border-radius:5px;overflow:hidden">';
-      html+='<div style="width:'+avg+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'bb);border-radius:5px;transition:width .4s"></div>';
+      html+='<div style="width:'+avg+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'bb);border-radius:5px"></div>';
       html+='</div>';
       html+='<div style="font-size:10px;color:#5A7A65;margin-top:3px">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+' &nbsp;&middot;&nbsp; '+dlvs.filter(function(x){return x.progress===100;}).length+' completed</div>';
       html+='</div>';
     });
   }
   html+='</div></div>';
-
   html+='</div>';
 
-  // ── Row 5: Recent activity ────────────────────────────────────────────────
+  // ── Recent Activity ───────────────────────────────────────────────────────
   html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
   html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128336; Recent Activity Log</div></div>';
   var recentAudit=[].concat(S.auditLog).reverse().slice(0,8);
@@ -1509,205 +1526,6 @@ function rOverview(){
     html+='</tbody></table></div>';
   }
   html+='</div>';
-
-  html+='</div>';
-  return html;
-}
-
-
-function rApprovals(){
-  var pending=S.leads.filter(function(l){return l.leadStatus==='pending';});
-  var approved=S.leads.filter(function(l){return l.leadStatus==='approved';});
-  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
-
-  var html='<div>';
-
-  // Header
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">APPROVALS</div>';
-  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Lead Approval Queue</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Submitted leads awaiting review and approval before conversion to deals</div>';
-  html+='<div style="display:flex;gap:20px;margin-top:18px">';
-  [
-    [pending.length,'Pending Approval','#fed7aa','#c2410c'],
-    [approved.length,'Approved','#86efac','#16a34a'],
-    [S.leads.filter(function(l){return l.converted;}).length,'Converted to Deal','#c4b5fd','#7c3aed']
-  ].forEach(function(x){
-    html+='<div style="background:'+x[2]+'30;border:1px solid '+x[2]+'60;border-radius:10px;padding:12px 20px;text-align:center">';
-    html+='<div style="font-size:28px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div>';
-    html+='<div style="font-size:10px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[1].toUpperCase()+'</div>';
-    html+='</div>';
-  });
-  html+='</div></div>';
-
-  // Pending queue
-  html+='<div style="margin-bottom:24px">';
-  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#9203; Pending Approval <span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+pending.length+'</span></div>';
-
-  if(pending.length===0){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:40px;text-align:center">';
-    html+='<div style="font-size:40px;margin-bottom:12px">&#10003;</div>';
-    html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:6px">All clear!</div>';
-    html+='<div style="font-size:13px;color:#5A7A65">No leads pending approval. Submit a lead to see it here.</div>';
-    html+='</div>';
-  } else {
-    pending.forEach(function(l){
-      var col=svcCol[l.serviceType]||'#2D6A4F';
-      html+='<div style="background:#fff;border:1px solid #fed7aa;border-left:5px solid #c2410c;border-radius:12px;padding:20px 24px;margin-bottom:14px">';
-      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px">';
-
-      // Left: lead info
-      html+='<div style="flex:1;min-width:0">';
-      html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
-      html+='<span class="badge-id">'+e(l.leadId||'n/a')+'</span>';
-      html+='<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">PENDING APPROVAL</span>';
-      if(l.serviceType) html+='<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>';
-      html+='</div>';
-      html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:4px">'+e(l.bizName||l.ownerContact||'Unnamed Lead')+'</div>';
-      if(l.ownerContact) html+='<div style="font-size:13px;color:#5A7A65;margin-bottom:8px">Contact: '+e(l.ownerContact)+'</div>';
-      html+='<div style="display:flex;gap:16px;flex-wrap:wrap">';
-      if(l.phone) html+='<span style="font-size:12px;color:#5A7A65">&#128222; '+e(l.phone)+'</span>';
-      if(l.email) html+='<span style="font-size:12px;color:#5A7A65">&#9993; '+e(l.email)+'</span>';
-      if(l.source) html+='<span style="font-size:12px;color:#5A7A65">Source: '+e(l.source)+'</span>';
-      if(l.priority) html+='<span style="font-size:12px;font-weight:700;color:'+(l.priority==='High Priority'?'#dc2626':l.priority==='Medium'?'#C8972A':'#2D6A4F')+'">'+e(l.priority)+'</span>';
-      html+='</div>';
-      if(l.projectBrief) html+='<div style="margin-top:10px;font-size:12px;color:#5A7A65;background:#f8fafc;border-radius:8px;padding:10px 12px;line-height:1.6;max-width:500px">'+e(l.projectBrief)+'</div>';
-      html+='</div>';
-
-      // Right: Approve button
-      html+='<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">';
-      html+='<button class="aprbtn btn" data-id="'+e(l._id)+'" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#128272; Approve Lead</button>';
-      html+='<div style="font-size:11px;color:#5A7A65;text-align:right">'+e(l.label||'')+' lead</div>';
-      html+='</div>';
-
-      html+='</div></div>';
-    });
-  }
-  html+='</div>';
-
-  // Approved leads
-  html+='<div>';
-  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#10003; Approved Leads <span style="background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+approved.length+'</span></div>';
-
-  if(approved.length===0){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:32px;text-align:center;color:#5A7A65;font-size:13px">No approved leads yet.</div>';
-  } else {
-    html+='<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4"><table>';
-    html+='<thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>CONTACT</th><th>APPROVED BY</th><th>APPROVED AT</th><th>STATUS</th></tr></thead><tbody>';
-    approved.forEach(function(l,i){
-      var col=svcCol[l.serviceType]||'#2D6A4F';
-      html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-      html+='<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span></td>';
-      html+='<td style="font-weight:600;color:#1A4731">'+e(l.bizName||l.ownerContact||'&mdash;')+'</td>';
-      html+='<td>'+(l.serviceType?'<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>':'&mdash;')+'</td>';
-      html+='<td style="color:#5A7A65">'+e(l.ownerContact||'&mdash;')+'</td>';
-      html+='<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+(l.approvedBy||'?').charAt(0).toUpperCase()+'</span><span style="font-weight:600;color:#1A4731">'+e(l.approvedBy||'&mdash;')+'</span></div></td>';
-      html+='<td style="color:#5A7A65;font-size:12px;white-space:nowrap">'+e(l.approvedAt||'&mdash;')+'</td>';
-      html+='<td>'+(!l.converted?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Ready to Convert</span>':'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Converted</span>')+'</td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table></div>';
-  }
-  html+='</div>';
-
-  html+='</div>';
-  return html;
-}
-
-
-function rUsers(){
-  var isAdmin=S.currentUser&&S.currentUser.role==='admin';
-  var u=S.currentUser||{};
-
-  var html='<div>';
-
-  // Header
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">SETTINGS</div>';
-  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Users & Settings</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Manage team access and your account</div>';
-  html+='</div>';
-
-  // My Account section
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
-  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128100; My Account</div></div>';
-  html+='<div style="padding:20px 24px">';
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">NAME</div><div style="font-size:15px;font-weight:700;color:#1A4731">'+e(u.name||'')+'</div></div>';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">EMAIL</div><div style="font-size:15px;color:#1A4731">'+e(u.email||'')+'</div></div>';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">ROLE</div><span style="background:'+(u.role==='admin'?'#faf5ff':u.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(u.role==='admin'?'#7c3aed':u.role==='manager'?'#C8972A':'#2D6A4F')+';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">'+e(u.role||'staff').charAt(0).toUpperCase()+e(u.role||'staff').slice(1)+'</span></div>';
-  html+='</div>';
-
-  // Change password
-  html+='<div style="border-top:1px solid #E8F5EE;padding-top:16px">';
-  html+='<div style="font-size:13px;font-weight:700;color:#1A4731;margin-bottom:12px">Change Password</div>';
-  if(S.changePassSuccess) html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:13px;color:#16a34a;font-weight:600;margin-bottom:12px">'+e(S.changePassSuccess)+'</div>';
-  if(S.changePassError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.changePassError)+'</div>';
-  html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
-  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CURRENT PASSWORD</div><input id="cp-cur" type="password" placeholder="Current password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
-  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">NEW PASSWORD</div><input id="cp-new" type="password" placeholder="New password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
-  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CONFIRM NEW PASSWORD</div><input id="cp-confirm" type="password" placeholder="Confirm new password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
-  html+='<button id="cp-btn" style="padding:10px 20px;background:#1A4731;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">Update Password</button>';
-  html+='</div></div>';
-  html+='</div></div>';
-
-  // Logout button
-  html+='<div style="margin-bottom:20px;text-align:right">';
-  html+='<button id="logout-btn" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>';
-  html+='</div>';
-
-  // Admin: User Management
-  if(isAdmin){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
-    html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
-    html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128101; Team Members ('+S.users.length+')</div>';
-    html+='<button id="add-user-btn" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Add User</button>';
-    html+='</div>';
-
-    // Add user form (toggleable)
-    if(S.showAddUser){
-      html+='<div style="padding:20px 24px;background:#fafdfb;border-bottom:1px solid #C8E6D4">';
-      html+='<div style="font-size:13px;font-weight:800;color:#1A4731;margin-bottom:14px">New User</div>';
-      if(S.addUserError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:12px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.addUserError)+'</div>';
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">FULL NAME *</div><input id="nu-name" placeholder="e.g. John Mensah" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">EMAIL *</div><input id="nu-email" type="email" placeholder="john@africanaspirations.com" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">TEMPORARY PASSWORD *</div><input id="nu-pass" type="password" placeholder="Set a temporary password" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">ROLE *</div><select id="nu-role" style="width:100%;padding:10px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
-      html+='</div>';
-      html+='<div style="display:flex;gap:10px">';
-      html+='<button id="nu-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Create User</button>';
-      html+='<button id="nu-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
-      html+='</div></div>';
-    }
-
-    // Users table
-    if(S.users.length===0){
-      html+='<div style="padding:32px;text-align:center;color:#5A7A65;font-size:13px">No users yet. Add your first team member above.</div>';
-    } else {
-      html+='<div style="overflow-x:auto"><table>';
-      html+='<thead><tr><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>';
-      S.users.forEach(function(usr,i){
-        var isSelf=usr.id===S.currentUser.id;
-        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-        html+='<td style="font-weight:600;color:#1A4731">'+e(usr.name)+(isSelf?'<span style="margin-left:6px;background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">You</span>':'')+'</td>';
-        html+='<td style="color:#5A7A65">'+e(usr.email)+'</td>';
-        // Editable role dropdown
-        html+='<td><select class="role-sel" data-uid="'+e(usr.id)+'" '+(isSelf?'disabled':'')+' style="padding:4px 8px;border:1px solid #C8E6D4;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;background:'+(usr.role==='admin'?'#faf5ff':usr.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(usr.role==='admin'?'#7c3aed':usr.role==='manager'?'#C8972A':'#2D6A4F')+'"><option value="staff"'+(usr.role==='staff'?' selected':'')+'>Staff</option><option value="manager"'+(usr.role==='manager'?' selected':'')+'>Manager</option><option value="admin"'+(usr.role==='admin'?' selected':'')+'>Admin</option></select></td>';
-        html+='<td><span style="background:'+(usr.active?'#f0fdf4':'#fef2f2')+';color:'+(usr.active?'#16a34a':'#dc2626')+';border:1px solid '+(usr.active?'#86efac':'#fecaca')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+(usr.active?'Active':'Inactive')+'</span></td>';
-        html+='<td><div style="display:flex;gap:6px">';
-        if(!isSelf){
-          html+='<button class="toggle-user-btn" data-uid="'+e(usr.id)+'" data-active="'+(usr.active?'1':'0')+'" style="background:'+(usr.active?'#fff7ed':'#E8F5EE')+';color:'+(usr.active?'#c2410c':'#2D6A4F')+';border:1px solid '+(usr.active?'#fed7aa':'#C8E6D4')+';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">'+(usr.active?'Deactivate':'Activate')+'</button>';
-          html+='<button class="reset-pass-btn" data-uid="'+e(usr.id)+'" data-name="'+e(usr.name)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Reset Pass</button>';
-          html+='<button class="del-user-btn" data-uid="'+e(usr.id)+'" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Delete</button>';
-        }
-        html+='</div></td>';
-        html+='</tr>';
-      });
-      html+='</tbody></table></div>';
-    }
-    html+='</div>';
-  }
 
   html+='</div>';
   return html;
