@@ -62,6 +62,28 @@ tr:hover td{background:#E8F5EE}
 <div id="app"></div>
 <div id="toasts"></div>
 <script>
+// ─── Auto-logout (10 min inactivity) ────────────────────────────────────────
+var _autoLogoutTimer=null;
+var AUTO_LOGOUT_MS=10*60*1000; // 10 minutes
+
+function resetAutoLogout(){
+  if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);
+  if(!S.currentUser) return;
+  _autoLogoutTimer=setTimeout(function(){
+    if(S.currentUser){
+      S.currentUser=null;
+      sessionStorage.removeItem('aa_crm_user');
+      S.loginError='You were signed out due to 10 minutes of inactivity.';
+      render();
+    }
+  },AUTO_LOGOUT_MS);
+}
+
+// Reset timer on any user activity
+['click','keydown','mousemove','touchstart','scroll'].forEach(function(evt){
+  document.addEventListener(evt,resetAutoLogout,{passive:true});
+});
+
 // ─── Password Hashing ────────────────────────────────────────────────────────
 async function hashPassword(password){
   var encoder=new TextEncoder();
@@ -306,9 +328,8 @@ function rApp(){
   return '<div style="min-height:100vh;background:#F4FAF6">'+
   '<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);padding:0 28px;box-shadow:0 4px 20px #1A473140">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 12px;border-bottom:1px solid #4A946950;flex-wrap:wrap;gap:10px">'+
-      '<div style="display:flex;align-items:center;gap:12px"><div style="font-size:18px;font-weight:900;color:#fff">African Aspirations</div>'+(S.SB_LOADING?'<span style="background:#F5E6C380;color:#F5E6C3;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9654; Connecting...</span>':SB_CONNECTED?'<span style="background:#16a34a30;color:#86efac;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9679; Live</span>':'<span style="background:#dc262630;color:#fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="'+e(SB_ERROR)+'">&#9679; Offline</span>')+'</div>'+
-''+
-    '</div>'+
+      '<div style="display:flex;align-items:center;gap:12px"><div style="font-size:18px;font-weight:900;color:#fff">African Aspirations</div>'+(S.currentUser?'<span style="font-size:11px;color:rgba(255,255,255,.6)">'+e(S.currentUser.name)+'</span>':'')+(S.SB_LOADING?'<span style="background:#F5E6C380;color:#F5E6C3;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9654; Connecting...</span>':SB_CONNECTED?'<span style="background:#16a34a30;color:#86efac;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9679; Live</span>':'<span style="background:#dc262630;color:#fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="'+e(SB_ERROR)+'">&#9679; Offline</span>')+'</div>'+
+(S.currentUser?'<button id="hdr-logout" style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);color:#fca5a5;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>':'')+'</div>'+
     '<div style="display:flex;margin-top:2px">'+
       ([['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']]).concat(S.currentUser&&S.currentUser.role==='admin'?[['users','&#128101; Users']]:[['users','&#128101; Users']]).map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
@@ -2259,6 +2280,7 @@ function bRF(){
             if(user.password!==hash){S.loginError='Invalid email or password.';render();return;}
             S.currentUser=user;S.loginError='';S.loginEmail='';
             sessionStorage.setItem('aa_crm_user',JSON.stringify(user));
+            resetAutoLogout();
             loadUsers();render();
           }).catch(function(){S.loginError='Connection error. Please try again.';render();});
       });
@@ -2268,8 +2290,10 @@ function bRF(){
     var le=document.getElementById('login-email');
     if(le) le.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var lp2=document.getElementById('login-pass');if(lp2) lp2.focus();}});
   }
+  var hdrLogout=document.getElementById('hdr-logout');
+  if(hdrLogout) hdrLogout.addEventListener('click',function(){if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
   var logoutBtn=document.getElementById('logout-btn');
-  if(logoutBtn) logoutBtn.addEventListener('click',function(){S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
+  if(logoutBtn) logoutBtn.addEventListener('click',function(){if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
   var cpBtn=document.getElementById('cp-btn');
   if(cpBtn) cpBtn.addEventListener('click',function(){
     var cur=(document.getElementById('cp-cur')||{}).value||'';
@@ -2366,7 +2390,7 @@ function bRF(){
 S.form=bDeal();S.lform=bLead();
 // Restore session
 var _sess=sessionStorage.getItem('aa_crm_user');
-if(_sess){try{S.currentUser=JSON.parse(_sess);}catch(e){}}
+if(_sess){try{S.currentUser=JSON.parse(_sess);resetAutoLogout();}catch(e){}}
 render();
 loadFromSupabase();
 </script>
