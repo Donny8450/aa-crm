@@ -928,9 +928,9 @@ function cvt(id){
   var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[]});
   S.deals=S.deals.concat([newDeal2]);
   syncDeal(newDeal2);
-  var convertedLead=Object.assign({},l,{converted:true});
-  S.leads=S.leads.map(function(x){return x._id===id?convertedLead:x;});
-  syncLead(convertedLead);
+  // Remove lead from pipeline after conversion - no duplication
+  S.leads=S.leads.filter(function(x){return x._id!==id;});
+  deleteLead(id);
   flash('"'+l.contactPerson+'" converted to Pipeline!');
   S.tab='pipeline';render();
 }
