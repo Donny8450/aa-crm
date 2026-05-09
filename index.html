@@ -158,13 +158,11 @@ async function hashPassword(password){
 // ─── Supabase Configuration ───────────────────────────────────────────────────
 var SB_URL = 'https://fsfqzemhrdbrltvvjsdo.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnF6ZW1ocmRicmx0dnZqc2RvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjczNDUsImV4cCI6MjA5MjkwMzM0NX0.z_M3w5ocCpxB4T4jynajybqhV9tUBCwRUDIkNAkYc64';
-var SB_CRM_TOKEN = 'AAGhana@2026#Secure';
 var SB_HEADERS = {
   'apikey': SB_KEY,
   'Authorization': 'Bearer ' + SB_KEY,
   'Content-Type': 'application/json',
   'Prefer': 'return=minimal',
-  'X-CRM-Token': SB_CRM_TOKEN
 };
 
 var SB_SYNCING = false;
@@ -173,10 +171,7 @@ var SB_ERROR = '';
 
 function sbReq(method, table, body, query){
   var url = SB_URL + '/rest/v1/' + table + (query||'');
-  var hdrs = Object.assign({}, SB_HEADERS, {
-    'X-Set-Config-app.crm_token': SB_CRM_TOKEN
-  });
-  var opts = {method:method, headers:hdrs};
+  var opts = {method:method, headers:Object.assign({},SB_HEADERS)};
   if(body) opts.body = JSON.stringify(body);
   if(method==='POST') opts.headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
   return fetch(url, opts);
@@ -207,18 +202,15 @@ function loadUsers(){
 
 function saveUser(user){
   var url=SB_URL+'/rest/v1/crm_users?id=eq.'+user.id;
-  var hdrs=Object.assign({},SB_HEADERS,{'Prefer':'return=minimal','X-Set-Config-app.crm_token':SB_CRM_TOKEN});
-  fetch(url,{method:'PATCH',headers:hdrs,body:JSON.stringify(user)});
+  fetch(url,{method:'PATCH',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
 }
 
 function createUser(user){
-  var hdrs=Object.assign({},SB_HEADERS,{'Prefer':'return=minimal','X-Set-Config-app.crm_token':SB_CRM_TOKEN});
-  fetch(SB_URL+'/rest/v1/crm_users',{method:'POST',headers:hdrs,body:JSON.stringify(user)});
+  fetch(SB_URL+'/rest/v1/crm_users',{method:'POST',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
 }
 
 function deleteUserSB(id){
-  var hdrs=Object.assign({},SB_HEADERS,{'X-Set-Config-app.crm_token':SB_CRM_TOKEN});
-  fetch(SB_URL+'/rest/v1/crm_users?id=eq.'+id,{method:'DELETE',headers:hdrs});
+  fetch(SB_URL+'/rest/v1/crm_users?id=eq.'+id,{method:'DELETE',headers:SB_HEADERS});
 }
 
 function loadFromSupabase(){
