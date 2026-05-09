@@ -162,6 +162,7 @@ var S={
   ganttDeal:null,
   ganttSearch:'',
   ganttProject:'all',
+  confirmModal:null,
   approvalModal:false,
   approvalTargetId:null,
   approvalAction:null,
@@ -252,6 +253,7 @@ function rApp(){
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   rApprovalModal()+
+  rConfirmModal()+
   '</div>';
 }
 
@@ -1074,6 +1076,25 @@ function deleteDeliverable(dealId,dId){
   render();
 }
 
+function rConfirmModal(){
+  if(!S.confirmModal) return '';
+  var c=S.confirmModal;
+  var isDeal=c.type==='deal';
+  return '<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">'+
+    '<div style="background:#fff;border-radius:16px;padding:32px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border-top:4px solid #dc2626;text-align:center">'+
+      '<div style="font-size:44px;margin-bottom:12px">&#9888;&#65039;</div>'+
+      '<div style="font-size:18px;font-weight:900;color:#1A4731;margin-bottom:8px">Are you sure?</div>'+
+      '<div style="font-size:13px;color:#5A7A65;margin-bottom:6px;line-height:1.6">You are about to permanently delete this '+(isDeal?'deal':'lead')+':</div>'+
+      '<div style="font-size:14px;font-weight:700;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 16px;margin-bottom:22px">'+e(c.name||'Unknown')+'</div>'+
+      '<div style="font-size:12px;color:#5A7A65;margin-bottom:22px">This action cannot be undone.</div>'+
+      '<div style="display:flex;gap:12px;justify-content:center">'+
+        '<button id="confirm-no" style="flex:1;padding:13px;border-radius:10px;border:1px solid #C8E6D4;background:#E8F5EE;color:#2D6A4F;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">&#10060; No, Keep It</button>'+
+        '<button id="confirm-yes" style="flex:1;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">&#9989; Yes, Delete</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
 function dcsv(rows,fn){
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download=fn;a.click();
@@ -1561,7 +1582,7 @@ function rGantt(){
   html+='<tr style="background:#1A4731;border-top:1px solid #2D6A4F40">';
   var leftCols=[['ID','40px'],['TASK / DELIVERABLE','180px'],['OWNER','80px'],['PRIORITY','70px'],['START','72px'],['FINISH','72px'],['DAYS','46px'],['% DONE','64px']];
   leftCols.forEach(function(c){
-    html+='<th style="padding:10px 8px;text-align:left;color:#F5E6C3;font-size:12px;font-weight:900;letter-spacing:1px;white-space:nowrap;width:'+c[1]+';border-right:1px solid rgba(255,255,255,.15);text-shadow:0 1px 2px rgba(0,0,0,.3)">'+ c[0]+'</th>';
+    html+='<th style="padding:10px 8px;text-align:left;color:#fff;font-size:12px;font-weight:800;letter-spacing:.3px;white-space:nowrap;width:'+c[1]+';border-right:1px solid rgba(255,255,255,.15)">'+c[0].charAt(0).toUpperCase()+c[0].slice(1).toLowerCase().replace('/ deliverable','/ Deliverable').replace('% done','% Done')+'</th>';
   });
   days.forEach(function(d){
     var isToday=fmt(d)===fmt(today);
@@ -1814,7 +1835,13 @@ function bind(){
     el.addEventListener('click',function(ev){ev.stopPropagation();var d=S.deals.filter(function(x){return x._id===el.dataset.id;})[0];if(d){S.form=Object.assign({},bDeal(),d);S.eid=d._id;S.dfiles=d.files||[];S.tab='form';render();}});
   });
   document.querySelectorAll('.dld').forEach(function(el){
-    el.addEventListener('click',function(ev){ev.stopPropagation();var id=el.dataset.id;S.deals=S.deals.filter(function(x){return x._id!==id;});deleteDeal(id);flash('Deal removed.','err');render();});
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var id=el.dataset.id;
+      var deal=S.deals.filter(function(x){return x._id===id;})[0]||{};
+      S.confirmModal={type:'deal',id:id,name:deal.bizName||deal.dealId||'This deal'};
+      render();
+    });
   });
   document.querySelectorAll('.dr').forEach(function(el){
     el.addEventListener('click',function(){S.expId=S.expId===el.dataset.id?null:el.dataset.id;render();});
@@ -1875,10 +1902,26 @@ function bind(){
       }
     });
   });
-  document.querySelectorAll('.dll').forEach(function(el){el.addEventListener('click',function(){var id=el.dataset.id;S.leads=S.leads.filter(function(x){return x._id!==id;});deleteLead(id);flash('Lead removed.','err');render();});});
+  document.querySelectorAll('.dll').forEach(function(el){
+    el.addEventListener('click',function(){
+      var id=el.dataset.id;
+      var lead=S.leads.filter(function(x){return x._id===id;})[0]||{};
+      S.confirmModal={type:'lead',id:id,name:lead.bizName||lead.ownerContact||lead.leadId||'This lead'};
+      render();
+    });
+  });
   document.querySelectorAll('.cnv').forEach(function(el){el.addEventListener('click',function(){cvt(el.dataset.id);});});
   document.querySelectorAll('.aprbtn').forEach(function(el){el.addEventListener('click',function(){openApprovalModal(el.dataset.id,'approve');});});
   var aprCancel=document.getElementById('apr-cancel');if(aprCancel) aprCancel.addEventListener('click',closeApprovalModal);
+  var cNo=document.getElementById('confirm-no');
+  if(cNo) cNo.addEventListener('click',function(){S.confirmModal=null;render();});
+  var cYes=document.getElementById('confirm-yes');
+  if(cYes) cYes.addEventListener('click',function(){
+    var c=S.confirmModal;if(!c){return;}
+    if(c.type==='deal'){S.deals=S.deals.filter(function(x){return x._id!==c.id;});deleteDeal(c.id);flash('Deal deleted.','err');}
+    else if(c.type==='lead'){S.leads=S.leads.filter(function(x){return x._id!==c.id;});deleteLead(c.id);flash('Lead deleted.','err');}
+    S.confirmModal=null;render();
+  });
   var aprConfirm=document.getElementById('apr-confirm');if(aprConfirm) aprConfirm.addEventListener('click',confirmApproval);
   var aprPass=document.getElementById('apr-pass');if(aprPass) aprPass.addEventListener('keydown',function(ev){if(ev.key==='Enter') confirmApproval();});
   var aprUser=document.getElementById('apr-user');if(aprUser) aprUser.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var p=document.getElementById('apr-pass');if(p) p.focus();}});
