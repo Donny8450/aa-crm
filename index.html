@@ -236,11 +236,7 @@ function rApp(){
   '<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);padding:0 28px;box-shadow:0 4px 20px #1A473140">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 12px;border-bottom:1px solid #4A946950;flex-wrap:wrap;gap:10px">'+
       '<div style="display:flex;align-items:center;gap:12px"><div style="font-size:18px;font-weight:900;color:#fff">African Aspirations</div>'+(S.SB_LOADING?'<span style="background:#F5E6C380;color:#F5E6C3;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9654; Connecting...</span>':SB_CONNECTED?'<span style="background:#16a34a30;color:#86efac;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9679; Live</span>':'<span style="background:#dc262630;color:#fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="'+e(SB_ERROR)+'">&#9679; Offline</span>')+'</div>'+
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-        [['Deals',S.deals.length,'#C8972A'],['Active',act,'#22c55e'],['Won',won,'#C8972A'],['Lost',lost,'#ef4444'],['Leads',S.leads.length,'#a855f7']].map(function(x){
-          return '<div style="background:'+x[2]+'20;border:1px solid '+x[2]+'40;border-radius:10px;padding:5px 12px;text-align:center"><div style="font-size:10px;font-weight:700;color:'+x[2]+'">'+x[0].toUpperCase()+'</div><div style="font-size:16px;font-weight:800;color:'+x[2]+'">'+x[1]+'</div></div>';
-        }).join('')+
-      '</div>'+
+''+
     '</div>'+
     '<div style="display:flex;margin-top:2px">'+
       [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']].map(function(x){
