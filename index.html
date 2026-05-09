@@ -81,6 +81,50 @@ function sendApprovalNotification(lead){
   });
 }
 
+// ─── Brute Force Protection ──────────────────────────────────────────────────
+var MAX_ATTEMPTS = 5;
+var LOCKOUT_MS   = 15 * 60 * 1000; // 15 minutes
+
+function isLockedOut(email) {
+  var key = email.toLowerCase().trim();
+  var entry = S.loginAttempts[key];
+  if (!entry) return false;
+  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true;
+  // Lock expired — reset
+  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
+    delete S.loginAttempts[key];
+  }
+  return false;
+}
+
+function getLockoutMessage(email) {
+  var key = email.toLowerCase().trim();
+  var entry = S.loginAttempts[key];
+  if (!entry || !entry.lockedUntil) return '';
+  var remaining = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+  return 'Account temporarily locked after too many failed attempts. Try again in ' + remaining + ' minute' + (remaining === 1 ? '' : 's') + '.';
+}
+
+function recordFailedAttempt(email) {
+  var key = email.toLowerCase().trim();
+  if (!S.loginAttempts[key]) S.loginAttempts[key] = { count: 0, lockedUntil: null };
+  S.loginAttempts[key].count++;
+  if (S.loginAttempts[key].count >= MAX_ATTEMPTS) {
+    S.loginAttempts[key].lockedUntil = Date.now() + LOCKOUT_MS;
+  }
+}
+
+function getRemainingAttempts(email) {
+  var key = email.toLowerCase().trim();
+  var entry = S.loginAttempts[key];
+  if (!entry) return MAX_ATTEMPTS;
+  return Math.max(0, MAX_ATTEMPTS - entry.count);
+}
+
+function clearFailedAttempts(email) {
+  delete S.loginAttempts[email.toLowerCase().trim()];
+}
+
 // ─── Auto-logout (10 min inactivity) ────────────────────────────────────────
 var _autoLogoutTimer=null;
 var AUTO_LOGOUT_MS=10*60*1000; // 10 minutes
@@ -114,11 +158,13 @@ async function hashPassword(password){
 // ─── Supabase Configuration ───────────────────────────────────────────────────
 var SB_URL = 'https://fsfqzemhrdbrltvvjsdo.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnF6ZW1ocmRicmx0dnZqc2RvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjczNDUsImV4cCI6MjA5MjkwMzM0NX0.z_M3w5ocCpxB4T4jynajybqhV9tUBCwRUDIkNAkYc64';
+var SB_CRM_TOKEN = 'AAGhana@2026#Secure';
 var SB_HEADERS = {
   'apikey': SB_KEY,
   'Authorization': 'Bearer ' + SB_KEY,
   'Content-Type': 'application/json',
-  'Prefer': 'return=minimal'
+  'Prefer': 'return=minimal',
+  'X-CRM-Token': SB_CRM_TOKEN
 };
 
 var SB_SYNCING = false;
@@ -127,7 +173,10 @@ var SB_ERROR = '';
 
 function sbReq(method, table, body, query){
   var url = SB_URL + '/rest/v1/' + table + (query||'');
-  var opts = {method:method, headers:Object.assign({},SB_HEADERS)};
+  var hdrs = Object.assign({}, SB_HEADERS, {
+    'X-Set-Config-app.crm_token': SB_CRM_TOKEN
+  });
+  var opts = {method:method, headers:hdrs};
   if(body) opts.body = JSON.stringify(body);
   if(method==='POST') opts.headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
   return fetch(url, opts);
@@ -158,15 +207,18 @@ function loadUsers(){
 
 function saveUser(user){
   var url=SB_URL+'/rest/v1/crm_users?id=eq.'+user.id;
-  fetch(url,{method:'PATCH',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
+  var hdrs=Object.assign({},SB_HEADERS,{'Prefer':'return=minimal','X-Set-Config-app.crm_token':SB_CRM_TOKEN});
+  fetch(url,{method:'PATCH',headers:hdrs,body:JSON.stringify(user)});
 }
 
 function createUser(user){
-  fetch(SB_URL+'/rest/v1/crm_users',{method:'POST',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
+  var hdrs=Object.assign({},SB_HEADERS,{'Prefer':'return=minimal','X-Set-Config-app.crm_token':SB_CRM_TOKEN});
+  fetch(SB_URL+'/rest/v1/crm_users',{method:'POST',headers:hdrs,body:JSON.stringify(user)});
 }
 
 function deleteUserSB(id){
-  fetch(SB_URL+'/rest/v1/crm_users?id=eq.'+id,{method:'DELETE',headers:SB_HEADERS});
+  var hdrs=Object.assign({},SB_HEADERS,{'X-Set-Config-app.crm_token':SB_CRM_TOKEN});
+  fetch(SB_URL+'/rest/v1/crm_users?id=eq.'+id,{method:'DELETE',headers:hdrs});
 }
 
 function loadFromSupabase(){
@@ -240,6 +292,7 @@ var S={
   ganttProject:'all',
   currentUser:null,
   loginError:'',
+  loginAttempts:{},  // {email: {count, lockedUntil}}
   loginEmail:'',
   loginPass:'',
   users:[],
@@ -2247,14 +2300,28 @@ function bRF(){
       var email=(document.getElementById('login-email')||{}).value||'';
       var pass=(document.getElementById('login-pass')||{}).value||'';
       if(!email.trim()||!pass.trim()){S.loginError='Please enter your email and password.';render();return;}
+      // Check lockout first
+      if(isLockedOut(email)){S.loginError=getLockoutMessage(email);render();return;}
       S.loginError='Signing in...';render();
       hashPassword(pass).then(function(hash){
         sbReq('GET','crm_users',null,'?email=eq.'+encodeURIComponent(email.trim().toLowerCase())+'&active=eq.true&select=*')
           .then(function(r){return r.json();})
           .then(function(data){
-            if(!Array.isArray(data)||data.length===0){S.loginError='Invalid email or password.';render();return;}
+            if(!Array.isArray(data)||data.length===0){
+              recordFailedAttempt(email);
+              var rem=getRemainingAttempts(email);
+              S.loginError=isLockedOut(email)?getLockoutMessage(email):'Invalid email or password. '+(rem>0?rem+' attempt'+(rem===1?'':'s')+' remaining.':'');
+              render();return;
+            }
             var user=data[0];
-            if(user.password!==hash){S.loginError='Invalid email or password.';render();return;}
+            if(user.password!==hash){
+              recordFailedAttempt(email);
+              var rem2=getRemainingAttempts(email);
+              S.loginError=isLockedOut(email)?getLockoutMessage(email):'Incorrect password. '+(rem2>0?rem2+' attempt'+(rem2===1?'':'s')+' remaining.':'Account locked.');
+              render();return;
+            }
+            // Success — clear failed attempts
+            clearFailedAttempts(email);
             S.currentUser=user;S.loginError='';S.loginEmail='';
             sessionStorage.setItem('aa_crm_user',JSON.stringify(user));
             resetAutoLogout();
