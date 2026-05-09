@@ -57,11 +57,30 @@ tr:hover td{background:#E8F5EE}
 .ll:hover{background:#E8F5EE}
 .empty{text-align:center;padding:52px 32px;background:linear-gradient(160deg,#E8F5EE,#fff);border-radius:14px;border:1px solid #C8E6D4}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init("YSaPIm6AlAmRDEFnA");</script>
 </head>
 <body>
 <div id="app"></div>
 <div id="toasts"></div>
 <script>
+// --- Email Notifications ---
+function sendApprovalNotification(lead){
+  var managers=S.users.filter(function(u){return (u.role==="manager"||u.role==="admin")&&u.active&&u.email;});
+  if(!managers.length) return;
+  managers.forEach(function(mgr){
+    emailjs.send("service_y6a11op","template_v2q9z44",{
+      to_email:mgr.email,
+      manager_name:mgr.name||"Team",
+      lead_id:lead.leadId||"n/a",
+      lead_name:lead.bizName||lead.ownerContact||"Unknown",
+      service_type:lead.serviceType||"n/a",
+      submitted_by:S.currentUser?S.currentUser.name:"Staff"
+    }).then(function(){console.log("Notification sent to "+mgr.email);})
+    .catch(function(err){console.error("Email error:",err);});
+  });
+}
+
 // ─── Auto-logout (10 min inactivity) ────────────────────────────────────────
 var _autoLogoutTimer=null;
 var AUTO_LOGOUT_MS=10*60*1000; // 10 minutes
@@ -1006,6 +1025,7 @@ function subLead(){
   if(S.lfiles.length===0&&existingFiles===0){flash('Please upload at least one document before submitting.','err');return;}
   if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('End date cannot be before start date.','err');return;}
   persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
+  sendApprovalNotification(lf);
 }
 
 function cvt(id){
