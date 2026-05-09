@@ -526,15 +526,14 @@ function rPipe(){
     var exp=S.expId===d._id;
     return '<tr class="dr" data-id="'+d._id+'" style="cursor:pointer">'+
       '<td><span class="badge-id">'+e(d.dealId||'n/a')+'</span>'+(d.dealStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':d.dealStatus==='submitted'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">SUBMITTED</span>':'')+'</td>'+
-      '<td style="font-weight:600;color:#1A4731">'+e(d.companyName)+(d.website?'<div style="font-size:11px;color:#5A7A65">'+e(d.website)+'</div>':'')+'</td>'+
-      '<td><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:'+(SBG[d.status]||'#f8fafc')+';color:'+(SCOL[d.status]||'#666')+';border:1px solid '+(SCOL[d.status]||'#ccc')+'30"><span style="width:6px;height:6px;border-radius:50%;background:'+(SCOL[d.status]||'#999')+'"></span>'+e(d.status)+'</span></td>'+
-      '<td><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;background:'+(d.currentStage==='Close 1'?'#f0fdf4':'#E8F5EE')+';color:'+(d.currentStage==='Close 1'?'#15803d':'#5A7A65')+';border:1px solid #C8E6D4">'+e(d.currentStage||'Stage 0')+'</span></td>'+
-      '<td style="color:#5A7A65">'+(d.businessType?e(d.businessType):'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+(d.serviceType?e(d.serviceType):'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+(d.sector?e(d.sector):'&mdash;')+'</td>'+
+      '<td style="font-weight:600;color:#1A4731">'+e(d.bizName||'&mdash;')+'</td>'+
+      '<td>'+(d.serviceType?'<span style="background:'+(d.serviceType==='Business Consulting'?'#E8F5EE':d.serviceType==='Business Brokerage'?'#FDF8EE':'#faf5ff')+';color:'+(d.serviceType==='Business Consulting'?'#2D6A4F':d.serviceType==='Business Brokerage'?'#C8972A':'#7c3aed')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+e(d.serviceType)+'</span>':'<span style="color:#5A7A65">&mdash;</span>')+'</td>'+
+      '<td><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;background:'+(SBG[d.status]||'#f8fafc')+';color:'+(SCOL[d.status]||'#666')+';border:1px solid '+(SCOL[d.status]||'#ccc')+'30"><span style="width:6px;height:6px;border-radius:50%;background:'+(SCOL[d.status]||'#999')+'"></span>'+e(d.status||'Active')+'</span></td>'+
       '<td style="color:#5A7A65">'+(d.owner?e(d.owner):'&mdash;')+'</td>'+
-      '<td style="color:#5A7A65">'+(d.salesSource?e(d.salesSource):'&mdash;')+'</td>'+
-      '<td>'+(d.files&&d.files.length>0?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:700">&#128206; '+d.files.length+'</span>':'<span style="color:#5A7A65;font-size:12px">None</span>')+'</td>'+
+      '<td style="color:#5A7A65">'+(d.source?e(d.source):'&mdash;')+'</td>'+
+      '<td>'+function(){var dlvs=d.deliverables||[];if(!dlvs.length)return '<span style="color:#5A7A65;font-size:12px">&mdash;</span>';var avg=Math.round(dlvs.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs.length);var bc=avg===100?'#16a34a':avg>=65?'#2D6A4F':'#C8972A';return '<div style="display:flex;align-items:center;gap:5px"><div style="width:60px;height:6px;border-radius:3px;background:#E8F5EE;overflow:hidden"><div style="width:'+avg+'%;height:100%;background:'+bc+'"></div></div><span style="font-size:11px;font-weight:700;color:'+bc+'">'+avg+'%</span></div>';}()+'</td>'+
+      '<td style="font-size:11px;color:#5A7A65">'+(d.startDate||d.endDate?(e(d.startDate||'')+(d.startDate&&d.endDate?'<br>':'')+e(d.endDate||'')):'&mdash;')+'</td>'+
+      '<td>'+(d.files&&d.files.length>0?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">&#128206; '+d.files.length+' file'+(d.files.length===1?'':'s')+'</span>':'<span style="color:#5A7A65;font-size:12px">None</span>')+'</td>'+
       '<td><div style="display:flex;gap:7px">'+
         '<button class="btn btn-pale btn-sm edl" data-id="'+d._id+'">Edit</button>'+
         '<button class="btn btn-red btn-sm dld" data-id="'+d._id+'" style="font-size:13px">&#10005;</button>'+
@@ -631,16 +630,16 @@ function rLL(){
       '<button class="shdr'+(S.sec.doc?' on':'')+'" data-sec="doc"><span style="font-weight:800">&#128193; General Information &amp; Documents</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.doc?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
         '<div style="display:flex;flex-direction:column;gap:13px">'+
-            '<div><div class="field-lbl">'+(S.biz==='limited'?'Upload Documents (2 required)':'Upload Document (1 required)')+'</div>'+
+            '<div><div class="field-lbl">Upload Document <span style="font-size:10px;font-weight:400;color:#c2410c">(required &mdash; at least 1)</span></div>'+
             '<label style="display:inline-flex;align-items:center;gap:8px;background:'+(met?'#E8F5EE':'#fff7ed')+';color:'+(met?'#2D6A4F':'#c2410c')+';border:1px dashed '+(met?'#C8E6D4':'#fed7aa')+';border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;width:100%;justify-content:center">'+
               '&#128206; Upload Files<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+
             '</label>'+
             '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
-              Array.from({length:req},function(_,i){return '<div class="pbar'+(i<S.lfiles.length?' filled':'')+'"></div>';}).join('')+
-              '<span style="font-size:11px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+'">'+S.lfiles.length+'/'+req+'</span>'+
+              '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
+              '<span style="font-size:11px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+'">'+S.lfiles.length+'/1</span>'+
             '</div>'+
             '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
-            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'All required documents uploaded':'&#9888; '+(req-S.lfiles.length)+' more document'+(req-S.lfiles.length===1?'':'s')+' needed')+'</div>'+
+            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Please upload at least 1 document before submitting')+'</div>'+
           ''+
           '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
           '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
@@ -672,8 +671,7 @@ function rLL(){
     '<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4">'+
     '<table><thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>STRUCTURE</th><th>OWNER / CONTACT</th><th>PRIORITY</th><th>STAGE</th><th>LABEL</th><th>SOURCE</th><th>FILES</th><th>ACTIONS</th></tr></thead><tbody>'+
     leads.map(function(l){
-      var lr=l.bizStructure==='limited'?2:1;
-      var lm=l.bizStructure&&(l.files||[]).length>=lr;
+      var lm=(l.files||[]).length>=1;
       return '<tr>'+
         '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='pending'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">PENDING APPROVAL</span>':l.leadStatus==='approved'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">APPROVED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
         '<td style="font-weight:600;color:#1A4731">'+e(l.contactPerson)+'</td>'+
@@ -905,6 +903,9 @@ function subLead(){
   if(!lf.bizName||!lf.bizName.trim()){flash('Business Name is required.','err');return;}
   if(!lf.serviceType){flash('Service Type is required.','err');return;}
   if(!lf.ownerContact||!lf.ownerContact.trim()){flash('Owner / Main Contact is required.','err');return;}
+  var existingLead=S.leid!==null?S.leads.filter(function(x){return x._id===S.leid;})[0]:null;
+  var existingFiles=existingLead?(existingLead.files||[]).length:0;
+  if(S.lfiles.length===0&&existingFiles===0){flash('Please upload at least one document before submitting.','err');return;}
   if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('End date cannot be before start date.','err');return;}
   persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
 }
