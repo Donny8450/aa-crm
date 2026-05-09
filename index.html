@@ -173,13 +173,13 @@ var S={
   ]
 };
 
-var STATS=['Lead','Contacted','Qualified','Proposal Sent','Negotiation','Closed Won','Closed Lost','On Hold'];
+var STATS=['Active','On Hold','Completed','Cancelled'];
 var SRCS=['Cold Call','Email Campaign','Referral','Website','Social Media','Trade Show','Walk-in','LinkedIn','Other'];
 var SVCS=['Consulting','Software License','Implementation','Support & Maintenance','Training','Managed Services','Custom Development','Other'];
-var LSVCS=['Business Consulting','Business Brokerage','Business Funding'];
+var LSVCS=['Business Consulting','Business Brokerage','Business Funding','Business Valuation'];
 var PRIS=['High Priority','Medium','Low'];
 var SECTS=['Finance','Healthcare','Technology','Retail','Manufacturing','Education','Real Estate','Legal','Non-Profit','Government','Other'];
-var BIZTS=['Business Consulting','Business Funding','Business Brokerage'];
+var BIZTS=['Business Consulting','Business Funding','Business Brokerage','Business Valuation'];
 var STGS=['Stage 0','Stage 1','Stage 2','Stage 3','Stage 4','Close 1'];
 var PSRCS=['Drop Letters','Conferences','Networking Events','Referrals','Social Media','Website','Other'];
 var LBLS=['Hot','Warm','Cold'];
@@ -194,6 +194,7 @@ function nextLeadId(serviceType){
   var prefix='L';
   if(serviceType==='Business Consulting') prefix='C';
   else if(serviceType==='Business Funding') prefix='F';
+  else if(serviceType==='Business Valuation') prefix='V';
   else if(serviceType==='Business Brokerage') prefix='B';
   // Find highest existing number for this prefix
   var max=0;
