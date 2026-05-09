@@ -1569,6 +1569,95 @@ function rOverview(){
 }
 
 
+function rUsers(){
+  var isAdmin=S.currentUser&&S.currentUser.role==='admin';
+  var u=S.currentUser||{};
+  var html='<div>';
+
+  // Header
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">SETTINGS</div>';
+  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Users & Settings</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Manage team access and your account</div>';
+  html+='</div>';
+
+  // My Account
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
+  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128100; My Account</div></div>';
+  html+='<div style="padding:20px 24px">';
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">NAME</div><div style="font-size:15px;font-weight:700;color:#1A4731">'+e(u.name||'')+'</div></div>';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">EMAIL</div><div style="font-size:15px;color:#1A4731">'+e(u.email||'')+'</div></div>';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">ROLE</div><span style="background:'+(u.role==='admin'?'#faf5ff':u.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(u.role==='admin'?'#7c3aed':u.role==='manager'?'#C8972A':'#2D6A4F')+';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">'+((u.role||'staff').charAt(0).toUpperCase()+(u.role||'staff').slice(1))+'</span></div>';
+  html+='</div>';
+  // Change password
+  html+='<div style="border-top:1px solid #E8F5EE;padding-top:16px">';
+  html+='<div style="font-size:13px;font-weight:700;color:#1A4731;margin-bottom:12px">Change Password</div>';
+  if(S.changePassSuccess) html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:13px;color:#16a34a;font-weight:600;margin-bottom:12px">'+e(S.changePassSuccess)+'</div>';
+  if(S.changePassError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.changePassError)+'</div>';
+  html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
+  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CURRENT PASSWORD</div><input id="cp-cur" type="password" placeholder="Current password" style="width:100%;box-sizing:border-box"/></div>';
+  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">NEW PASSWORD</div><input id="cp-new" type="password" placeholder="New password (min 6 chars)" style="width:100%;box-sizing:border-box"/></div>';
+  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CONFIRM NEW PASSWORD</div><input id="cp-confirm" type="password" placeholder="Confirm new password" style="width:100%;box-sizing:border-box"/></div>';
+  html+='<button id="cp-btn" style="padding:10px 20px;background:#1A4731;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">Update Password</button>';
+  html+='</div></div></div></div>';
+
+  // Sign out
+  html+='<div style="margin-bottom:20px;text-align:right">';
+  html+='<button id="logout-btn" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>';
+  html+='</div>';
+
+  // Admin: User Management
+  if(isAdmin){
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
+    html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128101; Team Members ('+S.users.length+')</div>';
+    html+='<button id="add-user-btn" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Add User</button>';
+    html+='</div>';
+    if(S.showAddUser){
+      html+='<div style="padding:20px 24px;background:#fafdfb;border-bottom:1px solid #C8E6D4">';
+      html+='<div style="font-size:13px;font-weight:800;color:#1A4731;margin-bottom:14px">New User</div>';
+      if(S.addUserError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:12px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.addUserError)+'</div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">FULL NAME *</div><input id="nu-name" placeholder="e.g. John Mensah" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">EMAIL *</div><input id="nu-email" type="email" placeholder="john@africanaspirations.com" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">TEMPORARY PASSWORD *</div><input id="nu-pass" type="password" placeholder="Min 6 characters" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">ROLE *</div><select id="nu-role" style="width:100%;padding:10px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
+      html+='</div>';
+      html+='<div style="display:flex;gap:10px">';
+      html+='<button id="nu-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Create User</button>';
+      html+='<button id="nu-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
+      html+='</div></div>';
+    }
+    if(S.users.length===0){
+      html+='<div style="padding:32px;text-align:center;color:#5A7A65;font-size:13px">No users yet. Add your first team member above.</div>';
+    } else {
+      html+='<div style="overflow-x:auto"><table>';
+      html+='<thead><tr><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>';
+      S.users.forEach(function(usr,i){
+        var isSelf=usr.id===S.currentUser.id;
+        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+        html+='<td style="font-weight:600;color:#1A4731">'+e(usr.name)+(isSelf?'<span style="margin-left:6px;background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">You</span>':'')+'</td>';
+        html+='<td style="color:#5A7A65">'+e(usr.email)+'</td>';
+        html+='<td><select class="role-sel" data-uid="'+e(usr.id)+'" '+(isSelf?'disabled':'')+' style="padding:5px 8px;border:1px solid #C8E6D4;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;background:'+(usr.role==='admin'?'#faf5ff':usr.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(usr.role==='admin'?'#7c3aed':usr.role==='manager'?'#C8972A':'#2D6A4F')+'"><option value="staff"'+(usr.role==='staff'?' selected':'')+'>Staff</option><option value="manager"'+(usr.role==='manager'?' selected':'')+'>Manager</option><option value="admin"'+(usr.role==='admin'?' selected':'')+'>Admin</option></select></td>';
+        html+='<td><span style="background:'+(usr.active?'#f0fdf4':'#fef2f2')+';color:'+(usr.active?'#16a34a':'#dc2626')+';border:1px solid '+(usr.active?'#86efac':'#fecaca')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+(usr.active?'Active':'Inactive')+'</span></td>';
+        html+='<td><div style="display:flex;gap:6px">';
+        if(!isSelf){
+          html+='<button class="toggle-user-btn" data-uid="'+e(usr.id)+'" data-active="'+(usr.active?'1':'0')+'" style="background:'+(usr.active?'#fff7ed':'#E8F5EE')+';color:'+(usr.active?'#c2410c':'#2D6A4F')+';border:1px solid '+(usr.active?'#fed7aa':'#C8E6D4')+';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">'+(usr.active?'Deactivate':'Activate')+'</button>';
+          html+='<button class="reset-pass-btn" data-uid="'+e(usr.id)+'" data-name="'+e(usr.name)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Reset Pass</button>';
+          html+='<button class="del-user-btn" data-uid="'+e(usr.id)+'" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Delete</button>';
+        }
+        html+='</div></td></tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+    html+='</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+
 function rGantt(){
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
   var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
