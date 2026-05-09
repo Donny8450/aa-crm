@@ -824,7 +824,9 @@ function persistDeal(status,msg){
   f.dealStatus=status;
   if(S.eid!==null){
     var existing=S.deals.filter(function(x){return x._id===S.eid;})[0]||{};
-    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:f.deliverables&&f.deliverables.length>0?f.deliverables:existing.deliverables||[]});
+    // Always use the live deliverables from S.deals (updated by add/edit/delete actions)
+    var liveDelivs=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];
+    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:liveDelivs.length>0?liveDelivs:(f.deliverables||[])});
     S.deals=S.deals.map(function(x){return x._id===S.eid?updated:x;});
     syncDeal(updated);
     flash(msg);S.eid=null;
@@ -840,12 +842,15 @@ function persistDeal(status,msg){
 
 function saveDeal(){
   S.form=gDF();var f=S.form;
+  // Sync deliverables from live S.deals into S.form before saving
+  if(S.eid!==null){var livD=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];if(livD.length) S.form.deliverables=livD;}
   if(!f.bizName||!f.bizName.trim()){flash('Business Name is required to save.','err');return;}
   persistDeal('draft',S.eid!==null?'Draft saved!':'Deal saved as draft!');
 }
 
 function subDeal(){
   S.form=gDF();var f=S.form;
+  if(S.eid!==null){var livD2=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];if(livD2.length) S.form.deliverables=livD2;}
   if(!f.bizName||!f.bizName.trim()){flash('Business Name is required.','err');return;}
   if(!f.serviceType){flash('Service Type is required.','err');return;}
   if(!f.owner||!f.owner.trim()){flash('Owner / Main Contact is required.','err');return;}
@@ -1556,7 +1561,7 @@ function rGantt(){
   html+='<tr style="background:#1A4731;border-top:1px solid #2D6A4F40">';
   var leftCols=[['ID','40px'],['TASK / DELIVERABLE','180px'],['OWNER','80px'],['PRIORITY','70px'],['START','72px'],['FINISH','72px'],['DAYS','46px'],['% DONE','64px']];
   leftCols.forEach(function(c){
-    html+='<th style="padding:10px 8px;text-align:left;color:#fff;font-size:11px;font-weight:800;letter-spacing:.8px;white-space:nowrap;width:'+c[1]+';border-right:1px solid #2D6A4F40">'+ c[0]+'</th>';
+    html+='<th style="padding:10px 8px;text-align:left;color:#F5E6C3;font-size:12px;font-weight:900;letter-spacing:1px;white-space:nowrap;width:'+c[1]+';border-right:1px solid rgba(255,255,255,.15);text-shadow:0 1px 2px rgba(0,0,0,.3)">'+ c[0]+'</th>';
   });
   days.forEach(function(d){
     var isToday=fmt(d)===fmt(today);
