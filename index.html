@@ -662,7 +662,7 @@ function rPipe(){
       '<td>'+(d.files&&d.files.length>0?'<div style="display:flex;flex-direction:column;gap:3px">'+(d.files.map(function(f,fi){return '<button class="dl-file" data-did="'+e(d._id)+'" data-fi="'+fi+'" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px" title="'+e(f.name)+'">&#128229; '+e(f.name)+'</button>';}).join(''))+'</div>':'<span style="color:#5A7A65;font-size:12px">None</span>')+'</td>'+
       '<td><div style="display:flex;gap:7px">'+
         '<button class="btn btn-pale btn-sm edl" data-id="'+d._id+'">Edit</button>'+
-        '<button class="btn btn-red btn-sm dld" data-id="'+d._id+'" style="font-size:13px">&#10005;</button>'+
+        (S.currentUser&&S.currentUser.role==='admin'?'<button class="btn btn-red btn-sm dld" data-id="'+d._id+'" style="font-size:13px">&#10005;</button>':'')+
       '</div></td>'+
     '</tr>'+
     (exp?function(){
@@ -840,7 +840,7 @@ function rLL(){
             '<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#128274; Awaiting Approval</span>')+
           '<button class="btn btn-pale btn-sm ell" data-id="'+l._id+'">Edit</button>'+
 
-          '<button class="btn btn-red btn-sm dll" data-id="'+l._id+'">&#10005;</button>'+
+          (S.currentUser&&S.currentUser.role==='admin'?'<button class="btn btn-red btn-sm dll" data-id="'+l._id+'">&#10005;</button>':'')+
       '</tr>';
     }).join('')+
     '</tbody></table></div>')+
