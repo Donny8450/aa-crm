@@ -62,6 +62,14 @@ tr:hover td{background:#E8F5EE}
 <div id="app"></div>
 <div id="toasts"></div>
 <script>
+// ─── Password Hashing ────────────────────────────────────────────────────────
+async function hashPassword(password){
+  var encoder=new TextEncoder();
+  var data=encoder.encode(password+'AA_CRM_SALT_2026');
+  var hash=await crypto.subtle.digest('SHA-256',data);
+  return Array.from(new Uint8Array(hash)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
+
 // ─── Supabase Configuration ───────────────────────────────────────────────────
 var SB_URL = 'https://fsfqzemhrdbrltvvjsdo.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZzZnF6ZW1ocmRicmx0dnZqc2RvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjczNDUsImV4cCI6MjA5MjkwMzM0NX0.z_M3w5ocCpxB4T4jynajybqhV9tUBCwRUDIkNAkYc64';
@@ -97,6 +105,29 @@ function sbLoad(table){
     .then(function(r){return r.json();});
 }
 
+function loadUsers(){
+  sbReq('GET','crm_users',null,'?select=*&order=created_at.asc')
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(Array.isArray(data)) S.users=data;
+      S.usersLoaded=true;
+      render();
+    }).catch(function(){S.usersLoaded=true;render();});
+}
+
+function saveUser(user){
+  var url=SB_URL+'/rest/v1/crm_users?id=eq.'+user.id;
+  fetch(url,{method:'PATCH',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
+}
+
+function createUser(user){
+  fetch(SB_URL+'/rest/v1/crm_users',{method:'POST',headers:Object.assign({},SB_HEADERS,{'Prefer':'return=minimal'}),body:JSON.stringify(user)});
+}
+
+function deleteUserSB(id){
+  fetch(SB_URL+'/rest/v1/crm_users?id=eq.'+id,{method:'DELETE',headers:SB_HEADERS});
+}
+
 function loadFromSupabase(){
   S.SB_LOADING = true;
   render();
@@ -115,6 +146,7 @@ function loadFromSupabase(){
     if(Array.isArray(audit)) S.auditLog = audit.map(function(r){return Object.assign({_id:r.id},r.data);});
     SB_CONNECTED = true; SB_ERROR = '';
     S.SB_LOADING = false;
+    loadUsers();
     render();
   }).catch(function(err){
     SB_CONNECTED = false; SB_ERROR = 'Could not connect to database.';
@@ -162,6 +194,17 @@ var S={
   ganttDeal:null,
   ganttSearch:'',
   ganttProject:'all',
+  currentUser:null,
+  loginError:'',
+  loginEmail:'',
+  loginPass:'',
+  users:[],
+  usersLoaded:false,
+  showChangePass:false,
+  showAddUser:false,
+  addUserError:'',
+  changePassError:'',
+  changePassSuccess:'',
   confirmModal:null,
   approvalModal:false,
   approvalTargetId:null,
@@ -221,13 +264,40 @@ function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',ph
 function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
-  document.getElementById('app').innerHTML=rApp();
+  document.getElementById('app').innerHTML=S.currentUser?rApp():rLogin();
   bind();
 }
 
 function sel(n,opts,v){return '<select name="'+n+'">'+opts.map(function(o){return '<option'+(o===v?' selected':'')+'>'+e(o)+'</option>';}).join('')+'</select>';}
 function selO(n,opts,v){return '<select name="'+n+'"><option value="">Select...</option>'+opts.map(function(o){return '<option'+(o===v?' selected':'')+'>'+e(o)+'</option>';}).join('')+'</select>';}
 function inp(n,v,ph){return '<input name="'+n+'" value="'+e(v)+'" placeholder="'+e(ph||'')+'"/>';}
+
+function rLogin(){
+  return '<div style="min-height:100vh;background:linear-gradient(135deg,#0a1f13 0%,#1A4731 50%,#2D6A4F 100%);display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit">'+
+    '<div style="width:100%;max-width:420px">'+
+      '<div style="text-align:center;margin-bottom:32px">'+
+        '<div style="font-size:36px;font-weight:900;color:#fff;letter-spacing:-1px">African Aspirations</div>'+
+        '<div style="font-size:13px;color:rgba(255,255,255,.6);margin-top:6px;letter-spacing:2px">SALES CRM</div>'+
+      '</div>'+
+      '<div style="background:#fff;border-radius:20px;padding:36px;box-shadow:0 24px 80px rgba(0,0,0,.4)">'+
+        '<div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:6px">Welcome back</div>'+
+        '<div style="font-size:13px;color:#5A7A65;margin-bottom:28px">Sign in to your account</div>'+
+        (S.loginError?'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:18px">'+e(S.loginError)+'</div>':'')+
+        '<div style="margin-bottom:16px">'+
+          '<div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:6px">EMAIL ADDRESS</div>'+
+          '<input id="login-email" type="email" value="'+e(S.loginEmail||'')+'" placeholder="you@africanaspirations.com" style="width:100%;padding:12px 14px;border:1.5px solid #C8E6D4;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box"/>'+
+        '</div>'+
+        '<div style="margin-bottom:24px">'+
+          '<div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:6px">PASSWORD</div>'+
+          '<input id="login-pass" type="password" placeholder="••••••••" style="width:100%;padding:12px 14px;border:1.5px solid #C8E6D4;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box"/>'+
+        '</div>'+
+        '<button id="login-btn" style="width:100%;padding:14px;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;letter-spacing:.3px">Sign In</button>'+
+        '<div style="text-align:center;margin-top:20px;font-size:12px;color:#5A7A65">Contact your administrator to get access</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
 
 function rApp(){
   var won=S.deals.filter(function(d){return d.status==='Closed Won';}).length;
@@ -240,13 +310,13 @@ function rApp(){
 ''+
     '</div>'+
     '<div style="display:flex;margin-top:2px">'+
-      [['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']].map(function(x){
+      ([['dashboard','&#127968; Dashboard'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']]).concat(S.currentUser&&S.currentUser.role==='admin'?[['users','&#128101; Users']]:[['users','&#128101; Users']]).map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
       }).join('')+
     '</div>'+
   '</div>'+
   '<div style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
-    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?rApprovals():'')+(S.tab==='overview'?rOverview():''))+
+    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700">Access restricted</div><div style="font-size:13px;margin-top:6px">Only Managers and Admins can approve leads.</div></div></div>':rApprovals()):'')+(S.tab==='overview'?rOverview():'')+(S.tab==='users'?rUsers():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   rApprovalModal()+
@@ -1491,6 +1561,105 @@ function rApprovals(){
 }
 
 
+function rUsers(){
+  var isAdmin=S.currentUser&&S.currentUser.role==='admin';
+  var u=S.currentUser||{};
+
+  var html='<div>';
+
+  // Header
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">SETTINGS</div>';
+  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Users & Settings</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Manage team access and your account</div>';
+  html+='</div>';
+
+  // My Account section
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
+  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128100; My Account</div></div>';
+  html+='<div style="padding:20px 24px">';
+  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">NAME</div><div style="font-size:15px;font-weight:700;color:#1A4731">'+e(u.name||'')+'</div></div>';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">EMAIL</div><div style="font-size:15px;color:#1A4731">'+e(u.email||'')+'</div></div>';
+  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">ROLE</div><span style="background:'+(u.role==='admin'?'#faf5ff':u.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(u.role==='admin'?'#7c3aed':u.role==='manager'?'#C8972A':'#2D6A4F')+';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">'+e(u.role||'staff').charAt(0).toUpperCase()+e(u.role||'staff').slice(1)+'</span></div>';
+  html+='</div>';
+
+  // Change password
+  html+='<div style="border-top:1px solid #E8F5EE;padding-top:16px">';
+  html+='<div style="font-size:13px;font-weight:700;color:#1A4731;margin-bottom:12px">Change Password</div>';
+  if(S.changePassSuccess) html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:13px;color:#16a34a;font-weight:600;margin-bottom:12px">'+e(S.changePassSuccess)+'</div>';
+  if(S.changePassError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.changePassError)+'</div>';
+  html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
+  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CURRENT PASSWORD</div><input id="cp-cur" type="password" placeholder="Current password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
+  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">NEW PASSWORD</div><input id="cp-new" type="password" placeholder="New password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
+  html+='<div style="flex:1;min-width:160px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CONFIRM NEW PASSWORD</div><input id="cp-confirm" type="password" placeholder="Confirm new password" style="width:100%;padding:10px 12px;border:1.5px solid #C8E6D4;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box"/></div>';
+  html+='<button id="cp-btn" style="padding:10px 20px;background:#1A4731;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">Update Password</button>';
+  html+='</div></div>';
+  html+='</div></div>';
+
+  // Logout button
+  html+='<div style="margin-bottom:20px;text-align:right">';
+  html+='<button id="logout-btn" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>';
+  html+='</div>';
+
+  // Admin: User Management
+  if(isAdmin){
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
+    html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
+    html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128101; Team Members ('+S.users.length+')</div>';
+    html+='<button id="add-user-btn" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Add User</button>';
+    html+='</div>';
+
+    // Add user form (toggleable)
+    if(S.showAddUser){
+      html+='<div style="padding:20px 24px;background:#fafdfb;border-bottom:1px solid #C8E6D4">';
+      html+='<div style="font-size:13px;font-weight:800;color:#1A4731;margin-bottom:14px">New User</div>';
+      if(S.addUserError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:12px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.addUserError)+'</div>';
+      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">FULL NAME *</div><input id="nu-name" placeholder="e.g. John Mensah" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">EMAIL *</div><input id="nu-email" type="email" placeholder="john@africanaspirations.com" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">TEMPORARY PASSWORD *</div><input id="nu-pass" type="password" placeholder="Set a temporary password" style="width:100%;box-sizing:border-box"/></div>';
+      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">ROLE *</div><select id="nu-role" style="width:100%;padding:10px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
+      html+='</div>';
+      html+='<div style="display:flex;gap:10px">';
+      html+='<button id="nu-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Create User</button>';
+      html+='<button id="nu-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
+      html+='</div></div>';
+    }
+
+    // Users table
+    if(S.users.length===0){
+      html+='<div style="padding:32px;text-align:center;color:#5A7A65;font-size:13px">No users yet. Add your first team member above.</div>';
+    } else {
+      html+='<div style="overflow-x:auto"><table>';
+      html+='<thead><tr><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>';
+      S.users.forEach(function(usr,i){
+        var isSelf=usr.id===S.currentUser.id;
+        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+        html+='<td style="font-weight:600;color:#1A4731">'+e(usr.name)+(isSelf?'<span style="margin-left:6px;background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">You</span>':'')+'</td>';
+        html+='<td style="color:#5A7A65">'+e(usr.email)+'</td>';
+        // Editable role dropdown
+        html+='<td><select class="role-sel" data-uid="'+e(usr.id)+'" '+(isSelf?'disabled':'')+' style="padding:4px 8px;border:1px solid #C8E6D4;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;background:'+(usr.role==='admin'?'#faf5ff':usr.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(usr.role==='admin'?'#7c3aed':usr.role==='manager'?'#C8972A':'#2D6A4F')+'"><option value="staff"'+(usr.role==='staff'?' selected':'')+'>Staff</option><option value="manager"'+(usr.role==='manager'?' selected':'')+'>Manager</option><option value="admin"'+(usr.role==='admin'?' selected':'')+'>Admin</option></select></td>';
+        html+='<td><span style="background:'+(usr.active?'#f0fdf4':'#fef2f2')+';color:'+(usr.active?'#16a34a':'#dc2626')+';border:1px solid '+(usr.active?'#86efac':'#fecaca')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+(usr.active?'Active':'Inactive')+'</span></td>';
+        html+='<td><div style="display:flex;gap:6px">';
+        if(!isSelf){
+          html+='<button class="toggle-user-btn" data-uid="'+e(usr.id)+'" data-active="'+(usr.active?'1':'0')+'" style="background:'+(usr.active?'#fff7ed':'#E8F5EE')+';color:'+(usr.active?'#c2410c':'#2D6A4F')+';border:1px solid '+(usr.active?'#fed7aa':'#C8E6D4')+';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">'+(usr.active?'Deactivate':'Activate')+'</button>';
+          html+='<button class="reset-pass-btn" data-uid="'+e(usr.id)+'" data-name="'+e(usr.name)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Reset Pass</button>';
+          html+='<button class="del-user-btn" data-uid="'+e(usr.id)+'" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Delete</button>';
+        }
+        html+='</div></td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+    html+='</div>';
+  }
+
+  html+='</div>';
+  return html;
+}
+
+
 function rGantt(){
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
   var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
@@ -2073,9 +2242,131 @@ function bRF(){
       bRF();
     });
   });
+  // ── Login screen bindings ────────────────────────────────────────────────
+  var loginBtn=document.getElementById('login-btn');
+  if(loginBtn){
+    loginBtn.addEventListener('click',function(){
+      var email=(document.getElementById('login-email')||{}).value||'';
+      var pass=(document.getElementById('login-pass')||{}).value||'';
+      if(!email.trim()||!pass.trim()){S.loginError='Please enter your email and password.';render();return;}
+      S.loginError='Signing in...';render();
+      hashPassword(pass).then(function(hash){
+        sbReq('GET','crm_users',null,'?email=eq.'+encodeURIComponent(email.trim().toLowerCase())+'&active=eq.true&select=*')
+          .then(function(r){return r.json();})
+          .then(function(data){
+            if(!Array.isArray(data)||data.length===0){S.loginError='Invalid email or password.';render();return;}
+            var user=data[0];
+            if(user.password!==hash){S.loginError='Invalid email or password.';render();return;}
+            S.currentUser=user;S.loginError='';S.loginEmail='';
+            sessionStorage.setItem('aa_crm_user',JSON.stringify(user));
+            loadUsers();render();
+          }).catch(function(){S.loginError='Connection error. Please try again.';render();});
+      });
+    });
+    var lp=document.getElementById('login-pass');
+    if(lp) lp.addEventListener('keydown',function(ev){if(ev.key==='Enter') loginBtn.click();});
+    var le=document.getElementById('login-email');
+    if(le) le.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var lp2=document.getElementById('login-pass');if(lp2) lp2.focus();}});
+  }
+  var logoutBtn=document.getElementById('logout-btn');
+  if(logoutBtn) logoutBtn.addEventListener('click',function(){S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
+  var cpBtn=document.getElementById('cp-btn');
+  if(cpBtn) cpBtn.addEventListener('click',function(){
+    var cur=(document.getElementById('cp-cur')||{}).value||'';
+    var nw=(document.getElementById('cp-new')||{}).value||'';
+    var conf=(document.getElementById('cp-confirm')||{}).value||'';
+    S.changePassError='';S.changePassSuccess='';
+    if(!cur||!nw||!conf){S.changePassError='Please fill in all fields.';render();return;}
+    if(nw!==conf){S.changePassError='New passwords do not match.';render();return;}
+    if(nw.length<6){S.changePassError='Password must be at least 6 characters.';render();return;}
+    hashPassword(cur).then(function(curHash){
+      if(curHash!==S.currentUser.password){S.changePassError='Current password is incorrect.';render();return;}
+      hashPassword(nw).then(function(newHash){
+        var updated=Object.assign({},S.currentUser,{password:newHash});
+        saveUser(updated);S.currentUser=updated;
+        S.users=S.users.map(function(u){return u.id===updated.id?updated:u;});
+        sessionStorage.setItem('aa_crm_user',JSON.stringify(updated));
+        S.changePassSuccess='Password updated successfully!';render();
+      });
+    });
+  });
+  var addUserBtn=document.getElementById('add-user-btn');
+  if(addUserBtn) addUserBtn.addEventListener('click',function(){S.showAddUser=!S.showAddUser;S.addUserError='';render();});
+  var nuCancel=document.getElementById('nu-cancel');
+  if(nuCancel) nuCancel.addEventListener('click',function(){S.showAddUser=false;render();});
+  var nuSave=document.getElementById('nu-save');
+  if(nuSave) nuSave.addEventListener('click',function(){
+    var name=(document.getElementById('nu-name')||{}).value||'';
+    var email=(document.getElementById('nu-email')||{}).value||'';
+    var pass=(document.getElementById('nu-pass')||{}).value||'';
+    var role=(document.getElementById('nu-role')||{}).value||'staff';
+    S.addUserError='';
+    if(!name.trim()||!email.trim()||!pass.trim()){S.addUserError='All fields are required.';render();return;}
+    if(pass.length<6){S.addUserError='Password must be at least 6 characters.';render();return;}
+    if(S.users.some(function(u){return u.email.toLowerCase()===email.trim().toLowerCase();})){S.addUserError='A user with this email already exists.';render();return;}
+    hashPassword(pass).then(function(hash){
+      var newUser={id:'USR'+Date.now(),name:name.trim(),email:email.trim().toLowerCase(),password:hash,role:role,active:true,created_at:new Date().toISOString()};
+      S.users=S.users.concat([newUser]);createUser(newUser);
+      S.showAddUser=false;flash('User '+name+' created!');render();
+    });
+  });
+  document.querySelectorAll('.role-sel').forEach(function(el){
+    el.addEventListener('change',function(){
+      var uid=el.dataset.uid,role=el.value;
+      S.users=S.users.map(function(u){
+        if(u.id!==uid) return u;
+        var updated=Object.assign({},u,{role:role});saveUser(updated);
+        if(S.currentUser.id===uid){S.currentUser=updated;sessionStorage.setItem('aa_crm_user',JSON.stringify(updated));}
+        return updated;
+      });render();
+    });
+  });
+  document.querySelectorAll('.toggle-user-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      var uid=el.dataset.uid,active=el.dataset.active!=='1';
+      S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{active:active});saveUser(updated);return updated;});
+      flash(active?'User activated.':'User deactivated.');render();
+    });
+  });
+  document.querySelectorAll('.reset-pass-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      var uid=el.dataset.uid,name=el.dataset.name;
+      var newPass=prompt('Enter new temporary password for '+name+':');
+      if(!newPass||newPass.length<6){alert('Password must be at least 6 characters.');return;}
+      hashPassword(newPass).then(function(hash){
+        S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{password:hash});saveUser(updated);return updated;});
+        flash('Password reset for '+name+'!');render();
+      });
+    });
+  });
+  document.querySelectorAll('.del-user-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      if(!confirm('Delete this user? This cannot be undone.')) return;
+      var uid=el.dataset.uid;
+      S.users=S.users.filter(function(u){return u.id!==uid;});
+      deleteUserSB(uid);flash('User deleted.','err');render();
+    });
+  });
+  // Deal file downloads
+  document.querySelectorAll('.dl-file').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var d=S.deals.filter(function(x){return x._id===el.dataset.did;})[0];
+      if(d&&d.files) downloadFile(d.files[parseInt(el.dataset.fi)]);
+    });
+  });
+  document.querySelectorAll('.dl-lfile').forEach(function(el){
+    el.addEventListener('click',function(){
+      var l=S.leads.filter(function(x){return x._id===el.dataset.lid;})[0];
+      if(l&&l.files) downloadFile(l.files[parseInt(el.dataset.fi)]);
+    });
+  });
 }
 
 S.form=bDeal();S.lform=bLead();
+// Restore session
+var _sess=sessionStorage.getItem('aa_crm_user');
+if(_sess){try{S.currentUser=JSON.parse(_sess);}catch(e){}}
 render();
 loadFromSupabase();
 </script>
