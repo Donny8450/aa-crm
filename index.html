@@ -1144,7 +1144,7 @@ function cvt(id){
   var l=S.leads.filter(function(x){return x._id===id;})[0];if(!l) return;
   if(!l.approved){flash('This lead must be approved by an authorised user before it can be converted to a deal.','err');return;}
 
-  var nid=nextDealId(l.serviceType);
+  var nid=l.leadId;  // Keep the same ID from the lead
   var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[]});
   S.deals=S.deals.concat([newDeal2]);
   syncDeal(newDeal2);
