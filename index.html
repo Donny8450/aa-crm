@@ -56,6 +56,118 @@ tr:hover td{background:#E8F5EE}
 .ll{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #C8E6D4;border-radius:8px;text-decoration:none;margin-bottom:8px}
 .ll:hover{background:#E8F5EE}
 .empty{text-align:center;padding:52px 32px;background:linear-gradient(160deg,#E8F5EE,#fff);border-radius:14px;border:1px solid #C8E6D4}
+
+/* ── MOBILE RESPONSIVE ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+  /* Header */
+  .hdr-inner { flex-wrap: wrap; gap: 8px; }
+  img[alt="African Aspirations x Transworld"] { height: 28px !important; }
+
+  /* Navigation tabs — horizontal scroll */
+  .nav-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap !important; }
+  .tab { padding: 10px 14px; font-size: 12px; white-space: nowrap; }
+
+  /* Main content padding */
+  .main-pad { padding: 14px 12px !important; }
+
+  /* Cards */
+  .card { padding: 14px; border-radius: 10px; }
+
+  /* Grid 2 col → 1 col */
+  .grid2 { grid-template-columns: 1fr !important; }
+
+  /* Tables — horizontal scroll */
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
+  table { min-width: 600px; font-size: 12px; }
+  th, td { padding: 8px 10px; }
+
+  /* Forms */
+  div[style*="grid-template-columns:1fr 1fr"],
+  div[style*="grid-template-columns: 1fr 1fr"] { display: block !important; }
+  div[style*="grid-template-columns:2fr 1fr"],
+  div[style*="grid-template-columns: 2fr 1fr"] { display: block !important; }
+  div[style*="grid-template-columns:repeat(auto-fit"] { grid-template-columns: 1fr !important; }
+
+  /* Buttons — bigger tap targets */
+  .btn { padding: 12px 18px; font-size: 14px; }
+  .btn-sm { padding: 8px 12px; font-size: 12px; }
+
+  /* YNB radio buttons — stack on small screens */
+  .ynb { flex-direction: column; gap: 8px; }
+  .ynb label { justify-content: flex-start; }
+
+  /* Modals — full width */
+  div[style*="max-width:420px"] { max-width: 100% !important; margin: 10px !important; }
+  div[style*="max-width:500px"] { max-width: 100% !important; margin: 10px !important; }
+
+  /* Filter buttons — wrap */
+  div[style*="display:flex;gap:8px;flex-wrap:wrap"] { gap: 6px; }
+  .fbtn { font-size: 11px; padding: 5px 10px; }
+
+  /* Login screen */
+  div[style*="max-width:420px"].login-card { max-width: calc(100vw - 32px) !important; }
+
+  /* Gantt chart — horizontal scroll */
+  div[style*="overflow-x:auto"] { -webkit-overflow-scrolling: touch; }
+
+  /* Section headers */
+  div[style*="font-size:20px;font-weight:900"] { font-size: 16px !important; }
+  div[style*="font-size:22px;font-weight:900"] { font-size: 17px !important; }
+  div[style*="font-size:24px;font-weight:900"] { font-size: 18px !important; }
+
+  /* Management overview — single column charts */
+  div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+  /* Deliverables tracker — scroll */
+  div[style*="overflow-x:auto;border-radius:14px"] { border-radius: 8px; }
+
+  /* KPI cards — 2 per row on mobile */
+  div[style*="grid-template-columns:repeat(auto-fit,minmax(160px"] { grid-template-columns: 1fr 1fr !important; }
+  div[style*="grid-template-columns:repeat(auto-fit,minmax(130px"] { grid-template-columns: 1fr 1fr !important; }
+  div[style*="grid-template-columns:repeat(auto-fit,minmax(140px"] { grid-template-columns: 1fr 1fr !important; }
+
+  /* Pipeline row — action buttons stacked */
+  div[style*="display:flex;gap:6px"] { flex-wrap: wrap; gap: 4px; }
+
+  /* Header sign out button — smaller */
+  button[id="hdr-logout"] { padding: 5px 10px !important; font-size: 11px !important; }
+
+  /* Summary cards in header banners */
+  div[style*="display:flex;gap:24px"] { gap: 12px; flex-wrap: wrap; }
+  div[style*="display:flex;gap:20px"] { gap: 10px; flex-wrap: wrap; }
+
+  /* Donut charts + legend — stack vertically */
+  div[style*="display:flex;align-items:center;gap:20px;flex-wrap:wrap"] { flex-direction: column; align-items: flex-start !important; }
+
+  /* Section filter pills */
+  div[style*="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px"] { gap: 6px; }
+
+  /* Approvals cards */
+  div[style*="display:flex;align-items:flex-start;justify-content:space-between"] { flex-direction: column !important; gap: 12px !important; }
+
+  /* User management table */
+  div[style*="display:flex;gap:6px"] { flex-wrap: wrap; }
+
+  /* Toast position */
+  .toast { right: 10px; left: 10px; top: 10px; }
+}
+
+@media (max-width: 480px) {
+  /* Phone-specific */
+  .tab { padding: 9px 10px; font-size: 11px; }
+  .card { padding: 12px; }
+  th, td { padding: 7px 8px; font-size: 11px; }
+
+  /* KPI cards — full width on small phones */
+  div[style*="grid-template-columns:repeat(auto-fit,minmax(160px"] { grid-template-columns: 1fr !important; }
+
+  /* Header logo smaller */
+  img[alt="African Aspirations x Transworld"] { height: 24px !important; }
+
+  /* Form grid always 1 col */
+  div[style*="display:grid"] { grid-template-columns: 1fr !important; }
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script>emailjs.init("YSaPIm6AlAmRDEFnA");</script>
@@ -404,7 +516,7 @@ function rApp(){
       }).join('')+
     '</div>'+
   '</div>'+
-  '<div style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
+  '<div class="main-pad" style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
     (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700">Access restricted</div><div style="font-size:13px;margin-top:6px">Only Managers and Admins can approve leads.</div></div></div>':rApprovals()):'')+(S.tab==='overview'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700;color:#1A4731">Access Restricted</div><div style="font-size:13px;margin-top:6px">The Management Overview is available to Managers and Admins only.</div></div></div>':rOverview()):'')+(S.tab==='users'?rUsers():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
