@@ -2202,8 +2202,23 @@ function bind(){
   });
   var gsr=document.getElementById('gantt-search');
   if(gsr){
-    gsr.addEventListener('input',function(){S.ganttSearch=gsr.value;render();});
-    gsr.addEventListener('keydown',function(ev){if(ev.key==='Escape'){S.ganttSearch='';render();}});
+    // Use keyup so full value is available; re-focus after render
+    gsr.addEventListener('keyup',function(ev){
+      if(ev.key==='Escape'){S.ganttSearch='';render();return;}
+      var val=gsr.value;
+      S.ganttSearch=val;
+      render();
+      // Re-focus and restore cursor position
+      var el=document.getElementById('gantt-search');
+      if(el){el.focus();el.value=val;el.setSelectionRange(val.length,val.length);}
+    });
+    gsr.addEventListener('input',function(){
+      var val=gsr.value;
+      S.ganttSearch=val;
+      render();
+      var el=document.getElementById('gantt-search');
+      if(el){el.focus();el.value=val;el.setSelectionRange(val.length,val.length);}
+    });
   }
   var gsrc=document.getElementById('gantt-clear');
   if(gsrc) gsrc.addEventListener('click',function(){S.ganttSearch='';render();});
