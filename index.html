@@ -178,6 +178,21 @@ tr:hover td{background:#E8F5EE}
 <div id="toasts"></div>
 <script>
 // --- Email Notifications ---
+function sendDeliverableReviewNotification(deal, dlv){
+  var managers=S.users.filter(function(u){return (u.role==='manager'||u.role==='admin')&&u.active&&u.email;});
+  if(!managers.length) return;
+  managers.forEach(function(mgr){
+    emailjs.send('service_y6a11op','template_v2q9z44',{
+      to_email:mgr.email,
+      manager_name:mgr.name||'Team',
+      lead_id:deal.dealId||'n/a',
+      lead_name:deal.bizName||'Unknown',
+      service_type:dlv.name+' (Deliverable)',
+      submitted_by:S.currentUser?S.currentUser.name:'Staff'
+    }).catch(function(err){console.error('Email error:',err);});
+  });
+}
+
 function sendApprovalNotification(lead){
   var managers=S.users.filter(function(u){return (u.role==="manager"||u.role==="admin")&&u.active&&u.email;});
   if(!managers.length) return;
@@ -467,6 +482,7 @@ var S={
   ganttDeal:null,
   ganttSearch:'',
   ganttProject:'all',
+  ganttExpDlv:null,  // expanded deliverable _id
   currentUser:null,
   loginError:'',
   gcalToken:null,
@@ -1928,6 +1944,90 @@ function rUsers(){
 }
 
 
+function rDlvReviewPanel(deal, dlv){
+  var rs = dlv.reviewStatus||'Draft';
+  var files = dlv.reviewFiles||[];
+  var comments = dlv.comments||[];
+  var statusColors = {
+    'Draft':'#94a3b8','Submitted for Review':'#C8972A',
+    'Under Review':'#2563eb','Revision Needed':'#dc2626','Approved':'#16a34a'
+  };
+  var statusBg = {
+    'Draft':'#f8fafc','Submitted for Review':'#FDF8EE',
+    'Under Review':'#eff6ff','Revision Needed':'#fef2f2','Approved':'#f0fdf4'
+  };
+  var col = statusColors[rs]||'#94a3b8';
+  var bg = statusBg[rs]||'#f8fafc';
+  var isManager = S.currentUser&&(S.currentUser.role==='manager'||S.currentUser.role==='admin');
+
+  var html='<tr><td colspan="100%" style="padding:0;background:#fafdfb">';
+  html+='<div style="padding:16px 20px;border-top:2px solid #C8E6D4;border-bottom:2px solid #E8F5EE">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
+  html+='<div style="font-size:13px;font-weight:800;color:#1A4731">&#128203; '+e(dlv.name)+' &mdash; Review Panel</div>';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<span style="background:'+bg+';color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700">'+rs+'</span>';
+  html+='<button class="dlv-review-close" data-dlvid="'+e(dlv._id)+'" style="background:#E8F5EE;border:none;color:#2D6A4F;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Close</button>';
+  html+='</div></div>';
+
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">';
+
+  // ── Panel 1: Upload ──────────────────────────────────────────────────────
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px">';
+  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128196; Documents</div>';
+  if(files.length>0){
+    files.forEach(function(f,fi){
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fafdfb;border:1px solid #E8F5EE;border-radius:8px;margin-bottom:6px">';
+      html+='<div style="font-size:18px">&#128196;</div>';
+      html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(f.name)+'</div>';
+      html+='<div style="font-size:10px;color:#5A7A65">'+e(f.uploadedBy||'')+'  '+e(f.uploadedAt||'')+'</div></div>';
+      if(f.data) html+='<button class="dlv-file-dl" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" data-fi="'+fi+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128229;</button>';
+      html+='</div>';
+    });
+  } else {
+    html+='<div style="text-align:center;padding:16px;color:#5A7A65;font-size:11px">No documents yet</div>';
+  }
+  html+='<div style="margin-top:10px"><label style="display:block;background:#1A4731;color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;text-align:center">&#128196; Upload Document<input type="file" class="dlv-file-upload" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.png"/></label></div>';
+  html+='</div>';
+
+  // ── Panel 2: Review Status ───────────────────────────────────────────────
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px">';
+  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128260; Review Status</div>';
+  ['Draft','Submitted for Review','Under Review','Revision Needed','Approved'].forEach(function(status){
+    var sc=statusColors[status]||'#94a3b8';
+    var isActive=rs===status;
+    var canSet=status==='Submitted for Review'||status==='Draft'?true:(isManager);
+    html+='<button class="dlv-status-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" data-status="'+status+'" '+(!canSet?'disabled':'')+' style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 12px;border-radius:8px;border:1.5px solid '+(isActive?sc:'#E8F5EE')+';background:'+(isActive?statusBg[status]:'#fff')+';color:'+(isActive?sc:'#5A7A65')+';font-size:11px;font-weight:'+(isActive?'800':'500')+';cursor:'+(canSet?'pointer':'not-allowed')+';font-family:inherit;opacity:'+(canSet?1:0.5)+'">'+(isActive?'&#9679; ':'')+status+'</button>';
+  });
+  if(rs==='Approved'){
+    html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:#16a34a;font-weight:600;text-align:center">&#10003; Progress auto-set to 100%</div>';
+  }
+  html+='</div>';
+
+  // ── Panel 3: Comments ────────────────────────────────────────────────────
+  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px;display:flex;flex-direction:column">';
+  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128172; Comments ('+comments.length+')</div>';
+  html+='<div style="flex:1;max-height:180px;overflow-y:auto;margin-bottom:10px">';
+  if(comments.length===0){
+    html+='<div style="text-align:center;padding:16px;color:#5A7A65;font-size:11px">No comments yet</div>';
+  } else {
+    comments.forEach(function(c){
+      var isMe=S.currentUser&&c.userId===S.currentUser.id;
+      html+='<div style="margin-bottom:8px;padding:8px 10px;background:'+(isMe?'#E8F5EE':'#fafdfb')+';border-radius:8px;border:1px solid #E8F5EE">';
+      html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px">';
+      html+='<span style="font-size:10px;font-weight:700;color:#1A4731">'+e(c.user||'?')+'</span>';
+      html+='<span style="font-size:10px;color:#5A7A65">'+e(c.ts||'')+'</span>';
+      html+='</div><div style="font-size:11px;color:#333">'+e(c.text)+'</div></div>';
+    });
+  }
+  html+='</div>';
+  html+='<div style="display:flex;gap:6px">';
+  html+='<input id="dlv-comment-'+e(dlv._id)+'" type="text" placeholder="Add a comment..." style="flex:1;font-size:12px;padding:7px 10px"/>';
+  html+='<button class="dlv-add-comment" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">Send</button>';
+  html+='</div></div>';
+  html+='</div></div></td></tr>';
+  return html;
+}
+
 function rGantt(){
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
   var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
@@ -2082,9 +2182,21 @@ function rGantt(){
 
       html+='<tr style="background:'+rowBg+';border-bottom:1px solid #E8F5EE">';
       // ID
-      html+='<td style="padding:9px 8px;border-left:3px solid '+col+'"><span style="color:'+col+';font-size:11px;font-weight:700;font-family:monospace">'+e(deal.dealId||'?')+'.'+(di2+1)+'</span></td>';
+      var isExpanded=S.
+      isExpanded=S.ganttExpDlv===dlv._id;
+      var rs2=dlv.reviewStatus||'Draft';
+      var rsBadgeCol={'Draft':'#94a3b8','Submitted for Review':'#C8972A','Under Review':'#2563eb','Revision Needed':'#dc2626','Approved':'#16a34a'}[rs2]||'#94a3b8';
+      html+='<tr style="background:'+rowBg+';border-bottom:1px solid #E8F5EE">';
+      html+='<td style="padding:9px 8px;border-left:3px solid '+col+';white-space:nowrap"><span style="color:'+col+';font-size:11px;font-weight:700;font-family:monospace">'+e(deal.dealId||'?')+'.'+(di2+1)+'</span></td>';
       // Task name
-      html+='<td style="padding:9px 8px;font-weight:600;color:#1A4731;min-width:160px">'+e(dlv.name)+'</td>';
+      html+='<td style="padding:9px 8px;font-weight:600;color:#1A4731;min-width:160px">'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+          '<button class="dlv-expand-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:none;border:none;cursor:pointer;color:'+col+';font-size:14px;padding:0;flex-shrink:0;font-family:inherit">'+(isExpanded?'&#9660;':'&#9654;')+'</button>'+
+          '<span>'+e(dlv.name)+'</span>'+
+          (rs2!=='Draft'?'<span style="background:'+rsBadgeCol+'20;color:'+rsBadgeCol+';border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;white-space:nowrap">'+rs2+'</span>':'')+
+          ((dlv.reviewFiles||[]).length>0?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">&#128196; '+(dlv.reviewFiles.length)+'</span>':'')+
+        '</div>'+
+      '</td>';
       // Owner
       html+='<td style="padding:9px 8px;color:#5A7A65;font-size:11px;white-space:nowrap">'+e(dlv.owner||'&mdash;')+'</td>';
       // Priority
@@ -2133,6 +2245,7 @@ function rGantt(){
         html+='</td>';
       });
       html+='</tr>';
+      if(isExpanded){ html+=rDlvReviewPanel(deal,dlv); }
     });
   });
 
@@ -2439,6 +2552,131 @@ function bind(){
   var soo=document.getElementById('soo');if(soo) soo.addEventListener('click',function(){var to=(document.getElementById('eto')||{}).value,sub=(document.getElementById('esb')||{}).value,body=(document.getElementById('ebo')||{}).value;if(!to){flash('No email.','err');return;}window.open('https://outlook.office.com/mail/deeplink/compose?to='+encodeURIComponent(to)+'&subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body),'_blank');});
   var smo=document.getElementById('smo');if(smo) smo.addEventListener('click',function(){var to=(document.getElementById('eto')||{}).value,sub=(document.getElementById('esb')||{}).value,body=(document.getElementById('ebo')||{}).value;if(!to){flash('No email.','err');return;}window.location.href='mailto:'+to+'?subject='+encodeURIComponent(sub)+'&body='+encodeURIComponent(body);});
   bRF();
+  // ── Deliverable expand/collapse ───────────────────────────────────────────
+  document.querySelectorAll('.dlv-expand-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var did=el.dataset.dlvid;
+      S.ganttExpDlv=S.ganttExpDlv===did?null:did;
+      render();
+      // Re-focus gantt search if open
+      var gs=document.getElementById('gantt-search');
+      if(gs&&S.ganttSearch){gs.focus();gs.value=S.ganttSearch;}
+    });
+  });
+
+  // ── Close review panel ────────────────────────────────────────────────────
+  document.querySelectorAll('.dlv-review-close').forEach(function(el){
+    el.addEventListener('click',function(){S.ganttExpDlv=null;render();});
+  });
+
+  // ── Review status change ──────────────────────────────────────────────────
+  document.querySelectorAll('.dlv-status-btn').forEach(function(el){
+    el.addEventListener('click',function(){
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, status=el.dataset.status;
+      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var ts=new Date().toLocaleString();
+      S.deals=S.deals.map(function(d){
+        if(d._id!==dealId) return d;
+        var dlvs=(d.deliverables||[]).map(function(dlv){
+          if(dlv._id!==dlvId) return dlv;
+          var newPct=status==='Approved'?100:status==='Revision Needed'?Math.min(dlv.progress||0,50):dlv.progress||0;
+          var newComment=null;
+          if(status==='Submitted for Review'){
+            newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',text:'Submitted for review',ts:ts,system:true};
+            // Send email notification to managers
+            sendDeliverableReviewNotification(d,dlv);
+          } else if(status==='Approved'){
+            newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',text:'Approved ✓',ts:ts,system:true};
+          } else if(status==='Revision Needed'){
+            newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',text:'Revision needed',ts:ts,system:true};
+          }
+          var updatedComments=newComment?(dlv.comments||[]).concat([newComment]):(dlv.comments||[]);
+          return Object.assign({},dlv,{reviewStatus:status,progress:newPct,comments:updatedComments});
+        });
+        var updated=Object.assign({},d,{deliverables:dlvs});
+        syncDeal(updated);
+        return updated;
+      });
+      flash('Status updated to: '+status);render();
+    });
+  });
+
+  // ── File upload on deliverable ────────────────────────────────────────────
+  document.querySelectorAll('.dlv-file-upload').forEach(function(el){
+    el.addEventListener('change',function(){
+      if(!el.files||!el.files[0]) return;
+      var file=el.files[0];
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
+      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var ts=new Date().toLocaleString();
+      var reader=new FileReader();
+      reader.onload=function(ev){
+        S.deals=S.deals.map(function(d){
+          if(d._id!==dealId) return d;
+          var dlvs=(d.deliverables||[]).map(function(dlv){
+            if(dlv._id!==dlvId) return dlv;
+            var newFile={name:file.name,size:file.size,type:file.type,data:ev.target.result,uploadedBy:actor,uploadedAt:ts};
+            return Object.assign({},dlv,{reviewFiles:(dlv.reviewFiles||[]).concat([newFile])});
+          });
+          var updated=Object.assign({},d,{deliverables:dlvs});
+          syncDeal(updated);return updated;
+        });
+        flash('File uploaded: '+file.name);render();
+      };
+      reader.readAsDataURL(file);
+      el.value='';
+    });
+  });
+
+  // ── Download deliverable file ─────────────────────────────────────────────
+  document.querySelectorAll('.dlv-file-dl').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, fi=parseInt(el.dataset.fi);
+      var d=S.deals.filter(function(x){return x._id===dealId;})[0];
+      if(!d) return;
+      var dlv=(d.deliverables||[]).filter(function(x){return x._id===dlvId;})[0];
+      if(!dlv) return;
+      var f=(dlv.reviewFiles||[])[fi];
+      if(f&&f.data) downloadFile(f);
+      else flash('File data not available.','err');
+    });
+  });
+
+  // ── Add comment ───────────────────────────────────────────────────────────
+  document.querySelectorAll('.dlv-add-comment').forEach(function(el){
+    el.addEventListener('click',function(){
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
+      var inp=document.getElementById('dlv-comment-'+dlvId);
+      var text=inp?inp.value.trim():'';
+      if(!text) return;
+      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var ts=new Date().toLocaleString();
+      S.deals=S.deals.map(function(d){
+        if(d._id!==dealId) return d;
+        var dlvs=(d.deliverables||[]).map(function(dlv){
+          if(dlv._id!==dlvId) return dlv;
+          var newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',text:text,ts:ts};
+          return Object.assign({},dlv,{comments:(dlv.comments||[]).concat([newComment])});
+        });
+        var updated=Object.assign({},d,{deliverables:dlvs});
+        syncDeal(updated);return updated;
+      });
+      flash('Comment added');render();
+    });
+  });
+
+  // Enter key on comment input
+  document.querySelectorAll('[id^="dlv-comment-"]').forEach(function(el){
+    el.addEventListener('keydown',function(ev){
+      if(ev.key==='Enter'){
+        var btn=document.querySelector('.dlv-add-comment[data-dlvid="'+el.id.replace('dlv-comment-','')+'"]');
+        if(btn) btn.click();
+      }
+    });
+  });
+
   document.querySelectorAll('.gantt-proj-sel').forEach(function(el){
     el.addEventListener('click',function(){S.ganttProject=el.dataset.proj;render();});
   });
