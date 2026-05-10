@@ -182,13 +182,15 @@ function sendDeliverableReviewNotification(deal, dlv){
   var managers=S.users.filter(function(u){return (u.role==='manager'||u.role==='admin')&&u.active&&u.email;});
   if(!managers.length) return;
   managers.forEach(function(mgr){
-    emailjs.send('service_y6a11op','template_v2q9z44',{
+    emailjs.send('service_y6a11op','template_r4cad2z',{
       to_email:mgr.email,
       manager_name:mgr.name||'Team',
-      lead_id:deal.dealId||'n/a',
-      lead_name:deal.bizName||'Unknown',
-      service_type:dlv.name+' (Deliverable)',
+      deal_id:deal.dealId||'n/a',
+      deal_name:deal.bizName||'Unknown',
+      deliverable_name:dlv.name||'Deliverable',
       submitted_by:S.currentUser?S.currentUser.name:'Staff'
+    }).then(function(){
+      console.log('Deliverable review notification sent to '+mgr.email);
     }).catch(function(err){console.error('Email error:',err);});
   });
 }
