@@ -2201,7 +2201,10 @@ function bind(){
     el.addEventListener('click',function(){S.ganttProject=el.dataset.proj;render();});
   });
   var gsr=document.getElementById('gantt-search');
-  if(gsr) gsr.addEventListener('input',function(){S.ganttSearch=gsr.value;render();});
+  if(gsr){
+    gsr.addEventListener('input',function(){S.ganttSearch=gsr.value;render();});
+    gsr.addEventListener('keydown',function(ev){if(ev.key==='Escape'){S.ganttSearch='';render();}});
+  }
   var gsrc=document.getElementById('gantt-clear');
   if(gsrc) gsrc.addEventListener('click',function(){S.ganttSearch='';render();});
   var gwPrev=document.getElementById('gw-prev');if(gwPrev) gwPrev.addEventListener('click',function(){S.ganttWeek=(S.ganttWeek||0)-1;render();});
@@ -2232,9 +2235,6 @@ function bind(){
     });
   });
   var gsr=document.getElementById('gantt-srch');
-  if(gsr) gsr.addEventListener('input',function(){S.ganttSearch=gsr.value;render();});
-  var gsrc=document.getElementById('gantt-srch-clear');
-  if(gsrc) gsrc.addEventListener('click',function(){S.ganttSearch='';render();});
   // Service type selector
   document.querySelectorAll('.svc-sel').forEach(function(el){
     el.addEventListener('click',function(){
