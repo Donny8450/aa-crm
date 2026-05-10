@@ -2578,6 +2578,15 @@ function bind(){
       var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, status=el.dataset.status;
       var actor=S.currentUser?S.currentUser.name:'Unknown';
       var ts=new Date().toLocaleString();
+      // Guard: require at least one uploaded file before submitting for review
+      if(status==='Submitted for Review'){
+        var chkDeal=S.deals.filter(function(x){return x._id===dealId;})[0];
+        var chkDlv=chkDeal?(chkDeal.deliverables||[]).filter(function(x){return x._id===dlvId;})[0]:null;
+        if(!chkDlv||(chkDlv.reviewFiles||[]).length===0){
+          flash('Please upload a document first before submitting for review.','err');
+          return;
+        }
+      }
       S.deals=S.deals.map(function(d){
         if(d._id!==dealId) return d;
         var dlvs=(d.deliverables||[]).map(function(dlv){
