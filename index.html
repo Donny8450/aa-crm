@@ -170,6 +170,7 @@ tr:hover td{background:#E8F5EE}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>emailjs.init("YSaPIm6AlAmRDEFnA");</script>
 </head>
 <body>
@@ -192,6 +193,78 @@ function sendApprovalNotification(lead){
     .catch(function(err){console.error("Email error:",err);});
   });
 }
+
+// ─── Google Calendar Integration ─────────────────────────────────────────────
+var GC_CLIENT_ID = '55780604748-7jmsl2q0l3mpdd3n37l5s5jorv2og780.apps.googleusercontent.com';
+var GC_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+var gcTokenClient = null;
+
+function initGoogleCalendar(){
+  if(typeof google === 'undefined' || !google.accounts) return;
+  gcTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GC_CLIENT_ID,
+    scope: GC_SCOPE,
+    callback: function(resp){
+      if(resp.error){ flash('Google sign-in failed: '+resp.error,'err'); return; }
+      S.gcalToken = resp.access_token;
+      // Get user info
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
+        headers:{ Authorization: 'Bearer '+resp.access_token }
+      }).then(function(r){return r.json();}).then(function(info){
+        S.gcalUser = info.name || info.email || 'Google User';
+        flash('Connected to Google Calendar as '+S.gcalUser+'!');
+        render();
+      });
+    }
+  });
+}
+
+function connectGoogleCalendar(){
+  if(!gcTokenClient){ initGoogleCalendar(); }
+  if(gcTokenClient){ gcTokenClient.requestAccessToken(); }
+  else { flash('Google Calendar not ready yet. Try again in a moment.','err'); }
+}
+
+function disconnectGoogleCalendar(){
+  if(S.gcalToken) google.accounts.oauth2.revoke(S.gcalToken, function(){});
+  S.gcalToken = null; S.gcalUser = null;
+  flash('Disconnected from Google Calendar.');
+  render();
+}
+
+function addToGoogleCalendar(act, lead){
+  if(!S.gcalToken){ flash('Please connect Google Calendar first.','err'); return; }
+  var startDT = act.date && act.time ? act.date+'T'+act.time+':00' : new Date().toISOString().slice(0,19);
+  var endDT   = act.date && act.time ? act.date+'T'+(function(){
+    var [h,m]=act.time.split(':').map(Number); h+=1; return (h<10?'0':'')+h+':'+(m<10?'0':'')+m;
+  }())+':00' : new Date(Date.now()+3600000).toISOString().slice(0,19);
+
+  var event = {
+    summary: act.type + (lead ? ' — ' + (lead.bizName||lead.ownerContact||'Lead') : ''),
+    description: [
+      act.note ? 'Notes: '+act.note : '',
+      lead ? 'Business: '+(lead.bizName||'') : '',
+      lead ? 'Contact: '+(lead.ownerContact||'') : '',
+      lead ? 'Phone: '+(lead.phone||'') : '',
+      lead ? 'Lead ID: '+(lead.leadId||'') : '',
+      'Logged via African Aspirations CRM'
+    ].filter(Boolean).join('\n'),
+    start: { dateTime: startDT, timeZone: 'Africa/Accra' },
+    end:   { dateTime: endDT,   timeZone: 'Africa/Accra' },
+    reminders: { useDefault: true }
+  };
+
+  fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer '+S.gcalToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify(event)
+  }).then(function(r){
+    if(r.ok){ flash('Event added to Google Calendar! &#128197;'); }
+    else { r.json().then(function(e){ flash('Calendar error: '+(e.error&&e.error.message||'Unknown'),'err'); }); }
+  }).catch(function(){ flash('Could not connect to Google Calendar.','err'); });
+}
+
+window.addEventListener('load', function(){ setTimeout(initGoogleCalendar, 1500); });
 
 // ─── Brute Force Protection ──────────────────────────────────────────────────
 var MAX_ATTEMPTS = 5;
@@ -396,6 +469,8 @@ var S={
   ganttProject:'all',
   currentUser:null,
   loginError:'',
+  gcalToken:null,
+  gcalUser:null,
   loginAttempts:{},  // {email: {count, lockedUntil}}
   loginEmail:'',
   loginPass:'',
@@ -1067,27 +1142,65 @@ function rNotes(){
 }
 
 function rActs(){
+  var gcConnected=!!S.gcalToken;
+  var gcBtnHtml=gcConnected
+    ?'<div style="display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 14px;margin-bottom:14px">'+
+        '<div style="font-size:18px">&#128197;</div>'+
+        '<div style="flex:1"><div style="font-size:12px;font-weight:700;color:#16a34a">Connected to Google Calendar</div>'+
+        '<div style="font-size:11px;color:#5A7A65">'+e(S.gcalUser||'')+'</div></div>'+
+        '<button id="gc-disconnect" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Disconnect</button>'+
+      '</div>'
+    :'<button id="gc-connect" style="width:100%;padding:11px;background:#fff;border:1.5px solid #4285F4;border-radius:10px;color:#4285F4;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px">'+
+        '&#128197; Connect Google Calendar'+
+      '</button>';
+
   return '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">'+
-  '<div style="flex:0 0 390px" class="card"><div style="font-size:15px;font-weight:800;color:#1A4731;margin-bottom:18px">&#128197; Schedule Activity</div>'+
-  '<div style="display:flex;flex-direction:column;gap:14px">'+
-    '<div><div class="field-lbl">Lead</div><select id="ald"><option value="">Select a lead...</option>'+S.leads.map(function(l){return '<option value="'+l._id+'">'+e(l.contactPerson)+(l.organization?' &mdash; '+e(l.organization):'')+'</option>';}).join('')+'</select></div>'+
-    '<div><div class="field-lbl">Activity Type</div><select id="aty">'+['Call Lead','Send Proposal','Follow Up','Schedule Meeting','Send Contract','Check In','Other'].map(function(t){return '<option>'+t+'</option>';}).join('')+'</select></div>'+
-    '<div><div class="field-lbl">Notes</div><textarea id="ano" placeholder="Notes about this activity..." style="min-height:60px"></textarea></div>'+
-    '<button class="btn btn-gold" id="sa" style="padding:11px">Save Activity</button>'+
-  '</div></div>'+
+  '<div style="flex:0 0 390px" class="card">'+
+    '<div style="font-size:15px;font-weight:800;color:#1A4731;margin-bottom:16px">&#128197; Schedule Activity</div>'+
+    gcBtnHtml+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><div class="field-lbl">Lead</div><select id="ald"><option value="">Select a lead...</option>'+
+        S.leads.map(function(l){return '<option value="'+l._id+'">'+e(l.bizName||l.ownerContact||l.leadId||'Lead')+(l.serviceType?' — '+e(l.serviceType):'')+'</option>';}).join('')+
+      '</select></div>'+
+      '<div><div class="field-lbl">Activity Type</div><select id="aty">'+
+        ['Call Lead','Send Proposal','Follow Up','Schedule Meeting','Send Contract','Site Visit','Client Presentation','Check In','Other'].map(function(t){return '<option>'+t+'</option>';}).join('')+
+      '</select></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div><div class="field-lbl">Date</div><input type="date" id="adate" value="'+new Date().toISOString().slice(0,10)+'"/></div>'+
+        '<div><div class="field-lbl">Time</div><input type="time" id="atime" value="09:00"/></div>'+
+      '</div>'+
+      '<div><div class="field-lbl">Duration</div><select id="adur">'+
+        ['30 minutes','1 hour','1.5 hours','2 hours','Half day','Full day'].map(function(t){return '<option>'+t+'</option>';}).join('')+
+      '</select></div>'+
+      '<div><div class="field-lbl">Notes</div><textarea id="ano" placeholder="Notes about this activity..." style="min-height:60px"></textarea></div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-gold" id="sa" style="flex:1;padding:11px">Save Activity</button>'+
+        (gcConnected
+          ?'<button class="btn" id="sa-cal" style="flex:1;padding:11px;background:#4285F4;color:#fff;border:none">&#128197; Save + Calendar</button>'
+          :'<button class="btn" id="sa-cal" style="flex:1;padding:11px;background:#E8F0FE;color:#4285F4;border:1px solid #4285F4;opacity:.7;cursor:not-allowed" disabled title="Connect Google Calendar to enable">&#128197; + Calendar</button>')+
+      '</div>'+
+    '</div>'+
+  '</div>'+
   '<div style="flex:1;min-width:0">'+
-    (S.acts.length===0?'<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#128197;</div><div style="font-size:18px;font-weight:800;color:#1A4731">No activities yet</div></div>':
-    '<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4"><table><thead><tr><th>ACTIVITY</th><th>LEAD</th><th>NOTES</th><th>DATE</th><th>STATUS</th><th></th></tr></thead><tbody>'+
-    [].concat(S.acts).reverse().map(function(a){
-      return '<tr style="'+(a.done?'opacity:.4;text-decoration:line-through':'')+'">'+
-        '<td style="font-weight:600;color:#2D6A4F">'+e(a.type)+'</td>'+
-        '<td style="color:#5A7A65">'+(a.leadName?e(a.leadName):'&mdash;')+'</td>'+
-        '<td style="color:#5A7A65;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.note?e(a.note):'&mdash;')+'</td>'+
-        '<td style="color:#5A7A65;font-size:12px">'+e(a.date)+'</td>'+
-        '<td><button class="tdn btn-sm" data-id="'+a._id+'" style="background:'+(a.done?'#E8F5EE':'#f8fafc')+';color:'+(a.done?'#2D6A4F':'#5A7A65')+';border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">'+(a.done?'Done':'Mark Done')+'</button></td>'+
-        '<td><button class="dac btn-sm" data-id="'+a._id+'" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:12px;color:#dc2626;cursor:pointer">&#10005;</button></td>'+
-      '</tr>';
-    }).join('')+'</tbody></table></div>')+
+    (S.acts.length===0
+      ?'<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#128197;</div><div style="font-size:18px;font-weight:800;color:#1A4731">No activities yet</div><div style="font-size:13px;color:#5A7A65;margin-top:8px">Schedule an activity to get started</div></div>'
+      :'<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4"><table><thead><tr><th>TYPE</th><th>LEAD</th><th>DATE</th><th>TIME</th><th>NOTES</th><th>CALENDAR</th><th>STATUS</th><th></th></tr></thead><tbody>'+
+        [].concat(S.acts).reverse().map(function(a){
+          return '<tr style="'+(a.done?'opacity:.5;text-decoration:line-through':'')+'">'+
+            '<td style="font-weight:600;color:#2D6A4F;white-space:nowrap">'+e(a.type)+'</td>'+
+            '<td style="color:#5A7A65;white-space:nowrap">'+(a.leadName?e(a.leadName):'&mdash;')+'</td>'+
+            '<td style="color:#5A7A65;font-size:12px;white-space:nowrap">'+(a.date?e(a.date):'&mdash;')+'</td>'+
+            '<td style="color:#5A7A65;font-size:12px">'+(a.time?e(a.time):'&mdash;')+'</td>'+
+            '<td style="color:#5A7A65;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(a.note?e(a.note):'&mdash;')+'</td>'+
+            '<td>'+(a.calendarId
+              ?'<span style="background:#E8F0FE;color:#4285F4;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">&#128197; Added</span>'
+              :(gcConnected
+                ?'<button class="act-cal-add btn-sm" data-id="'+a._id+'" style="background:#E8F0FE;color:#4285F4;border:1px solid #4285F4;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Calendar</button>'
+                :'<span style="color:#ccc;font-size:11px">Not connected</span>'))+'</td>'+
+            '<td><button class="tdn btn-sm" data-id="'+a._id+'" style="background:'+(a.done?'#E8F5EE':'#f8fafc')+';color:'+(a.done?'#2D6A4F':'#5A7A65')+';border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer">'+(a.done?'&#10003; Done':'Mark Done')+'</button></td>'+
+            '<td><button class="dac btn-sm" data-id="'+a._id+'" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 8px;font-size:12px;color:#dc2626;cursor:pointer;font-family:inherit">&#10005;</button></td>'+
+          '</tr>';
+        }).join('')+'</tbody></table></div>')+
   '</div></div>';
 }
 
@@ -2292,15 +2405,32 @@ function bind(){
   });
   document.querySelectorAll('.dno').forEach(function(el){el.addEventListener('click',function(){var id=el.dataset.id;S.notes=S.notes.filter(function(x){return x._id!==id;});deleteNote(id);render();});});
   // activities
-  var saa=document.getElementById('sa');if(saa) saa.addEventListener('click',function(){
-    var lid=(document.getElementById('ald')||{}).value;
-    var type=(document.getElementById('aty')||{}).value||'';
+  function collectActForm(addToCalendar){
+    var lid=(document.getElementById('ald')||{}).value||'';
+    var typ=(document.getElementById('aty')||{}).value||'Call Lead';
     var note=(document.getElementById('ano')||{}).value||'';
+    var adate=(document.getElementById('adate')||{}).value||new Date().toISOString().slice(0,10);
+    var atime=(document.getElementById('atime')||{}).value||'09:00';
+    var adur=(document.getElementById('adur')||{}).value||'1 hour';
     var lead=S.leads.filter(function(l){return l._id===lid;})[0];
-    var newAct={_id:'A'+S.aid++,leadName:lead?lead.contactPerson:null,type:type,note:note,date:new Date().toLocaleString(),done:false};
+    var newAct={_id:'A'+Date.now(),leadId:lid,leadName:lead?(lead.bizName||lead.ownerContact||lead.leadId||''):'',type:typ,note:note,date:adate,time:atime,duration:adur,done:false,calendarId:null};
     S.acts=S.acts.concat([newAct]);
     syncAct(newAct);
-    flash('Activity saved!');render();
+    if(addToCalendar&&S.gcalToken){ addToGoogleCalendar(newAct,lead); }
+    flash('Activity saved!'+(addToCalendar&&S.gcalToken?' Adding to Google Calendar...':''));
+    render();
+  }
+  var saa=document.getElementById('sa');if(saa) saa.addEventListener('click',function(){ collectActForm(false); });
+  var saCalBtn=document.getElementById('sa-cal');if(saCalBtn&&!saCalBtn.disabled) saCalBtn.addEventListener('click',function(){ collectActForm(true); });
+  var gcConnect=document.getElementById('gc-connect');if(gcConnect) gcConnect.addEventListener('click',connectGoogleCalendar);
+  var gcDisconnect=document.getElementById('gc-disconnect');if(gcDisconnect) gcDisconnect.addEventListener('click',disconnectGoogleCalendar);
+  document.querySelectorAll('.act-cal-add').forEach(function(el){
+    el.addEventListener('click',function(){
+      var id=el.dataset.id;
+      var act=S.acts.filter(function(a){return a._id===id;})[0];
+      var lead=act?S.leads.filter(function(l){return l._id===act.leadId;})[0]:null;
+      if(act){ addToGoogleCalendar(act,lead); }
+    });
   });
   document.querySelectorAll('.tdn').forEach(function(el){el.addEventListener('click',function(){var id=el.dataset.id;S.acts=S.acts.map(function(x){if(x._id!==id) return x;var u=Object.assign({},x,{done:!x.done});syncAct(u);return u;});render();});});
   document.querySelectorAll('.dac').forEach(function(el){el.addEventListener('click',function(){var id=el.dataset.id;S.acts=S.acts.filter(function(x){return x._id!==id;});deleteAct(id);render();});});
