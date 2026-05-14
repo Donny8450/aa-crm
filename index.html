@@ -423,14 +423,16 @@ function loadFromSupabase(){
     sbLoad('leads'),
     sbLoad('notes'),
     sbLoad('activities'),
-    sbLoad('audit_log')
+    sbLoad('audit_log'),
+    sbLoad('clients')
   ]).then(function(results){
-    var deals=results[0], leads=results[1], notes=results[2], acts=results[3], audit=results[4];
+    var deals=results[0], leads=results[1], notes=results[2], acts=results[3], audit=results[4], clients=results[5];
     if(Array.isArray(deals)) S.deals = deals.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(leads)) S.leads = leads.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(notes)) S.notes = notes.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(acts)) S.acts = acts.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(audit)) S.auditLog = audit.map(function(r){return Object.assign({_id:r.id},r.data);});
+    if(Array.isArray(clients)) S.clients = clients.map(function(r){return Object.assign({_id:r.id},r.data);});
     // Load deal audit from same table (dealId field distinguishes them)
     S.dealAuditLog = S.auditLog.filter(function(e){return e.dealId;});
     S.auditLog = S.auditLog.filter(function(e){return e.leadId&&!e.dealId;});
@@ -443,6 +445,26 @@ function loadFromSupabase(){
     S.SB_LOADING = false;
     render();
   });
+}
+
+function syncClient(client){
+  sbUpsert('clients', client._id, client).catch(function(){flash('Sync error.','err');});
+}
+
+function deleteClient(id){
+  sbReq('DELETE','clients',null,'?id=eq.'+id).catch(function(){});
+}
+
+function nextClientId(){
+  var max=0;
+  S.clients.forEach(function(c){
+    var id=c.clientId||'';
+    if(id.startsWith('CLI')){
+      var num=parseInt(id.slice(3),10);
+      if(!isNaN(num)&&num>max) max=num;
+    }
+  });
+  return 'CLI'+ ('0000'+(max+1)).slice(-5);
 }
 
 function syncDeal(deal){
@@ -468,7 +490,7 @@ function deleteAct(id){sbDelete('activities', id);}
 
 var S={
   tab:'dashboard',lsub:'list',
-  deals:[],leads:[],notes:[],acts:[],
+  deals:[],leads:[],notes:[],acts:[],clients:[],
   auditLog:[],dealAuditLog:[],auditUser:'Ona',
   auditFilter:'all',
   form:null,lform:null,
@@ -487,6 +509,11 @@ var S={
   ganttExpDlv:null,  // expanded deliverable _id
   currentUser:null,
   loginError:'',
+  clientView:null,
+  clientForm:null,
+  showClientForm:false,
+  editClientId:null,
+  clientSearch:'',
   gcalToken:null,
   gcalUser:null,
   loginAttempts:{},  // {email: {count, lockedUntil}}
@@ -555,6 +582,18 @@ function flash(msg,t){
   setTimeout(function(){d.remove();},2800);
 }
 
+function bClient(){
+  return {
+    companyName:'', industry:'', size:'', location:'', website:'',
+    phone:'', email:'', notes:'', status:'Prospect',
+    contacts:[]
+  };
+}
+
+function bContact(){
+  return {id:'CNT'+Date.now(), name:'', role:'', phone:'', email:'', isPrimary:false};
+}
+
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
 function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
@@ -604,13 +643,14 @@ function rApp(){
       '<div style="display:flex;align-items:center;gap:12px"><img src="data:image/png;base64,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" style="height:42px;width:auto;object-fit:contain" alt="African Aspirations x Transworld"/>'+(S.currentUser?'<span style="font-size:11px;color:rgba(255,255,255,.6)">'+e(S.currentUser.name)+'</span>':'')+(S.SB_LOADING?'<span style="background:#F5E6C380;color:#F5E6C3;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9654; Connecting...</span>':SB_CONNECTED?'<span style="background:#16a34a30;color:#86efac;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700">&#9679; Live</span>':'<span style="background:#dc262630;color:#fca5a5;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700" title="'+e(SB_ERROR)+'">&#9679; Offline</span>')+'</div>'+
 (S.currentUser?'<button id="hdr-logout" style="background:rgba(220,38,38,.2);border:1px solid rgba(220,38,38,.4);color:#fca5a5;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>':'')+'</div>'+
     '<div style="display:flex;margin-top:2px">'+
-      ([['dashboard','&#127968; Home'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']]).concat(S.currentUser&&S.currentUser.role==='admin'?[['users','&#128101; Users']]:[['users','&#128101; Users']]).map(function(x){
+      ([['dashboard','&#127968; Home'],['clients','&#127970; Clients ('+S.clients.length+')'],['form',S.eid!==null?'&#9999; Edit Deal':'&#65291; Add Deal'],['pipeline','&#9889; Pipeline ('+S.deals.length+')'],['leads','&#9711; Leads ('+S.leads.length+')'],['gantt','&#128197; Gantt'],['approvals','&#128505; Approvals'],['overview','&#128200; Management Overview']]).concat(S.currentUser&&S.currentUser.role==='admin'?[['users','&#128101; Users']]:[['users','&#128101; Users']]).map(function(x){
         return '<button class="tab'+(S.tab===x[0]?' on':'')+'" data-tab="'+x[0]+'">'+x[1]+'</button>';
       }).join('')+
     '</div>'+
   '</div>'+
   '<div class="main-pad" style="padding:24px 28px;max-width:1320px;margin:0 auto">'+
-    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700">Access restricted</div><div style="font-size:13px;margin-top:6px">Only Managers and Admins can approve leads.</div></div></div>':rApprovals()):'')+(S.tab==='overview'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700;color:#1A4731">Access Restricted</div><div style="font-size:13px;margin-top:6px">The Management Overview is available to Managers and Admins only.</div></div></div>':rOverview()):'')+(S.tab==='users'?rUsers():''))+
+    (S.SB_LOADING?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9654;</div><div style="font-size:20px;font-weight:800;color:#1A4731;margin-bottom:8px">Connecting to database...</div><div style="font-size:13px;color:#5A7A65">Syncing your deals and leads</div></div>':!SB_CONNECTED&&SB_ERROR?'<div style="text-align:center;padding:80px 40px"><div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div><div style="font-size:20px;font-weight:800;color:#dc2626;margin-bottom:8px">Database connection failed</div><div style="font-size:13px;color:#5A7A65;margin-bottom:20px">'+e(SB_ERROR)+'</div><button onclick="loadFromSupabase()" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer">Retry Connection</button></div>':(S.tab==='dashboard'?rDash():'')+(S.tab==='clients'?rClients():'')
+  +(S.tab==='form'?rDealForm():'')+(S.tab==='pipeline'?rPipe():'')+(S.tab==='leads'?rLeads():'')+(S.tab==='gantt'?rGantt():'')+(S.tab==='approvals'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700">Access restricted</div><div style="font-size:13px;margin-top:6px">Only Managers and Admins can approve leads.</div></div></div>':rApprovals()):'')+(S.tab==='overview'?(S.currentUser&&S.currentUser.role==='staff'?'<div class="card"><div style="text-align:center;padding:40px;color:#5A7A65"><div style="font-size:40px;margin-bottom:12px">&#128274;</div><div style="font-size:16px;font-weight:700;color:#1A4731">Access Restricted</div><div style="font-size:13px;margin-top:6px">The Management Overview is available to Managers and Admins only.</div></div></div>':rOverview()):'')+(S.tab==='users'?rUsers():''))+
   '</div>'+
   '<div style="background:#1A4731;padding:20px 28px;margin-top:40px"><div style="max-width:1320px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px"><div style="font-size:13px;font-weight:800;color:#fff">African Aspirations<div style="font-size:11px;color:#F5E6C3;font-weight:400;margin-top:2px">6 Koi Street, Osu. Accra, Ghana &nbsp;&middot;&nbsp; 030 398 2318</div></div><div style="font-size:10px;color:#F5E6C380">&copy; 2026 African Aspirations</div></div></div>'+
   rApprovalModal()+
@@ -749,6 +789,7 @@ function rDealForm(){
   /* Common fields block reused in each service form */
   var commonFields=
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">'+
+      '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(f.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
       '<div style="grid-column:1/-1"><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(f.bizName)+'" placeholder="e.g. Mensah Holdings Ltd."/></div>'+
       '<div><div class="field-lbl">Owner / Main Contact</div><input name="owner" value="'+e(f.owner)+'" placeholder="e.g. Kwame Mensah"/></div>'+
       '<div><div class="field-lbl">Email</div><input name="email" value="'+e(f.email)+'" placeholder="contact@company.com"/></div>'+
@@ -974,6 +1015,7 @@ function rLL(){
       '<button class="shdr'+(S.sec.ov?' on':'')+'" data-sec="ov"><span style="font-weight:800">&#128100; Customer Overview</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.ov?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.ov?' on':'')+'">'+
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
+          '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
@@ -2030,6 +2072,185 @@ function rDlvReviewPanel(deal, dlv){
   return html;
 }
 
+function rClients(){
+  // ── If viewing a specific client ──────────────────────────────────────────
+  if(S.clientView){
+    var c=S.clients.filter(function(x){return x._id===S.clientView;})[0];
+    if(!c){S.clientView=null;render();return '';}
+    var cDeals=S.deals.filter(function(d){return d.clientId===c._id;});
+    var cLeads=S.leads.filter(function(l){return l.clientId===c._id;});
+    var cActs=S.acts.filter(function(a){return a.clientId===c._id||cDeals.some(function(d){return d._id===a.dealId;})||cLeads.some(function(l){return l._id===a.leadId;});});
+    var statusCol={'Active':'#16a34a','Prospect':'#C8972A','Inactive':'#94a3b8'};
+    var html='<div>';
+    // Back button + header
+    html+='<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">';
+    html+='<button id="client-back" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#8592; All Clients</button>';
+    html+='<div style="font-size:22px;font-weight:900;color:#1A4731">'+e(c.companyName)+'</div>';
+    html+='<span style="background:'+(statusCol[c.status]||'#94a3b8')+'20;color:'+(statusCol[c.status]||'#94a3b8')+';border:1px solid '+(statusCol[c.status]||'#94a3b8')+'40;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700">'+e(c.status||'Prospect')+'</span>';
+    html+='</div>';
+
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+
+    // Client details card
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
+    html+='<div style="background:#1A4731;padding:12px 18px;display:flex;align-items:center;justify-content:space-between"><div style="color:#fff;font-size:13px;font-weight:800">&#127970; Client Details</div>';
+    html+='<button class="edit-client-btn" data-id="'+e(c._id)+'" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Edit</button></div>';
+    html+='<div style="padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    [['Client ID',c.clientId],['Industry',c.industry],['Company Size',c.size],['Location',c.location],['Phone',c.phone],['Email',c.email],['Website',c.website]].forEach(function(row){
+      if(!row[1]) return;
+      html+='<div><div style="font-size:10px;font-weight:700;color:#5A7A65;letter-spacing:.7px">'+row[0].toUpperCase()+'</div><div style="font-size:13px;color:#1A4731;font-weight:500;margin-top:2px">'+e(row[1])+'</div></div>';
+    });
+    html+='</div>';
+    if(c.notes) html+='<div style="padding:0 18px 16px"><div style="font-size:10px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">NOTES</div><div style="font-size:12px;color:#5A7A65;line-height:1.6">'+e(c.notes)+'</div></div>';
+    html+='</div>';
+
+    // Contacts card
+    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
+    html+='<div style="background:#1A4731;padding:12px 18px;display:flex;align-items:center;justify-content:space-between"><div style="color:#fff;font-size:13px;font-weight:800">&#128100; Contacts ('+(c.contacts||[]).length+')</div>';
+    html+='<button class="add-contact-btn" data-id="'+e(c._id)+'" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:6px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">+ Add Contact</button></div>';
+    if((c.contacts||[]).length===0){
+      html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:12px">No contacts yet</div>';
+    } else {
+      (c.contacts||[]).forEach(function(ct){
+        html+='<div style="padding:12px 18px;border-bottom:1px solid #E8F5EE;display:flex;align-items:flex-start;justify-content:space-between">';
+        html+='<div><div style="display:flex;align-items:center;gap:6px"><div style="font-size:13px;font-weight:700;color:#1A4731">'+e(ct.name)+'</div>'+(ct.isPrimary?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">Primary</span>':'')+'</div>';
+        if(ct.role) html+='<div style="font-size:11px;color:#5A7A65;margin-top:1px">'+e(ct.role)+'</div>';
+        if(ct.phone) html+='<div style="font-size:11px;color:#5A7A65">&#128222; '+e(ct.phone)+'</div>';
+        if(ct.email) html+='<div style="font-size:11px;color:#2563eb">&#9993; '+e(ct.email)+'</div>';
+        html+='</div>';
+        html+='<button class="del-contact-btn" data-clientid="'+e(c._id)+'" data-cid="'+e(ct.id)+'" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit">&#10005;</button>';
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+    html+='</div>';
+
+    // KPI strip
+    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">';
+    [['Total Deals',cDeals.length,'#1A4731','#E8F5EE'],['Active Deals',cDeals.filter(function(d){return d.status==='Active';}).length,'#16a34a','#f0fdf4'],['Leads',cLeads.length,'#C8972A','#FDF8EE'],['Activities',cActs.length,'#2563eb','#eff6ff']].forEach(function(k){
+      html+='<div style="background:'+k[3]+';border:1px solid '+k[2]+'30;border-radius:12px;padding:16px;text-align:center"><div style="font-size:28px;font-weight:900;color:'+k[2]+'">'+k[1]+'</div><div style="font-size:11px;font-weight:700;color:'+k[2]+';opacity:.7;margin-top:3px">'+k[0].toUpperCase()+'</div></div>';
+    });
+    html+='</div>';
+
+    // Deals table
+    if(cDeals.length>0){
+      html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:16px">';
+      html+='<div style="background:#2D6A4F;padding:12px 18px"><div style="color:#fff;font-size:13px;font-weight:800">&#9889; Deals</div></div>';
+      html+='<div style="overflow-x:auto"><table><thead><tr><th>DEAL ID</th><th>SERVICE TYPE</th><th>STATUS</th><th>OWNER</th><th>START DATE</th></tr></thead><tbody>';
+      cDeals.forEach(function(d,i){
+        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+';cursor:pointer" class="deal-row-link" data-did="'+e(d._id)+'">';
+        html+='<td><span class="badge-id">'+e(d.dealId||'n/a')+'</span></td>';
+        html+='<td><span style="background:#E8F5EE;color:#2D6A4F;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+e(d.serviceType||'')+'</span></td>';
+        html+='<td><span style="font-size:12px;font-weight:700;color:'+(d.status==='Active'?'#16a34a':d.status==='Completed'?'#2563eb':d.status==='On Hold'?'#C8972A':'#dc2626')+'">'+e(d.status||'')+'</span></td>';
+        html+='<td style="color:#5A7A65;font-size:12px">'+e(d.owner||'')+'</td>';
+        html+='<td style="color:#5A7A65;font-size:12px">'+e(d.startDate||'')+'</td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+
+    // Leads table
+    if(cLeads.length>0){
+      html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:16px">';
+      html+='<div style="background:#C8972A;padding:12px 18px"><div style="color:#fff;font-size:13px;font-weight:800">&#9711; Leads</div></div>';
+      html+='<div style="overflow-x:auto"><table><thead><tr><th>LEAD ID</th><th>SERVICE TYPE</th><th>STATUS</th><th>PRIORITY</th><th>LABEL</th></tr></thead><tbody>';
+      cLeads.forEach(function(l,i){
+        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
+        html+='<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span></td>';
+        html+='<td style="font-size:12px;color:#5A7A65">'+e(l.serviceType||'')+'</td>';
+        html+='<td><span style="font-size:11px;font-weight:700;color:#C8972A">'+e(l.leadStatus||'draft')+'</span></td>';
+        html+='<td style="font-size:12px;color:#5A7A65">'+e(l.priority||'')+'</td>';
+        html+='<td style="font-size:12px;color:#1A4731;font-weight:600">'+e(l.label||'')+'</td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+
+    html+='</div>';
+    return html;
+  }
+
+  // ── Client list view ────────────────────────────────────────────────────────
+  var html='<div>';
+
+  // Header
+  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden">';
+  html+='<div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(200,151,42,.12)"></div>';
+  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:6px">CLIENT MANAGEMENT</div>';
+  html+='<div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:4px">Clients</div>';
+  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:18px">Manage your client base and account history</div>';
+  html+='<div style="display:flex;gap:20px;flex-wrap:wrap">';
+  [['Total Clients',S.clients.length,'#fff'],['Active',S.clients.filter(function(c){return c.status==='Active';}).length,'#86efac'],['Prospects',S.clients.filter(function(c){return c.status==='Prospect';}).length,'#F5E6C3'],['Inactive',S.clients.filter(function(c){return c.status==='Inactive';}).length,'rgba(255,255,255,.4)']].forEach(function(k){
+    html+='<div><div style="font-size:28px;font-weight:900;color:'+k[2]+'">'+k[1]+'</div><div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:600">'+k[0].toUpperCase()+'</div></div>';
+  });
+  html+='</div></div>';
+
+  // Add button + search
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">';
+  html+='<input id="client-search" value="'+e(S.clientSearch||'')+'" placeholder="Search clients by name, industry or location..." style="flex:1;min-width:200px;padding:10px 14px;border:1.5px solid #C8E6D4;border-radius:10px;font-size:13px;font-family:inherit;outline:none"/>';
+  html+='<button id="add-client-btn" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ New Client</button>';
+  html+='</div>';
+
+  // Add/Edit client form
+  if(S.showClientForm){
+    var cf=S.clientForm||bClient();
+    html+='<div style="background:#fff;border:1.5px solid #C8E6D4;border-radius:14px;padding:24px;margin-bottom:20px">';
+    html+='<div style="font-size:15px;font-weight:800;color:#1A4731;margin-bottom:18px">'+(S.editClientId?'Edit Client':'New Client')+'</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
+    html+='<div><div class="field-lbl">Company Name *</div><input id="cf-name" value="'+e(cf.companyName||'')+'" placeholder="e.g. Mensah Holdings Ltd"/></div>';
+    html+='<div><div class="field-lbl">Status</div><select id="cf-status"><option'+(cf.status==='Prospect'?' selected':'')+'>Prospect</option><option'+(cf.status==='Active'?' selected':'')+'>Active</option><option'+(cf.status==='Inactive'?' selected':'')+'>Inactive</option></select></div>';
+    html+='<div><div class="field-lbl">Industry</div><select id="cf-industry"><option value="">Select...</option>'+['Agriculture','Banking & Finance','Construction','Education','Energy','Healthcare','Hospitality','Manufacturing','Mining','Real Estate','Retail','Technology','Telecommunications','Transport & Logistics','Other'].map(function(x){return '<option'+(cf.industry===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
+    html+='<div><div class="field-lbl">Company Size</div><select id="cf-size"><option value="">Select...</option>'+['1–10 employees','11–50 employees','51–200 employees','201–500 employees','500+ employees'].map(function(x){return '<option'+(cf.size===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
+    html+='<div><div class="field-lbl">Location</div><input id="cf-location" value="'+e(cf.location||'')+'" placeholder="e.g. Accra, Ghana"/></div>';
+    html+='<div><div class="field-lbl">Phone</div><input id="cf-phone" value="'+e(cf.phone||'')+'" placeholder="+233 xx xxx xxxx"/></div>';
+    html+='<div><div class="field-lbl">Email</div><input id="cf-email" type="email" value="'+e(cf.email||'')+'" placeholder="info@company.com"/></div>';
+    html+='<div><div class="field-lbl">Website</div><input id="cf-website" value="'+e(cf.website||'')+'" placeholder="www.company.com"/></div>';
+    html+='<div style="grid-column:1/-1"><div class="field-lbl">Notes</div><textarea id="cf-notes" placeholder="Any relevant notes about this client..." style="min-height:60px">'+e(cf.notes||'')+'</textarea></div>';
+    html+='</div>';
+    html+='<div style="display:flex;gap:10px">';
+    html+='<button id="cf-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">'+(S.editClientId?'Save Changes':'Create Client')+'</button>';
+    html+='<button id="cf-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
+    html+='</div></div>';
+  }
+
+  // Client cards / table
+  var filtered=(S.clientSearch||'').trim().toLowerCase();
+  var shown=S.clients.filter(function(c){
+    if(!filtered) return true;
+    return (c.companyName||'').toLowerCase().includes(filtered)||(c.industry||'').toLowerCase().includes(filtered)||(c.location||'').toLowerCase().includes(filtered);
+  });
+
+  if(shown.length===0){
+    html+='<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#127970;</div><div style="font-size:18px;font-weight:800;color:#1A4731">'+(S.clients.length===0?'No clients yet':'No results found')+'</div><div style="font-size:13px;color:#5A7A65;margin-top:6px">'+(S.clients.length===0?'Click "+ New Client" to add your first client':'Try a different search term')+'</div></div>';
+  } else {
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">';
+    shown.forEach(function(c){
+      var cDeals=S.deals.filter(function(d){return d.clientId===c._id;}).length;
+      var cLeads=S.leads.filter(function(l){return l.clientId===c._id;}).length;
+      var statusColors={'Active':'#16a34a','Prospect':'#C8972A','Inactive':'#94a3b8'};
+      var sc=statusColors[c.status]||'#94a3b8';
+      html+='<div class="client-card" data-id="'+e(c._id)+'" style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:20px;cursor:pointer">';
+      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">';
+      html+='<div style="font-size:16px;font-weight:800;color:#1A4731">'+e(c.companyName)+'</div>';
+      html+='<span style="background:'+sc+'20;color:'+sc+';border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap">'+e(c.status||'Prospect')+'</span>';
+      html+='</div>';
+      html+='<div style="font-size:11px;color:#5A7A65;font-weight:600;margin-bottom:3px">'+e(c.clientId||'')+'</div>';
+      if(c.industry) html+='<div style="font-size:12px;color:#5A7A65;margin-bottom:2px">&#127970; '+e(c.industry)+'</div>';
+      if(c.location) html+='<div style="font-size:12px;color:#5A7A65;margin-bottom:10px">&#128205; '+e(c.location)+'</div>';
+      html+='<div style="display:flex;gap:10px;border-top:1px solid #E8F5EE;padding-top:10px">';
+      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#1A4731">'+cDeals+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">DEALS</div></div>';
+      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#C8972A">'+cLeads+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">LEADS</div></div>';
+      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#5A7A65">'+(c.contacts||[]).length+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">CONTACTS</div></div>';
+      html+='</div></div>';
+    });
+    html+='</div>';
+  }
+
+  html+='</div>';
+  return html;
+}
+
+
 function rGantt(){
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
   var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
@@ -2832,6 +3053,118 @@ function bRF(){
     var le=document.getElementById('login-email');
     if(le) le.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var lp2=document.getElementById('login-pass');if(lp2) lp2.focus();}});
   }
+  // ── Client tab bindings ──────────────────────────────────────────────────
+  // Search
+  var csrch=document.getElementById('client-search');
+  if(csrch){
+    csrch.addEventListener('input',function(){S.clientSearch=csrch.value;render();});
+    csrch.addEventListener('keyup',function(){
+      var el=document.getElementById('client-search');
+      if(el){el.focus();el.value=S.clientSearch;el.setSelectionRange(S.clientSearch.length,S.clientSearch.length);}
+    });
+  }
+
+  // Open add form
+  var addClientBtn=document.getElementById('add-client-btn');
+  if(addClientBtn) addClientBtn.addEventListener('click',function(){
+    S.showClientForm=true;S.editClientId=null;S.clientForm=bClient();render();
+  });
+
+  // Cancel form
+  var cfCancel=document.getElementById('cf-cancel');
+  if(cfCancel) cfCancel.addEventListener('click',function(){S.showClientForm=false;S.editClientId=null;S.clientForm=null;render();});
+
+  // Save client
+  var cfSave=document.getElementById('cf-save');
+  if(cfSave) cfSave.addEventListener('click',function(){
+    var name=(document.getElementById('cf-name')||{}).value||'';
+    if(!name.trim()){flash('Company name is required.','err');return;}
+    var cf={
+      companyName:name.trim(),
+      status:(document.getElementById('cf-status')||{}).value||'Prospect',
+      industry:(document.getElementById('cf-industry')||{}).value||'',
+      size:(document.getElementById('cf-size')||{}).value||'',
+      location:(document.getElementById('cf-location')||{}).value||'',
+      phone:(document.getElementById('cf-phone')||{}).value||'',
+      email:(document.getElementById('cf-email')||{}).value||'',
+      website:(document.getElementById('cf-website')||{}).value||'',
+      notes:(document.getElementById('cf-notes')||{}).value||'',
+    };
+    if(S.editClientId){
+      var existing=S.clients.filter(function(c){return c._id===S.editClientId;})[0]||{};
+      var updated=Object.assign({},existing,cf);
+      S.clients=S.clients.map(function(c){return c._id===S.editClientId?updated:c;});
+      syncClient(updated);
+      flash('Client updated!');
+    } else {
+      var newClient=Object.assign({},cf,{_id:'C'+Date.now(),clientId:nextClientId(),contacts:[],createdAt:new Date().toISOString()});
+      S.clients=S.clients.concat([newClient]);
+      syncClient(newClient);
+      flash('Client '+cf.companyName+' created!');
+    }
+    S.showClientForm=false;S.editClientId=null;S.clientForm=null;render();
+  });
+
+  // Click client card → view
+  document.querySelectorAll('.client-card').forEach(function(el){
+    el.addEventListener('click',function(){S.clientView=el.dataset.id;render();});
+  });
+
+  // Back from client view
+  var clientBack=document.getElementById('client-back');
+  if(clientBack) clientBack.addEventListener('click',function(){S.clientView=null;render();});
+
+  // Edit client from profile
+  document.querySelectorAll('.edit-client-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var c=S.clients.filter(function(x){return x._id===el.dataset.id;})[0];
+      if(!c) return;
+      S.showClientForm=true;S.editClientId=c._id;S.clientForm=c;S.clientView=null;render();
+    });
+  });
+
+  // Add contact
+  document.querySelectorAll('.add-contact-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var cid=el.dataset.id;
+      var name=prompt('Contact Name:');
+      if(!name||!name.trim()) return;
+      var role=prompt('Role / Title (optional):','');
+      var phone=prompt('Phone (optional):','');
+      var email=prompt('Email (optional):','');
+      var isPrimary=(S.clients.filter(function(c){return c._id===cid;})[0]||{}).contacts&&(S.clients.filter(function(c){return c._id===cid;})[0]||{}).contacts.length===0;
+      S.clients=S.clients.map(function(c){
+        if(c._id!==cid) return c;
+        var newContact={id:'CNT'+Date.now(),name:name.trim(),role:role||'',phone:phone||'',email:email||'',isPrimary:isPrimary};
+        var updated=Object.assign({},c,{contacts:(c.contacts||[]).concat([newContact])});
+        syncClient(updated);return updated;
+      });
+      flash('Contact added!');render();
+    });
+  });
+
+  // Delete contact
+  document.querySelectorAll('.del-contact-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      if(!confirm('Remove this contact?')) return;
+      var clientId=el.dataset.clientid, cid=el.dataset.cid;
+      S.clients=S.clients.map(function(c){
+        if(c._id!==clientId) return c;
+        var updated=Object.assign({},c,{contacts:(c.contacts||[]).filter(function(ct){return ct.id!==cid;})});
+        syncClient(updated);return updated;
+      });
+      flash('Contact removed.');render();
+    });
+  });
+
+  // Click deal row in client view → go to pipeline
+  document.querySelectorAll('.deal-row-link').forEach(function(el){
+    el.addEventListener('click',function(){S.tab='pipeline';S.expId=el.dataset.did;S.clientView=null;render();});
+  });
+
   var hdrLogout=document.getElementById('hdr-logout');
   if(hdrLogout) hdrLogout.addEventListener('click',function(){if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
   var logoutBtn=document.getElementById('logout-btn');
