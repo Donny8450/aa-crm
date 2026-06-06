@@ -876,6 +876,74 @@ function rDash(){
   return html;
 }
 
+function rDeliverables(f){
+  var dlvs=f.deliverables||[];
+  var did=f._id||'new';
+  var suffix=did;
+
+  var html='<div style="border:1px solid #C8E6D4;border-radius:12px;overflow:hidden;margin-bottom:18px">';
+  html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128203; Deliverables Tracker</div>';
+  html+='<div style="font-size:11px;color:#F5E6C3">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+'</div>';
+  html+='</div>';
+
+  html+='<div style="padding:14px 18px;background:#E8F5EE;border-bottom:1px solid #C8E6D4">';
+  html+='<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:8px;letter-spacing:.7px">ADD NEW DELIVERABLE</div>';
+  html+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 80px auto;gap:8px;align-items:end">';
+  html+='<div><div class="field-lbl" style="font-size:10px">Deliverable Name *</div><input id="dlv-name-'+suffix+'" placeholder="e.g. Financial Model"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">Owner</div><input id="dlv-owner-'+suffix+'" placeholder="e.g. Vincent"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">Start Date</div><input type="date" id="dlv-start-'+suffix+'"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">End Date</div><input type="date" id="dlv-end-'+suffix+'"/></div>';
+  html+='<div><div class="field-lbl" style="font-size:10px">% Done <span id="dlv-pct-lbl-'+suffix+'" style="color:#2D6A4F;font-weight:700">0%</span></div>';
+  html+='<select id="dlv-pct-'+suffix+'" class="new-pct-slider" data-suffix="'+suffix+'"><option>0%</option>'+[5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100].map(function(v){return '<option>'+v+'%</option>';}).join('')+'</select></div>';
+  html+='<button type="button" class="add-dlv-btn btn" data-did="'+suffix+'" style="align-self:end;white-space:nowrap">+ Add</button>';
+  html+='</div></div>';
+
+  if(dlvs.length>0){
+    html+='<div style="overflow-x:auto"><table style="margin:0"><thead><tr>';
+    ['DELIVERABLE NAME','OWNER','% DONE','PROGRESS','START','END',''].forEach(function(h){
+      html+='<th style="background:#275F45;color:#fff;padding:8px 12px;font-size:11px;font-weight:600;letter-spacing:.5px;white-space:nowrap;text-align:left">'+h+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    dlvs.forEach(function(d,idx){
+      var pct=d.progress||0;
+      var barCol=pct===100?'#16a34a':pct>=65?'#275F45':pct>=35?'#D97706':'#1D4ED8';
+      var isEditing=S.editDlvId===d._id;
+      if(isEditing){
+        html+='<tr style="background:#FFFBEB">';
+        html+='<td style="padding:8px 10px"><input id="edit-dlv-name-'+d._id+'" value="'+e(d.name)+'" style="font-size:12px;padding:5px 8px"/></td>';
+        html+='<td style="padding:8px 10px"><input id="edit-dlv-owner-'+d._id+'" value="'+e(d.owner||'')+'" placeholder="Owner" style="font-size:12px;padding:5px 8px"/></td>';
+        html+='<td style="padding:8px 10px"><input type="range" id="edit-dlv-pct-'+d._id+'" min="0" max="100" value="'+pct+'" class="edit-pct-slider" data-dlvid="'+d._id+'" style="width:80px;accent-color:'+barCol+'"/><span id="edit-pct-lbl-'+d._id+'" style="font-size:12px;font-weight:700;color:'+barCol+'">'+pct+'%</span></td>';
+        html+='<td></td>';
+        html+='<td style="padding:8px 10px"><input type="date" id="edit-dlv-start-'+d._id+'" value="'+e(d.start||'')+'" style="font-size:12px;padding:5px 8px"/></td>';
+        html+='<td style="padding:8px 10px"><input type="date" id="edit-dlv-end-'+d._id+'" value="'+e(d.end||'')+'" style="font-size:12px;padding:5px 8px"/></td>';
+        html+='<td style="padding:8px 10px;white-space:nowrap">';
+        html+='<button type="button" class="save-edit-dlv btn btn-sm" data-did="'+suffix+'" data-dlvid="'+d._id+'">Save</button> ';
+        html+='<button type="button" class="cancel-edit-dlv btn btn-ghost btn-sm">Cancel</button>';
+        html+='</td></tr>';
+      } else {
+        html+='<tr style="background:'+(idx%2===0?'#fff':'#F8FAF9')+'">';
+        html+='<td style="padding:9px 12px;font-weight:600;color:#1A1A1A;min-width:160px">'+e(d.name)+'</td>';
+        html+='<td style="padding:9px 12px;color:#5F6B65;white-space:nowrap">'+e(d.owner||'—')+'</td>';
+        html+='<td style="padding:9px 12px;text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;background:'+barCol+'20;color:'+barCol+'">'+pct+'%</span></td>';
+        html+='<td style="padding:9px 12px;min-width:140px"><div style="display:flex;align-items:center;gap:8px"><input type="range" min="0" max="100" value="'+pct+'" class="prog-slider" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'" style="flex:1;accent-color:'+barCol+'"/><span id="prog-lbl-'+e(d._id)+'" style="font-size:11px;font-weight:600;color:'+barCol+';width:32px">'+pct+'%</span></div></td>';
+        html+='<td style="padding:9px 12px;color:#5F6B65;font-size:12px;white-space:nowrap">'+e(d.start||'—')+'</td>';
+        html+='<td style="padding:9px 12px;color:#5F6B65;font-size:12px;white-space:nowrap">'+e(d.end||'—')+'</td>';
+        html+='<td style="padding:9px 12px;white-space:nowrap">';
+        html+='<button type="button" class="edit-dlv-btn btn btn-ghost btn-sm" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'">Edit</button> ';
+        html+='<button type="button" class="del-dlv-btn btn btn-danger btn-xs" data-did="'+suffix+'" data-dlvid="'+e(d._id)+'">&#10005;</button>';
+        html+='</td></tr>';
+      }
+    });
+    html+='</tbody></table></div>';
+  } else {
+    html+='<div style="padding:20px;text-align:center;color:#5F6B65;font-size:13px;background:#fff">No deliverables yet. Add one above.</div>';
+  }
+  html+='</div>';
+  return html;
+}
+
+
 function rDealForm(){
   var f=S.form||bDeal();var isE=S.eid!==null;
   var svc=f.serviceType||'';
