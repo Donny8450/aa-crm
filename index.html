@@ -510,6 +510,7 @@ var S={
   currentUser:null,
   loginError:'',
   clientView:null,
+  leadsView:'pipeline',
   clientForm:null,
   showClientForm:false,
   editClientId:null,
@@ -663,6 +664,10 @@ function rApp(){
         '<div class="sidebar-item'+(S.tab==="dashboard"?' active':'')+'" data-tab="dashboard"><span class="si-icon">&#8962;</span><span>Dashboard</span></div>'+
         '<div class="sidebar-item'+(S.tab==="clients"?' active':'')+'" data-tab="clients"><span class="si-icon">&#127970;</span><span>Clients</span>'+(S.clients.length>0?'<span class="si-badge">'+S.clients.length+'</span>':'')+'</div>'+
         '<div class="sidebar-item'+(S.tab==="leads"?' active':'')+'" data-tab="leads"><span class="si-icon">&#9711;</span><span>Leads</span>'+(S.leads.length>0?'<span class="si-badge">'+S.leads.length+'</span>':'')+'</div>'+
+        (S.tab==="leads"?
+          '<div class="sidebar-item'+(S.leadsView==="form"?' active':'')+' " style="padding-left:32px;font-size:12px;" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();return false;"><span class="si-icon" style="font-size:12px;">&#65291;</span><span>New Lead</span></div>'+
+          '<div class="sidebar-item'+(S.leadsView==="pipeline"?' active':'')+' " style="padding-left:32px;font-size:12px;" onclick="S.leadsView=\'pipeline\';render();return false;"><span class="si-icon" style="font-size:12px;">&#9776;</span><span>Leads Pipeline</span></div>'
+        :'')+
         '<div class="sidebar-item'+(S.tab==="pipeline"?' active':'')+'" data-tab="pipeline"><span class="si-icon">&#9889;</span><span>Pipeline</span>'+(S.deals.length>0?'<span class="si-badge">'+S.deals.length+'</span>':'')+'</div>'+
         '<div class="sidebar-item'+(S.tab==="gantt"?' active':'')+'" data-tab="gantt"><span class="si-icon">&#9638;</span><span>Gantt / Projects</span></div>'+
         '<div class="sidebar-item'+(S.tab==="approvals"?' active':'')+'" data-tab="approvals"><span class="si-icon">&#10003;</span><span>Approvals</span>'+(pendingCount>0?'<span class="si-badge">'+pendingCount+'</span>':'')+'</div>'+
@@ -1074,14 +1079,16 @@ function rPipe(){
 }
 
 function rLeads(){
-  return '<div>'+
-  '<div style="display:flex;background:#fff;border-radius:12px 12px 0 0;border:1px solid #C8E6D4;overflow:hidden;margin-bottom:20px">'+
-    [['list','&#128203; Leads'],['notes','&#128221; Notes ('+S.notes.length+')'],['activities','&#128197; Activities ('+S.acts.length+')'],['email','&#9993; Email']].map(function(x){
+  var subNav='<div style="display:flex;background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;margin-bottom:16px">'+
+    [['notes','Notes ('+S.notes.length+')'],['activities','Activities ('+S.acts.length+')'],['email','Email']].map(function(x){
       return '<button class="stab'+(S.lsub===x[0]?' on':'')+'" data-ls="'+x[0]+'">'+x[1]+'</button>';
-    }).join('')+
-  '</div>'+
-  (S.lsub==='list'?rLL():'')+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'')+
-  '</div>';
+    }).join('')+'</div>';
+  if(S.leadsView==='form'){
+    var hdr='<div class="page-header"><div class="page-header-left"><h1>'+(S.leid?'Edit Lead':'New Lead')+'</h1><p>'+(S.leid?'Update lead details':'Capture a new lead into the pipeline')+'</p></div><div class="page-header-actions"><button class="btn btn-ghost btn-sm" onclick="S.leadsView=\'pipeline\';render();">&#8592; Leads Pipeline</button></div></div>';
+    return hdr+rLL();
+  }
+  var pipeHdr='<div class="page-header"><div class="page-header-left"><h1>Leads Pipeline</h1><p>'+S.leads.length+' total leads in pipeline</p></div><div class="page-header-actions"><button class="btn" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();">+ New Lead</button></div></div>';
+  return pipeHdr+rLL()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
 }
 
 function rLL(){
