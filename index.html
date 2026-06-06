@@ -3041,10 +3041,18 @@ function bind(){
   var gsr=document.getElementById('gantt-srch');
   // Service type selector
   document.querySelectorAll('.svc-sel').forEach(function(el){
-    el.addEventListener('click',function(){
-      var cur=Object.assign({},S.form||bDeal(),gDF());
-      cur.serviceType=el.dataset.svc;
-      S.form=cur;render();
+    el.addEventListener('click',function(ev){
+      ev.preventDefault();ev.stopPropagation();
+      var svcName=el.dataset.svc;
+      if(!svcName) return;
+      // Preserve existing form data, just set the service type
+      if(!S.form) S.form=bDeal();
+      S.form=Object.assign({},S.form,{serviceType:svcName});
+      S.tab='form';
+      render();
+      // Re-focus top of content area
+      var ca=document.querySelector('.content-area');
+      if(ca) ca.scrollTop=0;
     });
   });
   // Add deliverable buttons
