@@ -611,8 +611,14 @@ function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'
 
 function render(){
   try{
+    // Save scroll position before rebuilding DOM
+    var ca=document.querySelector('.content-area');
+    var scrollTop=ca?ca.scrollTop:0;
     document.getElementById('app').innerHTML=S.currentUser?rApp():rLogin();
     bind();
+    // Restore scroll position after rebuild
+    var ca2=document.querySelector('.content-area');
+    if(ca2&&scrollTop>0) ca2.scrollTop=scrollTop;
   } catch(err){
     document.getElementById('app').innerHTML='<div style="padding:40px;color:red;font-family:monospace;"><h2>Render Error</h2><pre>'+err.message+'\n'+err.stack+'</pre></div>';
     console.error('Render error:',err);
@@ -1423,10 +1429,10 @@ function rLeadForm(){
             '</label>'+
             '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
               '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
-              '<span style="font-size:11px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+'">'+S.lfiles.length+'/1</span>'+
+              '<span style="font-size:12px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+';background:'+(met?'#E8F5EE':'#fff7ed')+';padding:2px 8px;border-radius:4px;">'+S.lfiles.length+'/1 '+(met?'&#10003;':'')+'</span>'+
             '</div>'+
             '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
-            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Please upload at least 1 document before submitting')+'</div>'+
+            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Upload required before submitting')+'</div>'+
           ''+
           '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
           '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
@@ -1525,10 +1531,10 @@ function rLL(){
             '</label>'+
             '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
               '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
-              '<span style="font-size:11px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+'">'+S.lfiles.length+'/1</span>'+
+              '<span style="font-size:12px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+';background:'+(met?'#E8F5EE':'#fff7ed')+';padding:2px 8px;border-radius:4px;">'+S.lfiles.length+'/1 '+(met?'&#10003;':'')+'</span>'+
             '</div>'+
             '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
-            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Please upload at least 1 document before submitting')+'</div>'+
+            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Upload required before submitting')+'</div>'+
           ''+
           '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
           '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
@@ -3121,7 +3127,7 @@ function bind(){
   document.querySelectorAll('.kbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{kickoffMeeting:el.value});render();});});
   document.querySelectorAll('.mbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{maSigned:el.value});render();});});
   document.querySelectorAll('.bstr-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{bizStructure:el.value});render();});});
-  document.querySelectorAll('.bsbtn').forEach(function(el){el.addEventListener('click',function(){S.biz=el.dataset.v;S.lfiles=[];render();});});
+  document.querySelectorAll('.bsbtn').forEach(function(el){el.addEventListener('click',function(){S.biz=el.dataset.v;render();});});
   var lfi=document.getElementById('lfi');
   if(lfi) lfi.addEventListener('change',function(){
     Array.from(lfi.files).forEach(function(f){
