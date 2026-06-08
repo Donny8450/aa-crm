@@ -1160,12 +1160,12 @@ function rLeads(){
   if(S.leadsView==='form'){
     // Show ONLY the lead intake form — hide the table column
     var hdr='<div class="page-header"><div class="page-header-left"><h1>'+(S.leid?'Edit Lead':'New Lead')+'</h1><p>'+(S.leid?'Update lead details':'Capture a new lead into the pipeline')+'</p></div><div class="page-header-actions"><button class="btn btn-ghost btn-sm" onclick="S.leadsView=\'pipeline\';render();">&#8592; Leads Pipeline</button></div></div>';
-    return hdr+rLL()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
+    return hdr+rLL();
   }
 
   // Pipeline view — show ONLY the table, form hidden, table full width
   var pipeHdr='<div class="page-header"><div class="page-header-left"><h1>Leads Pipeline</h1><p>'+S.leads.length+' total leads</p></div><div class="page-header-actions"><button class="btn" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();">+ New Lead</button></div></div>';
-  return pipeHdr+rLeadsPipeline()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
+  return pipeHdr+rLeadsPipeline();
 }
 
 function rLeadsPipeline(){
@@ -1178,7 +1178,7 @@ function rLeadsPipeline(){
   if(S.lsrch){var q=S.lsrch.toLowerCase();leads=leads.filter(function(l){return (l.contactPerson||'').toLowerCase().indexOf(q)>=0||(l.organization||'').toLowerCase().indexOf(q)>=0||(l.leadId||'').toLowerCase().indexOf(q)>=0;});}
 
 
-  return   '<div class="ll-table-col" style="flex:1;min-width:0">'+
+  return '<div style="width:100%">'+
     '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">'+
       ['All','Hot','Warm','Cold'].map(function(lb){
         var cnt=lb==='All'?S.leads.length:S.leads.filter(function(l){return l.label===lb;}).length;
@@ -1216,48 +1216,9 @@ function rLeadsPipeline(){
     }).join('')+
     '</tbody></table></div>')+
 
-    '<div class="card" style="margin-top:24px;border-top:4px solid #2D6A4F">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">'+
-        '<div>'+
-          '<div style="font-size:14px;font-weight:800;color:#1A4731">&#128203; Lead Activity Log</div>'+
-          '<div style="font-size:12px;color:#5A7A65;margin-top:2px">Select a lead below to view its specific activity &mdash; or view all</div>'+
-        '</div>'+
-        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
-          '<span style="font-size:12px;color:#5A7A65;font-weight:600">Logged as:</span>'+
-          '<input id="au" value="'+e(S.auditUser)+'" placeholder="Your name..." style="padding:6px 12px;font-size:12px;width:140px"/>'+
-          '<select id="audit-filter" style="padding:6px 10px;font-size:12px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit">'+
-            '<option value="all">All Leads</option>'+
-            S.leads.map(function(l){return '<option value="'+e(l.leadId||l._id)+'"'+(S.auditFilter===l.leadId?'selected':'')+'>'+e(l.leadId||'?')+' - '+e(l.bizName||l.ownerContact||'Lead')+'</option>';}).join('')+
-          '</select>'+
-          (S.auditLog.length>0?'<button class="btn btn-red btn-sm" id="cla">Clear All</button>':'')+
-        '</div>'+
-      '</div>'+
-      function(){
-        var filt=S.auditFilter||'all';
-        var filtered=filt==='all'?[].concat(S.auditLog):S.auditLog.filter(function(en){return en.leadId===filt;});
-        if(filtered.length===0) return '<div style="text-align:center;padding:24px;color:#5A7A65;font-size:13px"><div style="font-weight:600;margin-bottom:4px">No activity'+(filt!=='all'?' for this lead':'')+' yet</div><div style="font-size:12px">Activity appears here when leads are viewed or edited</div></div>';
-        return '<div style="overflow-x:auto;border-radius:10px;border:1px solid #C8E6D4"><table>'+
-          '<thead><tr>'+
-          (filt==='all'?'<th>LEAD ID</th>':'')+
-          '<th>USER</th><th>ACTION / FIELD</th><th>PREVIOUS VALUE</th><th>NEW VALUE</th><th>TIME</th><th></th></tr></thead><tbody>'+
-          filtered.reverse().map(function(en,i){
-            return '<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">'+
-              (filt==='all'?'<td><span class="badge-id">'+e(en.leadId)+'</span></td>':'')+
-              '<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+e((en.user||'?').charAt(0).toUpperCase())+'</span><span style="font-weight:600;color:#1A4731">'+e(en.user)+'</span></div></td>'+
-              '<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border:1px solid #F5E6C3;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap">'+e(en.field)+'</span>')+'</td>'+
-              '<td style="color:#5A7A65;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.prev))+'</td>'+
-              '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.next))+'</td>'+
-              '<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>'+
-              '<td><button class="dau btn-sm" data-id="'+en._id+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:700">x</button></td>'+
-            '</tr>';
-          }).join('')+
-        '</tbody></table></div>';
-      }()+
-    '</div>'+
-  '</div></div>';
+
+  '</div>';
 }
-
-
 function rLL(){
   var lf=S.lform||bLead();var isE=S.leid!==null;
   var ac=true;
