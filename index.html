@@ -512,6 +512,11 @@ var S={
   clientView:null,
   leadsView:'pipeline',
   leadSort:'newest',
+  contactView:null,
+  contactTab:'overview',
+  contactSearch:'',
+  contactForm:null,
+  showContactForm:false,
   clientForm:null,
   showClientForm:false,
   editClientId:null,
@@ -593,7 +598,18 @@ function bClient(){
 }
 
 function bContact(){
-  return {id:'CNT'+Date.now(), name:'', role:'', phone:'', email:'', isPrimary:false};
+  return {
+    id:'CNT'+Date.now(),
+    firstName:'', lastName:'', preferredName:'', jobTitle:'', department:'',
+    company:'', email:'', email2:'', mobile:'', office:'', whatsapp:'',
+    linkedin:'', website:'',
+    country:'Ghana', region:'', city:'Accra', postal:'', address:'', billingAddress:'', mailingAddress:'',
+    seniorityLevel:'', industry:'', functionArea:'', isDecisionMaker:false, isInfluencer:false, isBudgetAuthority:false,
+    relationshipStrength:'', clientPriority:'', preferredComms:'', preferredTime:'',
+    lastContactDate:'', nextFollowUp:'', notes:'',
+    status:'Active', isPrimary:false,
+    activities:[], name:''
+  };
 }
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
@@ -674,7 +690,11 @@ function rApp(){
       '<div class="sidebar-group">'+
         '<div class="sidebar-group-label">MAIN</div>'+
         '<div class="sidebar-item'+(S.tab==="dashboard"?' active':'')+'" data-tab="dashboard"><span class="si-icon">&#8962;</span><span>Dashboard</span></div>'+
-        '<div class="sidebar-item'+(S.tab==="clients"?' active':'')+'" data-tab="clients"><span class="si-icon">&#127970;</span><span>Clients</span>'+(S.clients.length>0?'<span class="si-badge">'+S.clients.length+'</span>':'')+'</div>'+
+        '<div class="sidebar-item'+(S.tab==="clients"?' active':'')+'" data-tab="clients"><span class="si-icon">&#127970;</span><span>Client Accounts</span>'+(S.clients.length>0?'<span class="si-badge">'+S.clients.length+'</span>':'')+'</div>'+
+        (S.tab==="clients"||S.tab==="contacts"?
+          '<div class="sidebar-item'+(S.tab==="contacts"?' active':'')+' " style="padding-left:32px;font-size:12px;" data-tab="contacts"><span class="si-icon" style="font-size:12px;">&#128100;</span><span>Contacts</span>'+(function(){var t=0;S.clients.forEach(function(c){t+=(c.contacts||[]).length;});return t>0?'<span class="si-badge">'+t+'</span>':'';}())+'</div>'
+        :'')+
+
         '<div class="sidebar-item'+(S.tab==="leads"?' active':'')+'" data-tab="leads"><span class="si-icon">&#9711;</span><span>Leads</span>'+(S.leads.length>0?'<span class="si-badge">'+S.leads.length+'</span>':'')+'</div>'+
         (S.tab==="leads"?
           '<div class="sidebar-item'+(S.leadsView==="form"?' active':'')+' " style="padding-left:32px;font-size:12px;" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();return false;"><span class="si-icon" style="font-size:12px;">&#65291;</span><span>New Lead</span></div>'+
@@ -727,6 +747,8 @@ function rApp(){
       '<main class="content-area">'+
         (S.tab==="dashboard"?rDash():"")+
         (S.tab==="clients"?rClients():"")+
+        (S.tab==="contacts"?rContacts():"")+
+
         (S.tab==="leads"?rLeads():"")+
         (S.tab==="form"?rDealForm():"")+
         (S.tab==="pipeline"?rPipe():"")+
@@ -2530,6 +2552,332 @@ function rDlvReviewPanel(deal, dlv){
   return html;
 }
 
+function rContacts(){
+  // Gather ALL contacts from all clients
+  var allContacts=[];
+  S.clients.forEach(function(c){
+    (c.contacts||[]).forEach(function(ct){
+      allContacts.push(Object.assign({},ct,{
+        _clientId:c._id,
+        _clientName:c.companyName||'',
+        _clientId2:c.clientId||''
+      }));
+    });
+  });
+
+  // ── Detail view ──────────────────────────────────────────────────────────
+  if(S.contactView){
+    var client=null,contact=null;
+    S.clients.forEach(function(c){
+      (c.contacts||[]).forEach(function(ct){
+        if(ct.id===S.contactView){client=c;contact=ct;}
+      });
+    });
+    if(!contact){S.contactView=null;render();return '';}
+    var ct=contact;
+    var fname=ct.firstName||ct.name||'';
+    var lname=ct.lastName||'';
+    var fullName=(fname+' '+lname).trim()||'Contact';
+    var initials=((fname.charAt(0))+(lname.charAt(0))).toUpperCase()||'?';
+    var tab=S.contactTab||'overview';
+
+    var strengthCol={'Strong':'#16a34a','Good':'#2563eb','Developing':'#D97706','Weak':'#dc2626'}[ct.relationshipStrength]||'#9BA8A2';
+    var priorityCol={'High':'#dc2626','Medium':'#D97706','Low':'#16a34a'}[ct.clientPriority]||'#9BA8A2';
+    var statusCol={'Active':'#16a34a','Inactive':'#9BA8A2','Prospect':'#D97706'}[ct.status||'Active']||'#9BA8A2';
+
+    var html='';
+
+    // Sticky header
+    html+='<div style="position:sticky;top:0;z-index:50;background:#F8FAF9;padding-bottom:12px;margin-bottom:0;">';
+    html+='<div style="display:flex;align-items:center;gap:12px;">';
+    html+='<button class="btn btn-ghost btn-sm" onclick="S.contactView=null;render();">&#8592; All Contacts</button>';
+    html+='<div style="height:16px;width:1px;background:#D8E3DC;"></div>';
+    html+='<div style="font-size:13px;color:#5F6B65;">'+e(client?client.companyName:'')+'</div>';
+    html+='<div style="font-size:13px;color:#D8E3DC;">/</div>';
+    html+='<div style="font-size:13px;font-weight:600;color:#1A1A1A;">'+e(fullName)+'</div>';
+    html+='<div style="margin-left:auto;display:flex;gap:8px;">';
+    html+='<button class="btn btn-ghost btn-sm" id="ct-cancel-edit">Cancel</button>';
+    html+='<button class="btn btn-sm" id="ct-save-contact" data-cid="'+e(ct.id)+'" data-clientid="'+e(client?client._id:'')+'">Save Contact</button>';
+    html+='</div></div></div>';
+
+    // Two-column layout
+    html+='<div style="display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start;">';
+
+    // ── LEFT COLUMN ─────────────────────────────────────────────────────────
+    html+='<div style="display:flex;flex-direction:column;gap:12px;">';
+
+    // Profile card
+    html+='<div class="card">';
+    html+='<div style="background:linear-gradient(135deg,#275F45,#1F4E39);height:64px;border-radius:6px 6px 0 0;position:relative;">';
+    html+='<div style="position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);width:56px;height:56px;border-radius:50%;background:#EAF3EE;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#275F45;">'+initials+'</div>';
+    html+='</div>';
+    html+='<div style="padding:36px 16px 16px;text-align:center;">';
+    html+='<div style="font-size:16px;font-weight:700;color:#1A1A1A;margin-bottom:2px;">'+e(fullName)+'</div>';
+    html+='<div style="font-size:12px;color:#5F6B65;margin-bottom:2px;">'+e(ct.jobTitle||'')+'</div>';
+    html+='<div style="font-size:12px;color:#9BA8A2;margin-bottom:10px;">'+e(client?client.companyName:'')+'</div>';
+    html+='<div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;">';
+    html+='<span style="background:'+statusCol+'18;color:'+statusCol+';border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;border:1px solid '+statusCol+'30;">'+e(ct.status||'Active')+'</span>';
+    if(ct.relationshipStrength) html+='<span style="background:'+strengthCol+'18;color:'+strengthCol+';border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;border:1px solid '+strengthCol+'30;">'+e(ct.relationshipStrength)+'</span>';
+    if(ct.clientPriority) html+='<span style="background:'+priorityCol+'18;color:'+priorityCol+';border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;border:1px solid '+priorityCol+'30;">'+e(ct.clientPriority)+' Priority</span>';
+    if(ct.isPrimary) html+='<span style="background:#EAF3EE;color:#275F45;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;border:1px solid #C8E6D4;">Primary</span>';
+    html+='</div></div></div>';
+
+    // Quick actions
+    html+='<div class="card card-body-sm">';
+    html+='<div style="font-size:11px;font-weight:700;color:#9BA8A2;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">Quick Actions</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+    var qas=[
+      ['&#128222;','Call',ct.mobile||ct.office||''],
+      ['&#9993;','Email',ct.email||''],
+      ['&#128241;','WhatsApp',ct.whatsapp||''],
+      ['&#128197;','Meeting',''],
+      ['&#128221;','Note',''],
+      ['&#9889;','Opportunity','']
+    ];
+    qas.forEach(function(qa){
+      html+='<button class="btn btn-ghost btn-sm" style="font-size:11px;justify-content:flex-start;gap:6px;">'+qa[0]+' '+qa[1]+'</button>';
+    });
+    html+='</div></div>';
+
+    // Relationship insights
+    html+='<div class="card card-body-sm">';
+    html+='<div style="font-size:11px;font-weight:700;color:#9BA8A2;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">Relationship Insights</div>';
+    function insightRow(label,val,isTag){
+      var disp=val?('<span style="font-weight:600;color:#1A1A1A;font-size:12px;">'+e(val)+'</span>'):'<span style="color:#9BA8A2;font-size:12px;">—</span>';
+      if(isTag&&val) disp='<span style="background:#EAF3EE;color:#275F45;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:700;">Yes</span>';
+      else if(isTag&&!val) disp='<span style="color:#9BA8A2;font-size:12px;">No</span>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #F8FAF9;"><div style="font-size:11px;color:#5F6B65;">'+label+'</div>'+disp+'</div>';
+    }
+    html+=insightRow('Decision Maker',ct.isDecisionMaker,true);
+    html+=insightRow('Influencer',ct.isInfluencer,true);
+    html+=insightRow('Budget Authority',ct.isBudgetAuthority,true);
+    html+=insightRow('Last Contact',ct.lastContactDate);
+    html+=insightRow('Next Follow-up',ct.nextFollowUp);
+    html+='</div></div>';
+
+    // ── RIGHT COLUMN ────────────────────────────────────────────────────────
+    html+='<div>';
+
+    // Tab bar
+    html+='<div style="display:flex;border-bottom:2px solid #D8E3DC;margin-bottom:16px;">';
+    [['overview','Overview'],['professional','Professional'],['relationship','Relationship'],['activities','Activities']].forEach(function(t){
+      var isActive=tab===t[0];
+      html+='<button class="ct-tab" data-ctab="'+t[0]+'" style="padding:8px 16px;font-size:13px;font-weight:'+(isActive?700:500)+';color:'+(isActive?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(isActive?'#275F45':'transparent')+';margin-bottom:-2px;font-family:Inter,sans-serif;">'+t[1]+'</button>';
+    });
+    html+='</div>';
+
+    // ── TAB CONTENT ─────────────────────────────────────────────────────────
+    function fRow(label,name,val,type,opts){
+      var inp='';
+      if(type==='select'&&opts){
+        inp='<select name="ct-'+name+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #D8E3DC;border-radius:4px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">';
+        inp+='<option value="">—</option>';
+        opts.forEach(function(o){inp+='<option'+(val===o?' selected':'')+'>'+o+'</option>';});
+        inp+='</select>';
+      } else if(type==='checkbox'){
+        inp='<input type="checkbox" name="ct-'+name+'"'+(val?' checked':'')+' style="width:16px;height:16px;accent-color:#275F45;margin:0;"/>';
+      } else {
+        inp='<input name="ct-'+name+'" value="'+e(val||'')+'" type="'+(type||'text')+'" placeholder="'+label+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #D8E3DC;border-radius:4px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;"/>';
+      }
+      return '<div><div style="font-size:10px;font-weight:600;color:#9BA8A2;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">'+label+'</div>'+inp+'</div>';
+    }
+
+    function sectionCard(title, icon, content){
+      return '<div class="card" style="margin-bottom:12px;"><div style="padding:10px 14px;border-bottom:1px solid #D8E3DC;display:flex;align-items:center;gap:6px;"><span style="font-size:14px;">'+icon+'</span><div style="font-size:12px;font-weight:700;color:#1A1A1A;">'+title+'</div></div><div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+content+'</div></div>';
+    }
+
+    if(tab==='overview'){
+      var basicFields=
+        fRow('First Name','firstName',ct.firstName)+
+        fRow('Last Name','lastName',ct.lastName)+
+        '<div style="grid-column:1/-1;">'+fRow('Preferred Name','preferredName',ct.preferredName)+'</div>'+
+        fRow('Job Title','jobTitle',ct.jobTitle)+
+        fRow('Department','department',ct.department)+
+        '<div style="grid-column:1/-1;">'+fRow('Company','company',ct.company||client&&client.companyName)+'</div>'+
+        fRow('Status','status',ct.status||'Active','select',['Active','Inactive','Prospect','On Hold'])+
+        fRow('Contact Owner','owner',ct.owner);
+      html+=sectionCard('Basic Information','&#128100;',basicFields);
+
+      var contactFields=
+        fRow('Primary Email','email',ct.email,'email')+
+        fRow('Secondary Email','email2',ct.email2,'email')+
+        fRow('Mobile Number','mobile',ct.mobile,'tel')+
+        fRow('Office Number','office',ct.office,'tel')+
+        fRow('WhatsApp','whatsapp',ct.whatsapp,'tel')+
+        '<div style="grid-column:1/-1;">'+fRow('LinkedIn Profile','linkedin',ct.linkedin)+'</div>'+
+        '<div style="grid-column:1/-1;">'+fRow('Website','website',ct.website)+'</div>';
+      html+=sectionCard('Contact Information','&#128222;',contactFields);
+
+      var addrFields=
+        fRow('Country','country',ct.country||'Ghana')+
+        fRow('Region / State','region',ct.region)+
+        fRow('City','city',ct.city||'Accra')+
+        fRow('Postal Code','postal',ct.postal)+
+        '<div style="grid-column:1/-1;">'+fRow('Office Address','address',ct.address)+'</div>'+
+        '<div style="grid-column:1/-1;">'+fRow('Billing Address','billingAddress',ct.billingAddress)+'</div>'+
+        '<div style="grid-column:1/-1;">'+fRow('Mailing Address','mailingAddress',ct.mailingAddress)+'</div>';
+      html+=sectionCard('Address Information','&#127968;',addrFields);
+    }
+
+    else if(tab==='professional'){
+      html+='<div class="card" style="margin-bottom:12px;">';
+      html+='<div style="padding:10px 14px;border-bottom:1px solid #D8E3DC;font-size:12px;font-weight:700;color:#1A1A1A;">&#128188; Professional Profile</div>';
+      html+='<div style="padding:14px;">';
+
+      // Badges row
+      html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #F8FAF9;">';
+      if(ct.seniorityLevel) html+='<span style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#9650; '+e(ct.seniorityLevel)+'</span>';
+      if(ct.industry) html+='<span style="background:#F0FDFA;color:#0E7490;border:1px solid #A5F3FC;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#127970; '+e(ct.industry)+'</span>';
+      if(ct.functionArea) html+='<span style="background:#F5F3FF;color:#7C3AED;border:1px solid #DDD6FE;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#128203; '+e(ct.functionArea)+'</span>';
+      if(ct.isDecisionMaker) html+='<span style="background:#ECFDF5;color:#2E7D32;border:1px solid #A7F3D0;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#9989; Decision Maker</span>';
+      if(ct.isBudgetAuthority) html+='<span style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#128176; Budget Authority</span>';
+      if(ct.isInfluencer) html+='<span style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;padding:4px 12px;font-size:11px;font-weight:700;">&#127775; Influencer</span>';
+      if(!ct.seniorityLevel&&!ct.industry&&!ct.functionArea&&!ct.isDecisionMaker&&!ct.isBudgetAuthority&&!ct.isInfluencer){
+        html+='<span style="color:#9BA8A2;font-size:12px;">No professional tags set — complete the fields below</span>';
+      }
+      html+='</div>';
+
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+      html+=fRow('Seniority Level','seniorityLevel',ct.seniorityLevel,'select',['C-Suite / Executive','VP / Director','Senior Manager','Manager','Associate / Analyst','Consultant','Other']);
+      html+=fRow('Industry','industry',ct.industry,'select',['Agriculture','Banking & Finance','Construction','Education','Energy','Healthcare','Hospitality','Manufacturing','Mining','Real Estate','Retail','Technology','Telecommunications','Transport & Logistics','Other']);
+      html+='<div style="grid-column:1/-1;">'+fRow('Function / Area','functionArea',ct.functionArea,'select',['Finance','Operations','Strategy','Sales & BD','Marketing','Legal','HR','Technology','Consulting','Investment','Other'])+'</div>';
+      // Checkboxes
+      html+='<div style="grid-column:1/-1;display:flex;gap:24px;flex-wrap:wrap;padding:10px;background:#F8FAF9;border-radius:6px;border:1px solid #D8E3DC;">';
+      [['isDecisionMaker','Decision Maker'],['isInfluencer','Influencer'],['isBudgetAuthority','Budget Authority']].forEach(function(f){
+        html+='<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#1A1A1A;"><input type="checkbox" name="ct-'+f[0]+'"'+(ct[f[0]]?' checked':'')+' style="width:15px;height:15px;accent-color:#275F45;"/> '+f[1]+'</label>';
+      });
+      html+='</div>';
+      html+='</div></div></div>';
+    }
+
+    else if(tab==='relationship'){
+      var relFields=
+        fRow('Relationship Strength','relationshipStrength',ct.relationshipStrength,'select',['Strong','Good','Developing','Weak'])+
+        fRow('Client Priority','clientPriority',ct.clientPriority,'select',['High','Medium','Low'])+
+        fRow('Preferred Communication','preferredComms',ct.preferredComms,'select',['Email','Phone','WhatsApp','In-Person','Video Call'])+
+        fRow('Preferred Contact Time','preferredTime',ct.preferredTime,'select',['Morning (8-12)','Afternoon (12-17)','Evening (17-20)','Flexible']);
+      html+=sectionCard('Relationship Dashboard','&#128200;',relFields);
+
+      var timelineFields=
+        fRow('Last Contact Date','lastContactDate',ct.lastContactDate,'date')+
+        fRow('Next Follow-up Date','nextFollowUp',ct.nextFollowUp,'date')+
+        '<div style="grid-column:1/-1;"><div style="font-size:10px;font-weight:600;color:#9BA8A2;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:3px;">Notes</div><textarea name="ct-notes" style="width:100%;padding:8px 10px;font-size:12px;border:1px solid #D8E3DC;border-radius:4px;font-family:Inter,sans-serif;min-height:80px;resize:vertical;outline:none;">'+e(ct.notes||'')+'</textarea></div>';
+      html+=sectionCard('Timeline','&#128344;',timelineFields);
+    }
+
+    else if(tab==='activities'){
+      var acts=(ct.activities||[]);
+      html+='<div class="card">';
+      html+='<div style="padding:10px 14px;border-bottom:1px solid #D8E3DC;display:flex;align-items:center;justify-content:space-between;">';
+      html+='<div style="font-size:12px;font-weight:700;color:#1A1A1A;">&#9889; Activity Feed</div>';
+      html+='<button class="btn btn-sm btn-ghost" id="ct-add-activity" data-cid="'+e(ct.id)+'" data-clientid="'+e(client?client._id:'')+'">+ Log Activity</button>';
+      html+='</div>';
+      html+='<div style="padding:14px;">';
+      if(!acts.length){
+        html+='<div style="text-align:center;padding:32px;color:#9BA8A2;">';
+        html+='<div style="font-size:28px;margin-bottom:8px;opacity:.4;">&#128337;</div>';
+        html+='<div style="font-size:13px;font-weight:600;color:#5F6B65;margin-bottom:4px;">No activity yet</div>';
+        html+='<div style="font-size:12px;">Log the first interaction with '+e(fullName)+'</div>';
+        html+='</div>';
+      } else {
+        var sortedActs=[].concat(acts).reverse();
+        sortedActs.forEach(function(act,i){
+          var typeCol={'Email':'#1D4ED8','Call':'#2E7D32','Meeting':'#7C3AED','Note':'#D97706','Task':'#0E7490'}[act.type]||'#5F6B65';
+          var typeIcon={'Email':'&#9993;','Call':'&#128222;','Meeting':'&#128197;','Note':'&#128221;','Task':'&#9989;'}[act.type]||'&#9679;';
+          var isLast=i===sortedActs.length-1;
+          html+='<div style="display:flex;gap:12px;'+(isLast?'':'margin-bottom:16px;')+'">';
+          html+='<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">';
+          html+='<div style="width:32px;height:32px;border-radius:50%;background:'+typeCol+'18;border:1.5px solid '+typeCol+'40;display:flex;align-items:center;justify-content:center;font-size:14px;">'+typeIcon+'</div>';
+          if(!isLast) html+='<div style="width:1px;flex:1;background:#D8E3DC;margin-top:4px;min-height:16px;"></div>';
+          html+='</div>';
+          html+='<div style="flex:1;padding-bottom:'+(isLast?0:16)+'px;">';
+          html+='<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">';
+          html+='<span style="font-size:12px;font-weight:700;color:'+typeCol+';">'+e(act.type)+'</span>';
+          html+='<span style="font-size:11px;color:#9BA8A2;">'+e(act.ts||act.date||'')+'</span>';
+          html+='<span style="font-size:11px;color:#5F6B65;">by '+e(act.user||'')+'</span>';
+          html+='</div>';
+          if(act.text) html+='<div style="font-size:12px;color:#5F6B65;line-height:1.5;">'+e(act.text)+'</div>';
+          html+='</div></div>';
+        });
+      }
+      html+='</div></div>';
+    }
+
+    html+='</div></div>';
+    return html;
+  }
+
+  // ── List view ──────────────────────────────────────────────────────────────
+  var allContacts=[];
+  S.clients.forEach(function(c){
+    (c.contacts||[]).forEach(function(ct){
+      allContacts.push(Object.assign({},ct,{_clientId:c._id,_clientName:c.companyName||'',_clientCode:c.clientId||''}));
+    });
+  });
+
+  var q=(S.contactSearch||'').toLowerCase().trim();
+  var shown=q?allContacts.filter(function(ct){
+    return (ct.name||ct.firstName||'').toLowerCase().indexOf(q)>=0||
+           (ct.lastName||'').toLowerCase().indexOf(q)>=0||
+           (ct.jobTitle||'').toLowerCase().indexOf(q)>=0||
+           (ct.email||'').toLowerCase().indexOf(q)>=0||
+           (ct._clientName||'').toLowerCase().indexOf(q)>=0;
+  }):allContacts;
+
+  var html='';
+  html+='<div class="page-header"><div class="page-header-left"><h1>Contacts</h1><p>'+allContacts.length+' contacts across '+S.clients.length+' accounts</p></div>';
+  html+='<div class="page-header-actions"><button class="btn" id="ct-new-btn">+ New Contact</button></div></div>';
+
+  // Search bar
+  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">';
+  html+='<div style="flex:1;position:relative;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9BA8A2;">&#128269;</span>';
+  html+='<input id="ct-search" value="'+e(S.contactSearch||'')+'" placeholder="Search contacts by name, title, company or email..." style="padding-left:30px;width:100%;"/></div>';
+  html+='</div>';
+
+  if(!shown.length){
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:64px;text-align:center;">';
+    html+='<div style="font-size:32px;opacity:.3;margin-bottom:12px;">&#128100;</div>';
+    html+='<div style="font-size:15px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(allContacts.length===0?'No contacts yet':'No results')+'</div>';
+    html+='<div style="font-size:13px;color:#5F6B65;">'+(allContacts.length===0?'Add contacts inside a Client Account to see them here':'Try a different search term')+'</div>';
+    html+='</div>';
+  } else {
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
+    html+='<div style="overflow-x:auto;"><table><thead><tr>';
+    html+='<th>CONTACT</th><th>TITLE</th><th>COMPANY</th><th>EMAIL</th><th>MOBILE</th><th>RELATIONSHIP</th><th>PRIORITY</th><th>TAGS</th><th></th>';
+    html+='</tr></thead><tbody>';
+    shown.forEach(function(ct,i){
+      var fname=ct.firstName||ct.name||'';
+      var lname=ct.lastName||'';
+      var full=(fname+' '+lname).trim()||'—';
+      var init=((fname.charAt(0))+(lname.charAt(0))).toUpperCase()||'?';
+      var sc={'Strong':'#16a34a','Good':'#2563eb','Developing':'#D97706','Weak':'#dc2626'}[ct.relationshipStrength]||'#9BA8A2';
+      var pc={'High':'#dc2626','Medium':'#D97706','Low':'#16a34a'}[ct.clientPriority]||'#9BA8A2';
+      html+='<tr>';
+      html+='<td style="min-width:160px;"><div style="display:flex;align-items:center;gap:10px;">';
+      html+='<div style="width:32px;height:32px;border-radius:50%;background:#EAF3EE;border:1px solid #D8E3DC;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#275F45;flex-shrink:0;">'+init+'</div>';
+      html+='<div><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(full)+'</div>';
+      if(ct.isPrimary) html+='<span style="font-size:10px;background:#EAF3EE;color:#275F45;border-radius:2px;padding:1px 5px;font-weight:600;">Primary</span>';
+      html+='</div></div></td>';
+      html+='<td style="font-size:12px;color:#5F6B65;">'+e(ct.jobTitle||'—')+'</td>';
+      html+='<td><div style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(ct._clientName)+'</div><div style="font-size:10px;color:#9BA8A2;">'+e(ct._clientCode)+'</div></td>';
+      html+='<td style="font-size:12px;color:#1D4ED8;">'+e(ct.email||'—')+'</td>';
+      html+='<td style="font-size:12px;color:#5F6B65;">'+e(ct.mobile||ct.phone||'—')+'</td>';
+      html+='<td>'+(ct.relationshipStrength?'<span style="background:'+sc+'18;color:'+sc+';border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;">'+e(ct.relationshipStrength)+'</span>':'<span style="color:#9BA8A2;font-size:12px;">—</span>')+'</td>';
+      html+='<td>'+(ct.clientPriority?'<span style="background:'+pc+'18;color:'+pc+';border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;">'+e(ct.clientPriority)+'</span>':'<span style="color:#9BA8A2;font-size:12px;">—</span>')+'</td>';
+      html+='<td style="max-width:140px;"><div style="display:flex;gap:4px;flex-wrap:wrap;">';
+      if(ct.isDecisionMaker) html+='<span style="background:#ECFDF5;color:#2E7D32;border-radius:2px;padding:1px 5px;font-size:10px;font-weight:600;">DM</span>';
+      if(ct.isBudgetAuthority) html+='<span style="background:#FFFBEB;color:#D97706;border-radius:2px;padding:1px 5px;font-size:10px;font-weight:600;">BA</span>';
+      if(ct.isInfluencer) html+='<span style="background:#EFF6FF;color:#1D4ED8;border-radius:2px;padding:1px 5px;font-size:10px;font-weight:600;">Inf</span>';
+      html+='</div></td>';
+      html+='<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm ct-view-btn" data-cid="'+e(ct.id)+'" style="font-size:11px;">View</button></td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+  return html;
+}
+
+
 function rClients(){
   // ── If viewing a specific client ──────────────────────────────────────────
   if(S.clientView){
@@ -3564,6 +3912,79 @@ function bRF(){
   });
 
   // Back from client view
+  // ── Contacts bindings ─────────────────────────────────────────────────────
+  var ctSearch=document.getElementById('ct-search');
+  if(ctSearch){
+    ctSearch.addEventListener('input',function(){S.contactSearch=ctSearch.value;render();});
+    ctSearch.addEventListener('keyup',function(){var el=document.getElementById('ct-search');if(el){el.focus();el.value=S.contactSearch;el.setSelectionRange(S.contactSearch.length,S.contactSearch.length);}});
+  }
+
+  // Tab switching in contact detail
+  document.querySelectorAll('.ct-tab').forEach(function(el){
+    el.addEventListener('click',function(){S.contactTab=el.dataset.ctab;render();});
+  });
+
+  // View contact
+  document.querySelectorAll('.ct-view-btn').forEach(function(el){
+    el.addEventListener('click',function(){S.contactView=el.dataset.cid;S.contactTab='overview';render();});
+  });
+
+  // Back from contact detail
+  var ctCancel=document.getElementById('ct-cancel-edit');
+  if(ctCancel) ctCancel.addEventListener('click',function(){S.contactView=null;render();});
+
+  // Save contact
+  var ctSave=document.getElementById('ct-save-contact');
+  if(ctSave) ctSave.addEventListener('click',function(){
+    var cid=ctSave.dataset.cid, clientId=ctSave.dataset.clientid;
+    var updates={};
+    document.querySelectorAll('[name^="ct-"]').forEach(function(el){
+      var key=el.name.replace('ct-','');
+      updates[key]=el.type==='checkbox'?el.checked:el.value;
+    });
+    updates.name=(updates.firstName||'')+' '+(updates.lastName||'');
+    S.clients=S.clients.map(function(c){
+      if(c._id!==clientId) return c;
+      var newContacts=(c.contacts||[]).map(function(ct){
+        if(ct.id!==cid) return ct;
+        return Object.assign({},ct,updates);
+      });
+      var updated=Object.assign({},c,{contacts:newContacts});
+      syncClient(updated);
+      return updated;
+    });
+    flash('Contact saved!');
+    render();
+  });
+
+  // Log activity button
+  var ctAddAct=document.getElementById('ct-add-activity');
+  if(ctAddAct) ctAddAct.addEventListener('click',function(){
+    var cid=ctAddAct.dataset.cid, clientId=ctAddAct.dataset.clientid;
+    var type=prompt('Activity type: Email, Call, Meeting, Note, Task','Note');
+    if(!type) return;
+    var text=prompt('Notes:','');
+    var newAct={type:type,text:text||'',ts:new Date().toLocaleString(),user:S.currentUser?S.currentUser.name:'User'};
+    S.clients=S.clients.map(function(c){
+      if(c._id!==clientId) return c;
+      var newContacts=(c.contacts||[]).map(function(ct){
+        if(ct.id!==cid) return ct;
+        return Object.assign({},ct,{activities:(ct.activities||[]).concat([newAct])});
+      });
+      var updated=Object.assign({},c,{contacts:newContacts});
+      syncClient(updated);return updated;
+    });
+    flash('Activity logged!');render();
+  });
+
+  // New contact from contacts list
+  var ctNewBtn=document.getElementById('ct-new-btn');
+  if(ctNewBtn) ctNewBtn.addEventListener('click',function(){
+    // Navigate to clients tab to add
+    if(S.clients.length===0){flash('Please create a Client Account first.','err');return;}
+    S.tab='clients';render();flash('Select a client to add a contact.');
+  });
+
   var clientBack=document.getElementById('client-back');
   if(clientBack) clientBack.addEventListener('click',function(){S.clientView=null;render();});
 
