@@ -511,6 +511,7 @@ var S={
   loginError:'',
   clientView:null,
   leadsView:'pipeline',
+  leadSort:'newest',
   clientForm:null,
   showClientForm:false,
   editClientId:null,
@@ -1169,56 +1170,181 @@ function rLeads(){
 }
 
 function rLeadsPipeline(){
-
-  var lf=S.lform||bLead();var isE=S.leid!==null;
-  var ac=true;
-  var req=S.biz==='limited'?2:1;var met=S.lfiles.length>=req;
   var leads=[].concat(S.leads);
-  if(S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
-  if(S.lsrch){var q=S.lsrch.toLowerCase();leads=leads.filter(function(l){return (l.contactPerson||'').toLowerCase().indexOf(q)>=0||(l.organization||'').toLowerCase().indexOf(q)>=0||(l.leadId||'').toLowerCase().indexOf(q)>=0;});}
 
+  // Filter by temperature label
+  if(S.flbl&&S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
 
-  return '<div style="width:100%">'+
-    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">'+
-      ['All','Hot','Warm','Cold'].map(function(lb){
-        var cnt=lb==='All'?S.leads.length:S.leads.filter(function(l){return l.label===lb;}).length;
-        return '<button class="fbtn'+(S.flbl===lb?' on':'')+'" data-fl="'+lb+'">'+(LMOJI[lb]||'')+' '+lb+' <strong>'+cnt+'</strong></button>';
-      }).join('')+
-      '<input id="lsr" value="'+e(S.lsrch)+'" placeholder="&#128269; Search leads..." style="flex:1;min-width:150px;padding:6px 12px;font-size:13px"/>'+
-      '<button class="btn btn-gold btn-sm" id="exl">&#8659; Export CSV</button>'+
-    '</div>'+
-    (leads.length===0?'<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#127807;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">Plant your first seed</div><div style="font-size:13px;color:#5A7A65">Capture your first prospect to begin.</div></div>':
-    '<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4">'+
-    '<table><thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>STRUCTURE</th><th>OWNER / CONTACT</th><th>PRIORITY</th><th>STAGE</th><th>LABEL</th><th>SOURCE</th><th>FILES</th><th>ACTIONS</th></tr></thead><tbody>'+
-    leads.map(function(l){
-      var lm=(l.files||[]).length>=1;
-      return '<tr>'+
-        '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='pending'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">PENDING APPROVAL</span>':l.leadStatus==='approved'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">APPROVED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
-        '<td style="font-weight:600;color:#1A4731">'+(l.bizName?e(l.bizName):'&mdash;')+'</td>'+
-        '<td>'+(l.serviceType?'<span style="background:'+(l.serviceType==='Business Consulting'?'#E8F5EE':l.serviceType==='Business Brokerage'?'#FDF8EE':'#faf5ff')+';color:'+(l.serviceType==='Business Consulting'?'#2D6A4F':l.serviceType==='Business Brokerage'?'#C8972A':'#7c3aed')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>':'<span style="color:#5A7A65">&mdash;</span>')+'</td>'+
-        '<td style="color:#5A7A65;font-size:12px">'+(l.ownershipStructure?e(l.ownershipStructure):'&mdash;')+'</td>'+
-        '<td style="color:#1A4731;font-weight:500">'+(l.ownerContact?e(l.ownerContact):'&mdash;')+'</td>'+
-        '<td>'+(l.priority?'<span style="background:'+(l.priority==='High Priority'?'#fef2f2':l.priority==='Medium'?'#FDF8EE':'#E8F5EE')+';color:'+(l.priority==='High Priority'?'#dc2626':l.priority==='Medium'?'#C8972A':'#2D6A4F')+';border:1px solid '+(l.priority==='High Priority'?'#fecaca':l.priority==='Medium'?'#F5E6C3':'#C8E6D4')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+e(l.priority)+'</span>':'<span style="color:#5A7A65">&mdash;</span>')+'</td>'+
-        '<td><div style="display:flex;align-items:center;gap:5px"><div style="width:50px;height:6px;border-radius:3px;background:#E8F5EE;overflow:hidden"><div style="width:'+(l.pctComplete||0)+'%;height:100%;background:'+(l.pctComplete>=65?'#2D6A4F':l.pctComplete>=35?'#C8972A':'#2563eb')+'"></div></div><span style="font-size:11px;font-weight:700;color:#5A7A65">'+(l.pctComplete||0)+'%</span></div></td>'+
-        '<td><span style="font-size:12px;font-weight:700;color:'+(l.label==='Hot'?'#2D6A4F':l.label==='Warm'?'#C8972A':'#2563eb')+'">'+e(LMOJI[l.label]||'')+' '+e(l.label||'')+'</span></td>'+
-        '<td style="color:#5A7A65;font-size:12px">'+(l.source?e(l.source):'&mdash;')+'</td>'+
-        '<td>'+(lm?'<div style="display:flex;flex-direction:column;gap:3px">'+((l.files||[]).map(function(f,fi){return '<button class="dl-lfile" data-lid="'+e(l._id)+'" data-fi="'+fi+'" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px" title="'+e(f.name)+'">&#128229; '+e(f.name)+'</button>';}).join(''))+'</div>':'<span style="color:#dc2626;font-size:12px">None</span>')+'</td>'+
+  // Search filter
+  if(S.lsrch&&S.lsrch.trim()){
+    var q=S.lsrch.trim().toLowerCase();
+    leads=leads.filter(function(l){
+      return (l.bizName||'').toLowerCase().indexOf(q)>=0||
+             (l.leadId||'').toLowerCase().indexOf(q)>=0||
+             (l.ownerContact||'').toLowerCase().indexOf(q)>=0||
+             (l.serviceType||'').toLowerCase().indexOf(q)>=0;
+    });
+  }
 
-        '<td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
-          (l.converted?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">Converted</span>':
-            l.approved?'<button class="btn btn-sm cnv" data-id="'+l._id+'" style="background:#FDF8EE;color:#1A4731;border:1px solid #C8972A;font-weight:700">&#9889; Convert</button>':
-            l.leadStatus==='pending'?'<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#9203; Pending Approval</span>':
-            '<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#128274; Awaiting Approval</span>')+
-          '<button class="btn btn-pale btn-sm ell" data-id="'+l._id+'">Edit</button>'+
+  // Sort
+  var srt=S.leadSort||'newest';
+  if(srt==='newest') leads=leads.reverse();
+  else if(srt==='biz') leads=leads.sort(function(a,b){return (a.bizName||'').localeCompare(b.bizName||'');});
+  else if(srt==='svc') leads=leads.sort(function(a,b){return (a.serviceType||'').localeCompare(b.serviceType||'');});
+  else if(srt==='status') leads=leads.sort(function(a,b){return (a.leadStatus||'').localeCompare(b.leadStatus||'');});
+  else if(srt==='label') leads=leads.sort(function(a,b){return (b.label||'').localeCompare(a.label||'');});
 
-          (S.currentUser&&S.currentUser.role==='admin'?'<button class="btn btn-red btn-sm dll" data-id="'+l._id+'">&#10005;</button>':'')+
-      '</tr>';
-    }).join('')+
-    '</tbody></table></div>')+
+  var svcCol={'Business Consulting':'#275F45','Business Brokerage':'#D97706','Business Funding':'#7C3AED','Business Valuation':'#0E7490'};
+  var svcBg={'Business Consulting':'#EAF3EE','Business Brokerage':'#FFFBEB','Business Funding':'#F5F3FF','Business Valuation':'#F0FDFA'};
 
+  var html='';
 
-  '</div>';
+  // ── Filter bar ──────────────────────────────────────────────────────────────
+  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
+
+  // Temperature filters
+  [['All',S.leads.length,'#5F6B65'],['Hot',S.leads.filter(function(l){return l.label==='Hot';}).length,'#DC2626'],['Warm',S.leads.filter(function(l){return l.label==='Warm';}).length,'#D97706'],['Cold',S.leads.filter(function(l){return l.label==='Cold';}).length,'#1D4ED8']].forEach(function(f){
+    var on=S.flbl===f[0]||(f[0]==='All'&&(!S.flbl||S.flbl==='All'));
+    html+='<button class="fbtn'+(on?' on':'')+'" data-fl="'+f[0]+'" style="'+(on?'background:'+f[2]+'18;color:'+f[2]+';border-color:'+f[2]+';font-weight:600;':'')+'">'+(f[0]==='Hot'?'🔥':f[0]==='Warm'?'🟡':f[0]==='Cold'?'❄️':'')+' '+f[0]+' <strong>'+f[1]+'</strong></button>';
+  });
+
+  // Search
+  html+='<div style="flex:1;min-width:200px;position:relative;">';
+  html+='<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9BA8A2;font-size:13px;">&#128269;</span>';
+  html+='<input id="lsr" value="'+e(S.lsrch||'')+'" placeholder="Search leads..." style="padding-left:30px;width:100%;"/>';
+  html+='</div>';
+
+  // Sort dropdown
+  html+='<select id="lead-sort" style="padding:7px 10px;font-size:12px;border:1px solid #D8E3DC;border-radius:4px;font-family:inherit;color:#1A1A1A;background:#fff;">';
+  [['newest','Newest First'],['biz','Business Name'],['svc','Service Type'],['status','Status'],['label','Temperature']].forEach(function(o){
+    html+='<option value="'+o[0]+'"'+(srt===o[0]?' selected':'')+'>'+o[1]+'</option>';
+  });
+  html+='</select>';
+
+  // Export
+  html+='<button class="btn btn-ghost btn-sm" id="exl">&#8659; Export CSV</button>';
+  html+='</div>';
+
+  // ── Table ───────────────────────────────────────────────────────────────────
+  if(leads.length===0){
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:64px 24px;text-align:center;">';
+    html+='<div style="font-size:32px;margin-bottom:12px;opacity:.3;">&#9711;</div>';
+    html+='<div style="font-size:15px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.leads.length===0?'No leads yet':'No leads match this filter')+'</div>';
+    html+='<div style="font-size:13px;color:#5F6B65;">'+(S.leads.length===0?'Click &ldquo;+ New Lead&rdquo; to capture your first lead':'Try a different filter or clear the search')+'</div>';
+    html+='</div>';
+  } else {
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
+
+    // Sort-able header
+    function sortTh(label, key){
+      var isActive=srt===key;
+      return '<th style="cursor:pointer;white-space:nowrap;user-select:none;" class="sort-th" data-sort="'+key+'">'+label+(isActive?' &#9650;':'')+'</th>';
+    }
+
+    html+='<div style="overflow-x:auto;">';
+    html+='<table><thead><tr>';
+    html+='<th>LEAD ID</th>';
+    html+=sortTh('BUSINESS NAME','biz');
+    html+=sortTh('SERVICE TYPE','svc');
+    html+='<th>STRUCTURE</th>';
+    html+='<th>OWNER / CONTACT</th>';
+    html+='<th>PRIORITY</th>';
+    html+='<th>STAGE</th>';
+    html+=sortTh('LABEL','label');
+    html+='<th>SOURCE</th>';
+    html+='<th>FILES</th>';
+    html+=sortTh('STATUS','status');
+    html+='<th>ACTIONS</th>';
+    html+='</tr></thead><tbody>';
+
+    leads.forEach(function(l,i){
+      var sc=svcCol[l.serviceType]||'#5F6B65';
+      var sb=svcBg[l.serviceType]||'#F8FAF9';
+      var lc=l.label==='Hot'?'#DC2626':l.label==='Warm'?'#D97706':'#1D4ED8';
+      var lb=l.label==='Hot'?'#FEF2F2':l.label==='Warm'?'#FFFBEB':'#EFF6FF';
+      var pct=l.pctComplete||0;
+      var bc=pct>=65?'#275F45':pct>=35?'#D97706':'#1D4ED8';
+
+      html+='<tr>';
+
+      // Lead ID + status badges
+      html+='<td style="white-space:nowrap;">';
+      html+='<span class="badge-id">'+e(l.leadId||'n/a')+'</span> ';
+      if(l.converted) html+='<span class="badge badge-success" style="font-size:10px;">Converted</span>';
+      else if(l.approved) html+='<span class="badge badge-success" style="font-size:10px;">&#10003; Approved</span>';
+      else if(l.leadStatus==='pending') html+='<span class="badge badge-warning" style="font-size:10px;">Pending</span>';
+      else html+='<span class="badge badge-neutral" style="font-size:10px;">Draft</span>';
+      html+='</td>';
+
+      // Business name
+      html+='<td style="font-weight:600;color:#1A1A1A;min-width:140px;">'+e(l.bizName||'—')+'</td>';
+
+      // Service type
+      html+='<td><span style="background:'+sb+';color:'+sc+';border-radius:3px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">'+e(l.serviceType||'—')+'</span></td>';
+
+      // Structure
+      html+='<td style="color:#5F6B65;font-size:12px;white-space:nowrap;">'+e(l.ownershipStructure||'—')+'</td>';
+
+      // Contact
+      html+='<td style="font-weight:500;min-width:120px;">'+e(l.ownerContact||'—')+'</td>';
+
+      // Priority
+      html+='<td>';
+      if(l.priority) html+='<span class="badge '+(l.priority==='High Priority'?'badge-error':l.priority==='Medium'?'badge-warning':'badge-success')+'" style="font-size:11px;">'+e(l.priority)+'</span>';
+      else html+='<span style="color:#9BA8A2;">—</span>';
+      html+='</td>';
+
+      // Stage (progress bar)
+      html+='<td style="min-width:100px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:5px;background:#F8FAF9;border-radius:3px;border:1px solid #D8E3DC;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div><span style="font-size:11px;font-weight:600;color:'+bc+';width:28px;">'+pct+'%</span></div></td>';
+
+      // Temperature label
+      html+='<td><span style="background:'+lb+';color:'+lc+';border-radius:3px;padding:2px 8px;font-size:11px;font-weight:600;">'+(l.label==='Hot'?'🔥':l.label==='Warm'?'🟡':'❄️')+' '+e(l.label||'—')+'</span></td>';
+
+      // Source
+      html+='<td style="color:#5F6B65;font-size:12px;">'+e(l.source||'—')+'</td>';
+
+      // Files
+      html+='<td>';
+      if(l.files&&l.files.length>0){
+        l.files.forEach(function(f,fi){
+          html+='<button class="dl-lfile btn btn-ghost btn-xs" data-lid="'+e(l._id)+'" data-fi="'+fi+'" style="margin-bottom:2px;display:block;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+e(f.name)+'">&#128229; '+e(f.name)+'</button>';
+        });
+      } else {
+        html+='<span style="color:#DC2626;font-size:11px;">None</span>';
+      }
+      html+='</td>';
+
+      // Status
+      html+='<td><span class="badge '+(l.leadStatus==='pending'?'badge-warning':l.leadStatus==='approved'||l.approved?'badge-success':'badge-neutral')+'" style="font-size:11px;">'+e(l.leadStatus||'draft')+'</span></td>';
+
+      // Actions
+      html+='<td style="white-space:nowrap;">';
+      html+='<div style="display:flex;gap:4px;align-items:center;">';
+      if(l.converted){
+        html+='<span class="badge badge-success" style="font-size:11px;">Converted</span>';
+      } else if(l.approved){
+        html+='<button class="btn btn-secondary btn-sm cnv" data-id="'+l._id+'" style="font-size:11px;">&#9889; Convert</button>';
+      } else if(l.leadStatus==='pending'){
+        html+='<span class="badge badge-warning" style="font-size:11px;">&#9203; Pending</span>';
+      } else {
+        html+='<span class="badge badge-neutral" style="font-size:11px;">&#128274; Awaiting</span>';
+      }
+      html+='<button class="btn btn-ghost btn-sm ell" data-id="'+l._id+'" style="font-size:11px;">Edit</button>';
+      if(S.currentUser&&S.currentUser.role==='admin'){
+        html+='<button class="btn btn-danger btn-sm dll" data-id="'+l._id+'" style="font-size:11px;">&#10005;</button>';
+      }
+      html+='</div></td>';
+
+      html+='</tr>';
+    });
+
+    html+='</tbody></table></div></div>';
+  }
+
+  return html;
 }
+
+
 function rLL(){
   var lf=S.lform||bLead();var isE=S.leid!==null;
   var ac=true;
@@ -3382,6 +3508,15 @@ function bRF(){
   // Click deal row in client view → go to pipeline
   document.querySelectorAll('.deal-row-link').forEach(function(el){
     el.addEventListener('click',function(){S.tab='pipeline';S.expId=el.dataset.did;S.clientView=null;render();});
+  });
+
+  // Lead sort dropdown
+  var leadSortEl=document.getElementById('lead-sort');
+  if(leadSortEl) leadSortEl.addEventListener('change',function(){S.leadSort=leadSortEl.value;render();});
+
+  // Sortable column headers
+  document.querySelectorAll('.sort-th').forEach(function(el){
+    el.addEventListener('click',function(){S.leadSort=el.dataset.sort;render();});
   });
 
   var hdrLogout=document.getElementById('hdr-logout');
