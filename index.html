@@ -1160,13 +1160,103 @@ function rLeads(){
   if(S.leadsView==='form'){
     // Show ONLY the lead intake form — hide the table column
     var hdr='<div class="page-header"><div class="page-header-left"><h1>'+(S.leid?'Edit Lead':'New Lead')+'</h1><p>'+(S.leid?'Update lead details':'Capture a new lead into the pipeline')+'</p></div><div class="page-header-actions"><button class="btn btn-ghost btn-sm" onclick="S.leadsView=\'pipeline\';render();">&#8592; Leads Pipeline</button></div></div>';
-    return hdr+'<style>.ll-table-col{display:none!important}</style>'+rLL()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
+    return hdr+rLL()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
   }
 
   // Pipeline view — show ONLY the table, form hidden, table full width
   var pipeHdr='<div class="page-header"><div class="page-header-left"><h1>Leads Pipeline</h1><p>'+S.leads.length+' total leads</p></div><div class="page-header-actions"><button class="btn" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();">+ New Lead</button></div></div>';
-  return pipeHdr+'<style>.ll-form-col{display:none!important}.ll-table-col{flex:1!important;min-width:0!important;width:100%!important}</style>'+rLL()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
+  return pipeHdr+rLeadsPipeline()+subNav+(S.lsub==='notes'?rNotes():'')+(S.lsub==='activities'?rActs():'')+(S.lsub==='email'?rEmail():'');
 }
+
+function rLeadsPipeline(){
+
+  var lf=S.lform||bLead();var isE=S.leid!==null;
+  var ac=true;
+  var req=S.biz==='limited'?2:1;var met=S.lfiles.length>=req;
+  var leads=[].concat(S.leads);
+  if(S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
+  if(S.lsrch){var q=S.lsrch.toLowerCase();leads=leads.filter(function(l){return (l.contactPerson||'').toLowerCase().indexOf(q)>=0||(l.organization||'').toLowerCase().indexOf(q)>=0||(l.leadId||'').toLowerCase().indexOf(q)>=0;});}
+
+
+  return   '<div class="ll-table-col" style="flex:1;min-width:0">'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">'+
+      ['All','Hot','Warm','Cold'].map(function(lb){
+        var cnt=lb==='All'?S.leads.length:S.leads.filter(function(l){return l.label===lb;}).length;
+        return '<button class="fbtn'+(S.flbl===lb?' on':'')+'" data-fl="'+lb+'">'+(LMOJI[lb]||'')+' '+lb+' <strong>'+cnt+'</strong></button>';
+      }).join('')+
+      '<input id="lsr" value="'+e(S.lsrch)+'" placeholder="&#128269; Search leads..." style="flex:1;min-width:150px;padding:6px 12px;font-size:13px"/>'+
+      '<button class="btn btn-gold btn-sm" id="exl">&#8659; Export CSV</button>'+
+    '</div>'+
+    (leads.length===0?'<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#127807;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">Plant your first seed</div><div style="font-size:13px;color:#5A7A65">Capture your first prospect to begin.</div></div>':
+    '<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4">'+
+    '<table><thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>STRUCTURE</th><th>OWNER / CONTACT</th><th>PRIORITY</th><th>STAGE</th><th>LABEL</th><th>SOURCE</th><th>FILES</th><th>ACTIONS</th></tr></thead><tbody>'+
+    leads.map(function(l){
+      var lm=(l.files||[]).length>=1;
+      return '<tr>'+
+        '<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span>'+(l.leadStatus==='draft'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">DRAFT</span>':'')+(l.leadStatus==='pending'?'<span style="margin-left:4px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">PENDING APPROVAL</span>':l.leadStatus==='approved'?'<span style="margin-left:4px;background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">APPROVED</span>':'')+(l.approved?'<span style="margin-left:4px;background:linear-gradient(135deg,#E8F5EE,#f0fdf4);border:1px solid #86efac;color:#15803d;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700">&#10003; APPROVED</span>':'')+'</td>'+
+        '<td style="font-weight:600;color:#1A4731">'+(l.bizName?e(l.bizName):'&mdash;')+'</td>'+
+        '<td>'+(l.serviceType?'<span style="background:'+(l.serviceType==='Business Consulting'?'#E8F5EE':l.serviceType==='Business Brokerage'?'#FDF8EE':'#faf5ff')+';color:'+(l.serviceType==='Business Consulting'?'#2D6A4F':l.serviceType==='Business Brokerage'?'#C8972A':'#7c3aed')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>':'<span style="color:#5A7A65">&mdash;</span>')+'</td>'+
+        '<td style="color:#5A7A65;font-size:12px">'+(l.ownershipStructure?e(l.ownershipStructure):'&mdash;')+'</td>'+
+        '<td style="color:#1A4731;font-weight:500">'+(l.ownerContact?e(l.ownerContact):'&mdash;')+'</td>'+
+        '<td>'+(l.priority?'<span style="background:'+(l.priority==='High Priority'?'#fef2f2':l.priority==='Medium'?'#FDF8EE':'#E8F5EE')+';color:'+(l.priority==='High Priority'?'#dc2626':l.priority==='Medium'?'#C8972A':'#2D6A4F')+';border:1px solid '+(l.priority==='High Priority'?'#fecaca':l.priority==='Medium'?'#F5E6C3':'#C8E6D4')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+e(l.priority)+'</span>':'<span style="color:#5A7A65">&mdash;</span>')+'</td>'+
+        '<td><div style="display:flex;align-items:center;gap:5px"><div style="width:50px;height:6px;border-radius:3px;background:#E8F5EE;overflow:hidden"><div style="width:'+(l.pctComplete||0)+'%;height:100%;background:'+(l.pctComplete>=65?'#2D6A4F':l.pctComplete>=35?'#C8972A':'#2563eb')+'"></div></div><span style="font-size:11px;font-weight:700;color:#5A7A65">'+(l.pctComplete||0)+'%</span></div></td>'+
+        '<td><span style="font-size:12px;font-weight:700;color:'+(l.label==='Hot'?'#2D6A4F':l.label==='Warm'?'#C8972A':'#2563eb')+'">'+e(LMOJI[l.label]||'')+' '+e(l.label||'')+'</span></td>'+
+        '<td style="color:#5A7A65;font-size:12px">'+(l.source?e(l.source):'&mdash;')+'</td>'+
+        '<td>'+(lm?'<div style="display:flex;flex-direction:column;gap:3px">'+((l.files||[]).map(function(f,fi){return '<button class="dl-lfile" data-lid="'+e(l._id)+'" data-fi="'+fi+'" style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px" title="'+e(f.name)+'">&#128229; '+e(f.name)+'</button>';}).join(''))+'</div>':'<span style="color:#dc2626;font-size:12px">None</span>')+'</td>'+
+
+        '<td><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+          (l.converted?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">Converted</span>':
+            l.approved?'<button class="btn btn-sm cnv" data-id="'+l._id+'" style="background:#FDF8EE;color:#1A4731;border:1px solid #C8972A;font-weight:700">&#9889; Convert</button>':
+            l.leadStatus==='pending'?'<span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#9203; Pending Approval</span>':
+            '<span style="background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">&#128274; Awaiting Approval</span>')+
+          '<button class="btn btn-pale btn-sm ell" data-id="'+l._id+'">Edit</button>'+
+
+          (S.currentUser&&S.currentUser.role==='admin'?'<button class="btn btn-red btn-sm dll" data-id="'+l._id+'">&#10005;</button>':'')+
+      '</tr>';
+    }).join('')+
+    '</tbody></table></div>')+
+
+    '<div class="card" style="margin-top:24px;border-top:4px solid #2D6A4F">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:800;color:#1A4731">&#128203; Lead Activity Log</div>'+
+          '<div style="font-size:12px;color:#5A7A65;margin-top:2px">Select a lead below to view its specific activity &mdash; or view all</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+          '<span style="font-size:12px;color:#5A7A65;font-weight:600">Logged as:</span>'+
+          '<input id="au" value="'+e(S.auditUser)+'" placeholder="Your name..." style="padding:6px 12px;font-size:12px;width:140px"/>'+
+          '<select id="audit-filter" style="padding:6px 10px;font-size:12px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit">'+
+            '<option value="all">All Leads</option>'+
+            S.leads.map(function(l){return '<option value="'+e(l.leadId||l._id)+'"'+(S.auditFilter===l.leadId?'selected':'')+'>'+e(l.leadId||'?')+' - '+e(l.bizName||l.ownerContact||'Lead')+'</option>';}).join('')+
+          '</select>'+
+          (S.auditLog.length>0?'<button class="btn btn-red btn-sm" id="cla">Clear All</button>':'')+
+        '</div>'+
+      '</div>'+
+      function(){
+        var filt=S.auditFilter||'all';
+        var filtered=filt==='all'?[].concat(S.auditLog):S.auditLog.filter(function(en){return en.leadId===filt;});
+        if(filtered.length===0) return '<div style="text-align:center;padding:24px;color:#5A7A65;font-size:13px"><div style="font-weight:600;margin-bottom:4px">No activity'+(filt!=='all'?' for this lead':'')+' yet</div><div style="font-size:12px">Activity appears here when leads are viewed or edited</div></div>';
+        return '<div style="overflow-x:auto;border-radius:10px;border:1px solid #C8E6D4"><table>'+
+          '<thead><tr>'+
+          (filt==='all'?'<th>LEAD ID</th>':'')+
+          '<th>USER</th><th>ACTION / FIELD</th><th>PREVIOUS VALUE</th><th>NEW VALUE</th><th>TIME</th><th></th></tr></thead><tbody>'+
+          filtered.reverse().map(function(en,i){
+            return '<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">'+
+              (filt==='all'?'<td><span class="badge-id">'+e(en.leadId)+'</span></td>':'')+
+              '<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+e((en.user||'?').charAt(0).toUpperCase())+'</span><span style="font-weight:600;color:#1A4731">'+e(en.user)+'</span></div></td>'+
+              '<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border:1px solid #F5E6C3;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap">'+e(en.field)+'</span>')+'</td>'+
+              '<td style="color:#5A7A65;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.prev))+'</td>'+
+              '<td style="font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(en.field==='n/a'?'&mdash;':e(en.next))+'</td>'+
+              '<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>'+
+              '<td><button class="dau btn-sm" data-id="'+en._id+'" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:12px;font-weight:700">x</button></td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody></table></div>';
+      }()+
+    '</div>'+
+  '</div></div>';
+}
+
 
 function rLL(){
   var lf=S.lform||bLead();var isE=S.leid!==null;
