@@ -13,11 +13,11 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 #app{height:100vh;overflow:hidden;}
 
 /* ── App Shell ─────────────────────────────────────────────────────────────── */
-.app-shell{display:flex;height:100vh;overflow:hidden;}
+.app-shell{display:flex;height:100vh;overflow:hidden;max-width:100vw;}
 .sidebar{width:224px;background:#fff;border-right:1px solid #D8E3DC;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;overflow-x:hidden;}
-.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+.main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;max-width:100%;}
 .top-nav{height:48px;background:#275F45;display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:100;}
-.content-area{flex:1;overflow-y:auto;padding:24px;background:#F8FAF9;}
+.content-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:24px;background:#F8FAF9;min-width:0;width:100%;}
 
 /* ── Sidebar ───────────────────────────────────────────────────────────────── */
 .sidebar-brand{padding:12px 16px;border-bottom:1px solid #D8E3DC;display:flex;align-items:center;gap:8px;min-height:48px;}
@@ -1161,7 +1161,7 @@ function rLeads(){
   if(S.leadsView==='form'){
     // Show ONLY the lead intake form — hide the table column
     var hdr='<div class="page-header"><div class="page-header-left"><h1>'+(S.leid?'Edit Lead':'New Lead')+'</h1><p>'+(S.leid?'Update lead details':'Capture a new lead into the pipeline')+'</p></div><div class="page-header-actions"><button class="btn btn-ghost btn-sm" onclick="S.leadsView=\'pipeline\';render();">&#8592; Leads Pipeline</button></div></div>';
-    return hdr+rLL();
+    return hdr+rLeadForm();
   }
 
   // Pipeline view — show ONLY the table, form hidden, table full width
@@ -1241,7 +1241,7 @@ function rLeadsPipeline(){
       return '<th style="cursor:pointer;white-space:nowrap;user-select:none;" class="sort-th" data-sort="'+key+'">'+label+(isActive?' &#9650;':'')+'</th>';
     }
 
-    html+='<div style="overflow-x:auto;">';
+    html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">';
     html+='<table><thead><tr>';
     html+='<th>LEAD ID</th>';
     html+=sortTh('BUSINESS NAME','biz');
@@ -1342,6 +1342,108 @@ function rLeadsPipeline(){
   }
 
   return html;
+}
+
+
+function rLeadForm(){
+
+  var lf=S.lform||bLead();var isE=S.leid!==null;
+  var ac=true;
+  var req=S.biz==='limited'?2:1;var met=S.lfiles.length>=req;
+  var leads=[].concat(S.leads);
+  if(S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
+  if(S.lsrch){var q=S.lsrch.toLowerCase();leads=leads.filter(function(l){return (l.contactPerson||'').toLowerCase().indexOf(q)>=0||(l.organization||'').toLowerCase().indexOf(q)>=0||(l.leadId||'').toLowerCase().indexOf(q)>=0;});}
+
+  return '<div style="max-width:860px;">'+
+    (lf.leadId?'<div class="badge-id" style="margin-bottom:8px;display:inline-block">ID: '+e(lf.leadId)+'</div>':'')+
+    '<div class="ccard" style="border-top:4px solid #C8972A">'+
+
+      '<button class="shdr'+(S.sec.ov?' on':'')+'" data-sec="ov"><span style="font-weight:800">&#128100; Customer Overview</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.ov?'&#9662;':'&#9656;')+'</span></button>'+
+      '<div class="sbody'+(S.sec.ov?' on':'')+'">'+
+        '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
+          '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
+          '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
+          '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
+          '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
+          '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
+          '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
+          '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
+          '<div class="grid2">'+
+            '<div><div class="field-lbl">Phone</div><input name="phone" value="'+e(lf.phone)+'" placeholder="+233 000 0000"/></div>'+
+            '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
+          '</div>'+
+          '<div><div class="field-lbl">Source <span style="font-weight:400;font-size:10px;color:#5A7A65">(who made contact with this lead?)</span></div><input name="source" value="'+e(lf.source)+'" placeholder="e.g. John via LinkedIn, referred by Ama..."/></div>'+
+          '<div><div class="field-lbl">Status Priority</div><div style="display:flex;gap:8px;margin-top:4px">'+
+            [['High Priority','#dc2626','#fef2f2','#fecaca'],['Medium','#C8972A','#FDF8EE','#F5E6C3'],['Low','#2D6A4F','#E8F5EE','#C8E6D4']].map(function(p){var on=lf.priority===p[0];return '<button type="button" class="prbtn" data-v="'+e(p[0])+'" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+(on?p[2]:' #C8E6D4')+';background:'+(on?p[2]:'#f8fafc')+';color:'+(on?p[1]:'#5A7A65')+';font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .2s">'+e(p[0])+'</button>';}).join('')+
+          '</div></div>'+
+          '<div class="grid2">'+
+            '<div><div class="field-lbl">Expected Start Date</div><input type="date" name="startDate" value="'+e(lf.startDate)+'"/></div>'+
+            '<div><div class="field-lbl">Expected End Date</div><input type="date" name="endDate" value="'+e(lf.endDate)+'" id="endDate"/><div id="date-err" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">End date cannot be before start date</div></div>'+
+          '</div>'+
+          '<div>'+
+            '<div class="field-lbl">Percentage Completed / Stage &nbsp;<span id="pct-lbl" style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(lf.pctComplete<=35?'background:#eff6ff;color:#2563eb':lf.pctComplete<=65?'background:#FDF8EE;color:#C8972A':'background:#E8F5EE;color:#2D6A4F')+'">'+lf.pctComplete+'% &mdash; '+(lf.pctComplete<=35?'Cold':lf.pctComplete<=65?'Warm':'Hot')+'</span></div>'+
+            '<input type="range" name="pctComplete" id="pct-slider" min="0" max="100" step="1" value="'+e(lf.pctComplete)+'" style="width:100%;margin-top:8px;accent-color:#2D6A4F"/>'+
+            '<div style="display:flex;justify-content:space-between;font-size:10px;color:#5A7A65;margin-top:2px"><span>0%</span><span style="color:#2563eb;font-weight:600">Cold (0-35%)</span><span style="color:#C8972A;font-weight:600">Warm (35-65%)</span><span style="color:#2D6A4F;font-weight:600">Hot (65-100%)</span><span>100%</span></div>'+
+          '</div>'+
+        '</div></form>'+
+      '</div>'+
+
+      '<button class="shdr'+(S.sec.at?' on':'')+'" data-sec="at"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:800">&#127991;&#65039; Attributes</span>'+
+        (ac?'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700">Complete</span>':'')+
+      '</div><span style="font-size:12px;color:#5A7A65">'+(S.sec.at?'&#9662;':'&#9656;')+'</span></button>'+
+      '<div class="sbody'+(S.sec.at?' on':'')+'">'+
+        
+        '<form id="af"><div style="display:flex;flex-direction:column;gap:11px">'+
+          
+          '<div class="grid2">'+
+                      '</div>'+
+          '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb">'+
+            '<label class="ynb-yes"><input type="radio" name="kickoffMeeting" value="Yes" class="kbtn-r"'+(lf.kickoffMeeting==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
+            '<label class="ynb-no"><input type="radio" name="kickoffMeeting" value="No" class="kbtn-r"'+(lf.kickoffMeeting==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
+          '</div></div>'+
+          '<div><div class="field-lbl">Has MA been signed?</div><div class="ynb">'+
+            '<label class="ynb-yes"><input type="radio" name="maSigned" value="Yes" class="mbtn-r"'+(lf.maSigned==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
+            '<label class="ynb-no"><input type="radio" name="maSigned" value="No" class="mbtn-r"'+(lf.maSigned==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
+          '</div>'+
+          (lf.maSigned==='Yes'?
+            '<div style="margin-top:12px;background:#E8F5EE;border:1px solid #C8E6D4;border-radius:10px;padding:12px 14px">'+
+              '<div style="font-size:11px;font-weight:700;color:#2D6A4F;margin-bottom:8px">&#128279; Listing Links</div>'+
+              '<a href="https://www.transworldbusinessadvisors.com/" target="_blank" class="ll"><div style="flex:1"><div style="font-size:12px;font-weight:700;color:#1A4731">Business Brokers | Selling and Buying Businesses</div><div style="font-size:11px;color:#2D6A4F;margin-top:1px">Transworld Business Advisors</div></div><span style="font-size:11px;color:#5A7A65">&#8599; Visit</span></a>'+
+              '<a href="https://www.businessesforsale.com/" target="_blank" class="ll"><div style="flex:1"><div style="font-size:12px;font-weight:700;color:#1A4731">Businesses For Sale &mdash; All Countries</div><div style="font-size:11px;color:#2D6A4F;margin-top:1px">36 Available To Buy Now</div></div><span style="font-size:11px;color:#5A7A65">&#8599; Visit</span></a>'+
+            '</div>':'')+'</div>'+
+        '</div></form>'+
+      '</div>'+
+
+      '<button class="shdr'+(S.sec.doc?' on':'')+'" data-sec="doc"><span style="font-weight:800">&#128193; General Information &amp; Documents</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.doc?'&#9662;':'&#9656;')+'</span></button>'+
+      '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
+        '<div style="display:flex;flex-direction:column;gap:13px">'+
+            '<div><div class="field-lbl">Upload Document <span style="font-size:10px;font-weight:400;color:#c2410c">(required &mdash; at least 1)</span></div>'+
+            '<label style="display:inline-flex;align-items:center;gap:8px;background:'+(met?'#E8F5EE':'#fff7ed')+';color:'+(met?'#2D6A4F':'#c2410c')+';border:1px dashed '+(met?'#C8E6D4':'#fed7aa')+';border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;width:100%;justify-content:center">'+
+              '&#128206; Upload Files<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+
+            '</label>'+
+            '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
+              '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
+              '<span style="font-size:11px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+'">'+S.lfiles.length+'/1</span>'+
+            '</div>'+
+            '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
+            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Please upload at least 1 document before submitting')+'</div>'+
+          ''+
+          '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
+          '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
+          '<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SAVE</span>Saves progress even if incomplete &nbsp;&nbsp;'+
+          '<span style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SUBMIT</span>Marks lead as complete'+
+          '</div>'+
+          '<div style="display:flex;gap:10px">'+
+            '<button type="button" id="svd" style="flex:1;padding:13px;border-radius:10px;border:2px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+
+            '<button type="button" id="slb" style="flex:1;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#9989; '+(isE?'Update Lead':'Submit Lead')+'</button>'+
+          '</div>'+
+          (isE?'<button type="button" id="clb" class="btn btn-pale" style="width:100%;margin-top:8px">Cancel</button>':'')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+
+    '</div>'+
+  '</div>';
 }
 
 
