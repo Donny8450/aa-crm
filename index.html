@@ -1446,26 +1446,7 @@ function rLeadForm(){
       '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
         '<div style="display:flex;flex-direction:column;gap:13px">'+
             '<div><div class="field-lbl">Upload Document <span style="font-size:10px;font-weight:400;color:#c2410c">(required &mdash; at least 1)</span></div>'+
-            '<label style="display:inline-flex;align-items:center;gap:8px;background:'+(met?'#E8F5EE':'#fff7ed')+';color:'+(met?'#2D6A4F':'#c2410c')+';border:1px dashed '+(met?'#C8E6D4':'#fed7aa')+';border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;width:100%;justify-content:center">'+
-              '&#128206; Upload Files<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+
-            '</label>'+
-            '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
-              '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
-              '<span style="font-size:12px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+';background:'+(met?'#E8F5EE':'#fff7ed')+';padding:2px 8px;border-radius:4px;">'+S.lfiles.length+'/1 '+(met?'&#10003;':'')+'</span>'+
-            '</div>'+
-            '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
-            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Upload required before submitting')+'</div>'+
-          ''+
-          '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
-          '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
-          '<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SAVE</span>Saves progress even if incomplete &nbsp;&nbsp;'+
-          '<span style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SUBMIT</span>Marks lead as complete'+
-          '</div>'+
-          '<div style="display:flex;gap:10px">'+
-            '<button type="button" id="svd" style="flex:1;padding:13px;border-radius:10px;border:2px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+
-            '<button type="button" id="slb" style="flex:1;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#9989; '+(isE?'Update Lead':'Submit Lead')+'</button>'+
-          '</div>'+
-          (isE?'<button type="button" id="clb" class="btn btn-pale" style="width:100%;margin-top:8px">Cancel</button>':'')+
+            '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start;margin-top:4px;">'+'<div>'+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+'<div style="display:inline-flex;align-items:center;gap:6px;background:#EAF3EE;border:1px solid #C8E6D4;border-radius:20px;padding:4px 12px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:#275F45;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">4</div>'+'<span style="font-size:11px;font-weight:600;color:#275F45;">Step 4 of 5</span>'+'</div>'+'<span style="font-size:13px;font-weight:600;color:#1A1A1A;">Documents &amp; Submission</span>'+'</div>'+'<div style="font-size:12px;color:#5F6B65;margin-bottom:12px;line-height:1.5;">Upload supporting documents. Accepted: PDF, Word, Excel, PNG, JPG &mdash; max 10MB each.</div>'+'<label for="lfi" style="display:block;cursor:pointer;">'+'<div style="border:2px dashed '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:8px;background:'+(met?'#F0FDF4':'#FAFAFA')+';padding:24px 16px;text-align:center;margin-bottom:10px;">'+'<div style="font-size:26px;margin-bottom:6px;opacity:.5;">&#128196;</div>'+'<div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:3px;">Drop files here or click to upload</div>'+'<div style="font-size:11px;color:#9BA8A2;margin-bottom:10px;">Supported formats &middot; Max 10MB each</div>'+'<span style="display:inline-flex;align-items:center;gap:6px;background:#275F45;color:#fff;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;font-family:Inter,sans-serif;">&#8679; Browse Files</span>'+'<div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin-top:10px;">'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PDF</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">DOCX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">XLSX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PNG</span>'+'</div>'+'</div>'+'<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+'</label>'+(S.lfiles.length>0?  '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">'+  S.lfiles.map(function(f,fi){    var ext=(f.name||'file').split('.').pop().toUpperCase().slice(0,4);    var sz=f.size?((f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')):'File';    var ec={'PDF':'#DC2626','DOCX':'#2563EB','DOC':'#2563EB','XLSX':'#16A34A','XLS':'#16A34A','PPTX':'#D97706','JPG':'#7C3AED','PNG':'#7C3AED'}[ext]||'#5F6B65';    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid #D8E3DC;border-radius:6px;">'      +'<div style="width:30px;height:30px;border-radius:4px;background:'+ec+'14;border:1px solid '+ec+'25;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:'+ec+';flex-shrink:0;">'+ext+'</div>'      +'<div style="flex:1;min-width:0;">'        +'<div style="font-size:12px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>'        +'<div style="font-size:10px;color:#9BA8A2;">'+sz+'</div>'      +'</div>'      +(f.data?'<button type="button" class="dl-lfile-btn btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;flex-shrink:0;">&#8659;</button>':'')      +'<button type="button" class="del-lfile btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;color:#DC2626;flex-shrink:0;">&#10005;</button>'      +'</div>';  }).join('')+  '</div>':'')+'<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:'+(met?'#F0FDF4':'#F8FAF9')+';border:1px solid '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:6px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:'+(met?'#16A34A':'#9BA8A2')+';display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700;">'+(met?'&#10003;':'1')+'</div>'+'<div style="flex:1;">'+'<div style="font-size:12px;font-weight:600;color:'+(met?'#15803D':'#374151')+'">'+(met?'All required documents uploaded':'Documents Required')+'</div>'+'<div style="font-size:11px;color:'+(met?'#86EFAC':'#9BA8A2')+'">'+(met?'Ready to submit':'Upload at least 1 document before submitting')+'</div>'+'</div>'+'</div>'+'</div>'+'<div style="position:sticky;top:60px;">'+'<div style="background:#fff;border:1px solid #D8E3DC;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+'<div style="padding:14px 16px;background:#F8FAF9;border-bottom:1px solid #D8E3DC;">'+'<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Lead Completion</div>'+(function(){  var lf2=S.lform||{};  var rows=[['Business Name',!!(lf2.bizName&&lf2.bizName.trim())],['Service Type',!!(lf2.serviceType)],['Owner',!!(lf2.ownerContact&&lf2.ownerContact.trim())],['Documents',met],['Start Date',!!(lf2.startDate)]];  var done=rows.filter(function(r){return r[1];}).length;  var pct=Math.round(done/rows.length*100);  var bc=pct===100?'#16A34A':pct>=60?'#275F45':'#D97706';  var o='<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px;">';  o+='<span style="font-size:22px;font-weight:700;color:'+bc+';">'+pct+'%</span>';  o+='<span style="font-size:11px;color:#9BA8A2;">'+done+' of '+rows.length+'</span></div>';  o+='<div style="height:5px;background:#E8E8E8;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div>';  rows.forEach(function(r){    o+='<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #F8FAF9;">';    o+='<div style="width:14px;height:14px;border-radius:50%;background:'+(r[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(r[1]?'&#10003;':'')+'</div>';    o+='<span style="font-size:11px;color:'+(r[1]?'#1A1A1A':'#9BA8A2')+';flex:1;">'+r[0]+'</span>';    if(!r[1]) o+='<span style="font-size:9px;font-weight:700;color:#D97706;">Missing</span>';    o+='</div>';  });  return o;}())+'</div>'+'<div style="padding:14px 16px;display:flex;flex-direction:column;gap:7px;">'+'<button type="button" id="slb" style="width:100%;padding:9px 14px;background:#275F45;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">'+(isE?'&#10003; Update Lead':'&#9889; Submit for Approval')+'</button>'+'<button type="button" id="svd" style="width:100%;padding:8px 14px;background:#fff;color:#275F45;border:1px solid #275F45;border-radius:5px;font-size:12px;font-weight:500;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+(isE?'<button type="button" id="clb" style="width:100%;padding:7px 14px;background:transparent;color:#9BA8A2;border:1px solid #D8E3DC;border-radius:5px;font-size:11px;font-family:Inter,sans-serif;cursor:pointer;">Cancel</button>':'')+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -1548,26 +1529,7 @@ function rLL(){
       '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
         '<div style="display:flex;flex-direction:column;gap:13px">'+
             '<div><div class="field-lbl">Upload Document <span style="font-size:10px;font-weight:400;color:#c2410c">(required &mdash; at least 1)</span></div>'+
-            '<label style="display:inline-flex;align-items:center;gap:8px;background:'+(met?'#E8F5EE':'#fff7ed')+';color:'+(met?'#2D6A4F':'#c2410c')+';border:1px dashed '+(met?'#C8E6D4':'#fed7aa')+';border-radius:8px;padding:9px 14px;cursor:pointer;font-size:13px;font-weight:600;width:100%;justify-content:center">'+
-              '&#128206; Upload Files<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+
-            '</label>'+
-            '<div style="margin-top:7px;display:flex;align-items:center;gap:8px">'+
-              '<div class="pbar'+(S.lfiles.length>=1?' filled':'')+'"></div>'+
-              '<span style="font-size:12px;font-weight:700;color:'+(met?'#2D6A4F':'#c2410c')+';background:'+(met?'#E8F5EE':'#fff7ed')+';padding:2px 8px;border-radius:4px;">'+S.lfiles.length+'/1 '+(met?'&#10003;':'')+'</span>'+
-            '</div>'+
-            '<div id="lfl" style="margin-top:7px">'+rFL(S.lfiles,'l')+'</div>'+
-            '<div style="margin-top:5px;font-size:11px;font-weight:600;color:'+(met?'#2D6A4F':'#c2410c')+'">'+(met?'&#10003; Document uploaded - ready to submit':'&#9888; Upload required before submitting')+'</div>'+
-          ''+
-          '<div style="margin-top:16px;border-top:1px solid #C8E6D4;padding-top:16px">'+
-          '<div style="font-size:11px;color:#5A7A65;margin-bottom:10px">'+
-          '<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SAVE</span>Saves progress even if incomplete &nbsp;&nbsp;'+
-          '<span style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px">SUBMIT</span>Marks lead as complete'+
-          '</div>'+
-          '<div style="display:flex;gap:10px">'+
-            '<button type="button" id="svd" style="flex:1;padding:13px;border-radius:10px;border:2px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+
-            '<button type="button" id="slb" style="flex:1;padding:13px;border-radius:10px;border:none;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">&#9989; '+(isE?'Update Lead':'Submit Lead')+'</button>'+
-          '</div>'+
-          (isE?'<button type="button" id="clb" class="btn btn-pale" style="width:100%;margin-top:8px">Cancel</button>':'')+
+            '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start;margin-top:4px;">'+'<div>'+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+'<div style="display:inline-flex;align-items:center;gap:6px;background:#EAF3EE;border:1px solid #C8E6D4;border-radius:20px;padding:4px 12px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:#275F45;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">4</div>'+'<span style="font-size:11px;font-weight:600;color:#275F45;">Step 4 of 5</span>'+'</div>'+'<span style="font-size:13px;font-weight:600;color:#1A1A1A;">Documents &amp; Submission</span>'+'</div>'+'<div style="font-size:12px;color:#5F6B65;margin-bottom:12px;line-height:1.5;">Upload supporting documents. Accepted: PDF, Word, Excel, PNG, JPG &mdash; max 10MB each.</div>'+'<label for="lfi" style="display:block;cursor:pointer;">'+'<div style="border:2px dashed '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:8px;background:'+(met?'#F0FDF4':'#FAFAFA')+';padding:24px 16px;text-align:center;margin-bottom:10px;">'+'<div style="font-size:26px;margin-bottom:6px;opacity:.5;">&#128196;</div>'+'<div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:3px;">Drop files here or click to upload</div>'+'<div style="font-size:11px;color:#9BA8A2;margin-bottom:10px;">Supported formats &middot; Max 10MB each</div>'+'<span style="display:inline-flex;align-items:center;gap:6px;background:#275F45;color:#fff;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;font-family:Inter,sans-serif;">&#8679; Browse Files</span>'+'<div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin-top:10px;">'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PDF</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">DOCX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">XLSX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PNG</span>'+'</div>'+'</div>'+'<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+'</label>'+(S.lfiles.length>0?  '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">'+  S.lfiles.map(function(f,fi){    var ext=(f.name||'file').split('.').pop().toUpperCase().slice(0,4);    var sz=f.size?((f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')):'File';    var ec={'PDF':'#DC2626','DOCX':'#2563EB','DOC':'#2563EB','XLSX':'#16A34A','XLS':'#16A34A','PPTX':'#D97706','JPG':'#7C3AED','PNG':'#7C3AED'}[ext]||'#5F6B65';    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid #D8E3DC;border-radius:6px;">'      +'<div style="width:30px;height:30px;border-radius:4px;background:'+ec+'14;border:1px solid '+ec+'25;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:'+ec+';flex-shrink:0;">'+ext+'</div>'      +'<div style="flex:1;min-width:0;">'        +'<div style="font-size:12px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>'        +'<div style="font-size:10px;color:#9BA8A2;">'+sz+'</div>'      +'</div>'      +(f.data?'<button type="button" class="dl-lfile-btn btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;flex-shrink:0;">&#8659;</button>':'')      +'<button type="button" class="del-lfile btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;color:#DC2626;flex-shrink:0;">&#10005;</button>'      +'</div>';  }).join('')+  '</div>':'')+'<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:'+(met?'#F0FDF4':'#F8FAF9')+';border:1px solid '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:6px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:'+(met?'#16A34A':'#9BA8A2')+';display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700;">'+(met?'&#10003;':'1')+'</div>'+'<div style="flex:1;">'+'<div style="font-size:12px;font-weight:600;color:'+(met?'#15803D':'#374151')+'">'+(met?'All required documents uploaded':'Documents Required')+'</div>'+'<div style="font-size:11px;color:'+(met?'#86EFAC':'#9BA8A2')+'">'+(met?'Ready to submit':'Upload at least 1 document before submitting')+'</div>'+'</div>'+'</div>'+'</div>'+'<div style="position:sticky;top:60px;">'+'<div style="background:#fff;border:1px solid #D8E3DC;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+'<div style="padding:14px 16px;background:#F8FAF9;border-bottom:1px solid #D8E3DC;">'+'<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Lead Completion</div>'+(function(){  var lf2=S.lform||{};  var rows=[['Business Name',!!(lf2.bizName&&lf2.bizName.trim())],['Service Type',!!(lf2.serviceType)],['Owner',!!(lf2.ownerContact&&lf2.ownerContact.trim())],['Documents',met],['Start Date',!!(lf2.startDate)]];  var done=rows.filter(function(r){return r[1];}).length;  var pct=Math.round(done/rows.length*100);  var bc=pct===100?'#16A34A':pct>=60?'#275F45':'#D97706';  var o='<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px;">';  o+='<span style="font-size:22px;font-weight:700;color:'+bc+';">'+pct+'%</span>';  o+='<span style="font-size:11px;color:#9BA8A2;">'+done+' of '+rows.length+'</span></div>';  o+='<div style="height:5px;background:#E8E8E8;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div>';  rows.forEach(function(r){    o+='<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #F8FAF9;">';    o+='<div style="width:14px;height:14px;border-radius:50%;background:'+(r[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(r[1]?'&#10003;':'')+'</div>';    o+='<span style="font-size:11px;color:'+(r[1]?'#1A1A1A':'#9BA8A2')+';flex:1;">'+r[0]+'</span>';    if(!r[1]) o+='<span style="font-size:9px;font-weight:700;color:#D97706;">Missing</span>';    o+='</div>';  });  return o;}())+'</div>'+'<div style="padding:14px 16px;display:flex;flex-direction:column;gap:7px;">'+'<button type="button" id="slb" style="width:100%;padding:9px 14px;background:#275F45;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">'+(isE?'&#10003; Update Lead':'&#9889; Submit for Approval')+'</button>'+'<button type="button" id="svd" style="width:100%;padding:8px 14px;background:#fff;color:#275F45;border:1px solid #275F45;border-radius:5px;font-size:12px;font-weight:500;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+(isE?'<button type="button" id="clb" style="width:100%;padding:7px 14px;background:transparent;color:#9BA8A2;border:1px solid #D8E3DC;border-radius:5px;font-size:11px;font-family:Inter,sans-serif;cursor:pointer;">Cancel</button>':'')+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -2976,80 +2938,154 @@ function rClients(){
     return html;
   }
 
-  // ── Client list view ────────────────────────────────────────────────────────
-  var html='<div>';
+  // ── Client list view ─────────────────────────────────────────────────────────
+  var cl=[].concat(S.clients);
+  var fSearch=(S.clientSearch||'').toLowerCase().trim();
+  var fStatus=S.clientFStatus||'All';
+  var fIndustry=S.clientFIndustry||'All';
+  if(fSearch) cl=cl.filter(function(c){return (c.companyName||'').toLowerCase().indexOf(fSearch)>=0||(c.clientId||'').toLowerCase().indexOf(fSearch)>=0||(c.industry||'').toLowerCase().indexOf(fSearch)>=0||(c.location||'').toLowerCase().indexOf(fSearch)>=0;});
+  if(fStatus!=='All') cl=cl.filter(function(c){return (c.status||'Prospect')===fStatus;});
+  if(fIndustry!=='All') cl=cl.filter(function(c){return c.industry===fIndustry;});
 
-  // Header
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden">';
-  html+='<div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(200,151,42,.12)"></div>';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:6px">CLIENT MANAGEMENT</div>';
-  html+='<div style="font-size:26px;font-weight:900;color:#fff;margin-bottom:4px">Clients</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:18px">Manage your client base and account history</div>';
-  html+='<div style="display:flex;gap:20px;flex-wrap:wrap">';
-  [['Total Clients',S.clients.length,'#fff'],['Active',S.clients.filter(function(c){return c.status==='Active';}).length,'#86efac'],['Prospects',S.clients.filter(function(c){return c.status==='Prospect';}).length,'#F5E6C3'],['Inactive',S.clients.filter(function(c){return c.status==='Inactive';}).length,'rgba(255,255,255,.4)']].forEach(function(k){
-    html+='<div><div style="font-size:28px;font-weight:900;color:'+k[2]+'">'+k[1]+'</div><div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:600">'+k[0].toUpperCase()+'</div></div>';
-  });
+  var totalActive=S.clients.filter(function(c){return c.status==='Active';}).length;
+  var totalProspects=S.clients.filter(function(c){return c.status==='Prospect';}).length;
+  var totalDealsOpen=S.deals.filter(function(d){return d.status==='Active'&&d.clientId;}).length;
+  var totalContacts=0;S.clients.forEach(function(c){totalContacts+=(c.contacts||[]).length;});
+  var industries=['All'];
+  S.clients.forEach(function(c){if(c.industry&&industries.indexOf(c.industry)<0) industries.push(c.industry);});
+
+  var html='';
+
+  // Page header — same style as dashboard
+  html+='<div class="page-header">';
+  html+='<div class="page-header-left">';
+  html+='<h1>Client Accounts</h1>';
+  html+='<p>'+S.clients.length+' account'+(S.clients.length!==1?'s':'')+' &middot; '+totalActive+' active &middot; '+totalProspects+' prospect'+(totalProspects!==1?'s':'')+'</p>';
+  html+='</div>';
+  html+='<div class="page-header-actions">';
+  html+='<button class="btn btn-ghost btn-sm">&#8659; Export</button>';
+  html+='<button id="add-client-btn" class="btn btn-sm">+ New Account</button>';
   html+='</div></div>';
 
-  // Add button + search
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap">';
-  html+='<input id="client-search" value="'+e(S.clientSearch||'')+'" placeholder="Search clients by name, industry or location..." style="flex:1;min-width:200px;padding:10px 14px;border:1.5px solid #C8E6D4;border-radius:10px;font-size:13px;font-family:inherit;outline:none"/>';
-  html+='<button id="add-client-btn" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">+ New Client</button>';
+  // KPI row — identical card style to dashboard
+  html+='<div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:16px;">';
+  [
+    ['Total Accounts',S.clients.length,'#275F45'],
+    ['Active Accounts',totalActive,'#16a34a'],
+    ['Prospects',totalProspects,'#D97706'],
+    ['Open Deals',totalDealsOpen,'#2563eb'],
+    ['Total Contacts',totalContacts,'#7C3AED'],
+  ].forEach(function(k){
+    html+='<div class="kpi-card">';
+    html+='<div class="kpi-value" style="color:'+k[2]+';">'+k[1]+'</div>';
+    html+='<div class="kpi-label">'+k[0]+'</div>';
+    html+='</div>';
+  });
   html+='</div>';
 
-  // Add/Edit client form
-  if(S.showClientForm){
-    var cf=S.clientForm||bClient();
-    html+='<div style="background:#fff;border:1.5px solid #C8E6D4;border-radius:14px;padding:24px;margin-bottom:20px">';
-    html+='<div style="font-size:15px;font-weight:800;color:#1A4731;margin-bottom:18px">'+(S.editClientId?'Edit Client':'New Client')+'</div>';
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
-    html+='<div><div class="field-lbl">Company Name *</div><input id="cf-name" value="'+e(cf.companyName||'')+'" placeholder="e.g. Mensah Holdings Ltd"/></div>';
-    html+='<div><div class="field-lbl">Status</div><select id="cf-status"><option'+(cf.status==='Prospect'?' selected':'')+'>Prospect</option><option'+(cf.status==='Active'?' selected':'')+'>Active</option><option'+(cf.status==='Inactive'?' selected':'')+'>Inactive</option></select></div>';
-    html+='<div><div class="field-lbl">Industry</div><select id="cf-industry"><option value="">Select...</option>'+['Agriculture','Banking & Finance','Construction','Education','Energy','Healthcare','Hospitality','Manufacturing','Mining','Real Estate','Retail','Technology','Telecommunications','Transport & Logistics','Other'].map(function(x){return '<option'+(cf.industry===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
-    html+='<div><div class="field-lbl">Company Size</div><select id="cf-size"><option value="">Select...</option>'+['1–10 employees','11–50 employees','51–200 employees','201–500 employees','500+ employees'].map(function(x){return '<option'+(cf.size===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
-    html+='<div><div class="field-lbl">Location</div><input id="cf-location" value="'+e(cf.location||'')+'" placeholder="e.g. Accra, Ghana"/></div>';
-    html+='<div><div class="field-lbl">Phone</div><input id="cf-phone" value="'+e(cf.phone||'')+'" placeholder="+233 xx xxx xxxx"/></div>';
-    html+='<div><div class="field-lbl">Email</div><input id="cf-email" type="email" value="'+e(cf.email||'')+'" placeholder="info@company.com"/></div>';
-    html+='<div><div class="field-lbl">Website</div><input id="cf-website" value="'+e(cf.website||'')+'" placeholder="www.company.com"/></div>';
-    html+='<div style="grid-column:1/-1"><div class="field-lbl">Notes</div><textarea id="cf-notes" placeholder="Any relevant notes about this client..." style="min-height:60px">'+e(cf.notes||'')+'</textarea></div>';
+  // Filter bar
+  html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:9px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+  html+='<div style="flex:1;min-width:180px;position:relative;">';
+  html+='<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#9BA8A2;font-size:13px;">&#128269;</span>';
+  html+='<input id="client-search" value="'+e(S.clientSearch||'')+'" placeholder="Search accounts by name, industry or location..." style="padding-left:28px;width:100%;height:32px;font-size:12px;"/>';
+  html+='</div>';
+  html+='<select id="cf-status-filter" style="height:32px;font-size:12px;padding:0 8px;border:1px solid #D8E3DC;border-radius:4px;color:#1A1A1A;font-family:Inter,sans-serif;background:#fff;">';
+  ['All','Active','Prospect','Inactive'].forEach(function(s){html+='<option'+(fStatus===s?' selected':'')+'>'+s+'</option>';});
+  html+='</select>';
+  html+='<select id="cf-industry-filter" style="height:32px;font-size:12px;padding:0 8px;border:1px solid #D8E3DC;border-radius:4px;color:#1A1A1A;font-family:Inter,sans-serif;background:#fff;">';
+  html+='<option value="All"'+(fIndustry==='All'?' selected':'')+'>All Industries</option>';
+  industries.slice(1).forEach(function(ind){html+='<option'+(fIndustry===ind?' selected':'')+'>'+e(ind)+'</option>';});
+  html+='</select>';
+  html+='<span style="font-size:11px;color:#9BA8A2;white-space:nowrap;">'+cl.length+' result'+(cl.length!==1?'s':'')+'</span>';
+  html+='</div>';
+
+  // Table — same clean style as dashboard recent deals
+  if(!cl.length){
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:64px;text-align:center;">';
+    html+='<div style="font-size:28px;opacity:.3;margin-bottom:12px;">&#127970;</div>';
+    html+='<div style="font-size:15px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.clients.length===0?'No client accounts yet':'No accounts match this filter')+'</div>';
+    html+='<div style="font-size:13px;color:#5F6B65;margin-bottom:16px;">'+(S.clients.length===0?'Click &ldquo;+ New Account&rdquo; to add your first client':'Try adjusting the search or filters')+'</div>';
+    if(S.clients.length===0) html+='<button id="add-client-btn" class="btn btn-sm">+ New Account</button>';
     html+='</div>';
-    html+='<div style="display:flex;gap:10px">';
-    html+='<button id="cf-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">'+(S.editClientId?'Save Changes':'Create Client')+'</button>';
-    html+='<button id="cf-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
-    html+='</div></div>';
+  } else {
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
+    html+='<div style="overflow-x:auto;"><table>';
+    html+='<thead><tr>';
+    html+='<th style="min-width:200px;">CLIENT NAME</th>';
+    html+='<th>INDUSTRY</th>';
+    html+='<th>LOCATION</th>';
+    html+='<th>CONTACTS</th>';
+    html+='<th>OPEN DEALS</th>';
+    html+='<th>LEADS</th>';
+    html+='<th>STATUS</th>';
+    html+='<th>LAST ACTIVITY</th>';
+    html+='<th></th>';
+    html+='</tr></thead><tbody>';
+
+    cl.forEach(function(c,i){
+      var cDeals=S.deals.filter(function(d){return d.clientId===c._id&&d.status==='Active';}).length;
+      var cLeads=S.leads.filter(function(l){return l.clientId===c._id;}).length;
+      var cContacts=(c.contacts||[]).length;
+      var sc={'Active':'#16a34a','Prospect':'#D97706','Inactive':'#9BA8A2'}[c.status||'Prospect']||'#9BA8A2';
+      var sb={'Active':'#ECFDF5','Prospect':'#FFFBEB','Inactive':'#F8FAF9'}[c.status||'Prospect']||'#F8FAF9';
+      var words=(c.companyName||'?').split(' ');
+      var init=(words[0].charAt(0)+(words[1]?words[1].charAt(0):'')).toUpperCase();
+      var avatarBg=c.status==='Active'?'#EAF3EE':c.status==='Prospect'?'#FFFBEB':'#F8FAF9';
+      var avatarCol=c.status==='Active'?'#275F45':c.status==='Prospect'?'#D97706':'#9BA8A2';
+      var avatarBorder=c.status==='Active'?'#C8E6D4':c.status==='Prospect'?'#FDE68A':'#D8E3DC';
+
+      html+='<tr class="account-row" data-id="'+e(c._id)+'" style="cursor:pointer;">';
+
+      // Client name + avatar
+      html+='<td style="min-width:200px;">';
+      html+='<div style="display:flex;align-items:center;gap:10px;">';
+      html+='<div style="width:30px;height:30px;border-radius:6px;background:'+avatarBg+';border:1px solid '+avatarBorder+';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:'+avatarCol+';flex-shrink:0;">'+init+'</div>';
+      html+='<div>';
+      html+='<div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(c.companyName)+'</div>';
+      html+='<div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(c.clientId||'')+'</div>';
+      html+='</div></div></td>';
+
+      // Industry
+      html+='<td style="font-size:12px;color:#5F6B65;">'+e(c.industry||'—')+'</td>';
+
+      // Location
+      html+='<td style="font-size:12px;color:#5F6B65;">'+e(c.location||'—')+'</td>';
+
+      // Contacts count
+      html+='<td><span style="font-weight:600;color:'+(cContacts>0?'#275F45':'#9BA8A2')+';font-size:13px;">'+cContacts+'</span></td>';
+
+      // Open deals
+      html+='<td><span style="font-weight:600;color:'+(cDeals>0?'#2563eb':'#9BA8A2')+';font-size:13px;">'+cDeals+'</span></td>';
+
+      // Leads
+      html+='<td><span style="font-weight:600;color:'+(cLeads>0?'#D97706':'#9BA8A2')+';font-size:13px;">'+cLeads+'</span></td>';
+
+      // Status badge
+      html+='<td><span style="background:'+sb+';color:'+sc+';border:1px solid '+sc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;">'+e(c.status||'Prospect')+'</span></td>';
+
+      // Last activity
+      html+='<td style="font-size:11px;color:#9BA8A2;white-space:nowrap;">'+e(c.lastActivity||'—')+'</td>';
+
+      // Row actions
+      html+='<td>';
+      html+='<div style="display:flex;gap:4px;align-items:center;opacity:0;transition:opacity .1s;" class="row-actions">';
+      html+='<button class="view-account-btn btn btn-ghost btn-sm" data-id="'+e(c._id)+'" style="font-size:11px;padding:3px 8px;">View</button>';
+      html+='<button class="edit-client-btn btn btn-ghost btn-sm" data-id="'+e(c._id)+'" style="font-size:11px;padding:3px 8px;">Edit</button>';
+      if(S.currentUser&&S.currentUser.role==='admin'){
+        html+='<button class="del-account-btn btn btn-ghost btn-sm" data-id="'+e(c._id)+'" style="font-size:11px;padding:3px 8px;color:#DC2626;">&#10005;</button>';
+      }
+      html+='</div></td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div></div>';
   }
 
-  // Client cards / table
-  var filtered=(S.clientSearch||'').trim().toLowerCase();
-  var shown=S.clients.filter(function(c){
-    if(!filtered) return true;
-    return (c.companyName||'').toLowerCase().includes(filtered)||(c.industry||'').toLowerCase().includes(filtered)||(c.location||'').toLowerCase().includes(filtered);
-  });
+  // Add CSS for row hover actions
+  html+='<style>.account-row:hover .row-actions{opacity:1!important;}</style>';
 
-  if(shown.length===0){
-    html+='<div class="empty"><div style="font-size:44px;margin-bottom:12px">&#127970;</div><div style="font-size:18px;font-weight:800;color:#1A4731">'+(S.clients.length===0?'No clients yet':'No results found')+'</div><div style="font-size:13px;color:#5A7A65;margin-top:6px">'+(S.clients.length===0?'Click "+ New Client" to add your first client':'Try a different search term')+'</div></div>';
-  } else {
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">';
-    shown.forEach(function(c){
-      var cDeals=S.deals.filter(function(d){return d.clientId===c._id;}).length;
-      var cLeads=S.leads.filter(function(l){return l.clientId===c._id;}).length;
-      var statusColors={'Active':'#16a34a','Prospect':'#C8972A','Inactive':'#94a3b8'};
-      var sc=statusColors[c.status]||'#94a3b8';
-      html+='<div class="client-card" data-id="'+e(c._id)+'" style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:20px;cursor:pointer">';
-      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">';
-      html+='<div style="font-size:16px;font-weight:800;color:#1A4731">'+e(c.companyName)+'</div>';
-      html+='<span style="background:'+sc+'20;color:'+sc+';border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;white-space:nowrap">'+e(c.status||'Prospect')+'</span>';
-      html+='</div>';
-      html+='<div style="font-size:11px;color:#5A7A65;font-weight:600;margin-bottom:3px">'+e(c.clientId||'')+'</div>';
-      if(c.industry) html+='<div style="font-size:12px;color:#5A7A65;margin-bottom:2px">&#127970; '+e(c.industry)+'</div>';
-      if(c.location) html+='<div style="font-size:12px;color:#5A7A65;margin-bottom:10px">&#128205; '+e(c.location)+'</div>';
-      html+='<div style="display:flex;gap:10px;border-top:1px solid #E8F5EE;padding-top:10px">';
-      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#1A4731">'+cDeals+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">DEALS</div></div>';
-      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#C8972A">'+cLeads+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">LEADS</div></div>';
-      html+='<div style="text-align:center;flex:1"><div style="font-size:18px;font-weight:800;color:#5A7A65">'+(c.contacts||[]).length+'</div><div style="font-size:10px;color:#5A7A65;font-weight:600">CONTACTS</div></div>';
-      html+='</div></div>';
-    });
-    html+='</div>';
+  // Add/Edit form
+  if(S.showClientForm){
+    html+=rClientForm(S.editClientId?S.clients.filter(function(c){return c._id===S.editClientId;})[0]:null);
   }
 
   html+='</div>';
