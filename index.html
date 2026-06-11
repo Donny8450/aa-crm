@@ -531,6 +531,8 @@ var S={
   leadsView:'pipeline',
   leadSort:'newest',
   contactView:null,
+  apqTab:'pending',
+  apqDrawer:null,
   leadSavedView:'all',
   leadFStage:'All',
   leadFApproval:'All',
@@ -1779,25 +1781,7 @@ function rLeadsPipeline(){
     }
   }
 
-  // ── Conversion confirmation modal ────────────────────────────────────────
-  if(S.convertModal){
-    var cl=S.leads.filter(function(x){return x._id===S.convertModal;})[0];
-    if(cl){
-      html+='<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;">';
-      html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:440px;">';
-      html+='<div style="padding:18px 22px;border-bottom:1px solid #D8E3DC;"><div style="font-size:16px;font-weight:700;color:#1A1A1A;">Convert Lead to Deal Pipeline?</div>';
-      html+='<div style="font-size:12px;color:#5F6B65;margin-top:4px;line-height:1.5;">This will create a new deal record and move this approved lead into the Deal Pipeline for execution.</div></div>';
-      html+='<div style="padding:16px 22px;">';
-      [['Business Name',cl.bizName],['Service Type',cl.serviceType],['Owner / Contact',cl.ownerContact],['Documents',(cl.files||[]).length+' file'+((cl.files||[]).length!==1?'s':'')]].forEach(function(r){
-        html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:12px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:13px;font-weight:600;color:#1A1A1A;">'+e(String(r[1]||'\u2014'))+'</span></div>';
-      });
-      html+='</div>';
-      html+='<div style="padding:14px 22px;border-top:1px solid #D8E3DC;display:flex;justify-content:flex-end;gap:8px;">';
-      html+='<button id="convert-cancel" class="btn btn-ghost">Cancel</button>';
-      html+='<button id="convert-confirm" data-id="'+e(cl._id)+'" class="btn">&#9889; Convert Lead</button>';
-      html+='</div></div></div>';
-    }
-  }
+  html+=rConvertModal();
 
   html+='</div>';
   return html;
@@ -2333,15 +2317,18 @@ function confirmApproval(){
   var match={name:u};
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
+  var isReject=S.approvalAction==='reject';
   S.leads=S.leads.map(function(l){
     if(l._id!==leadId) return l;
-    var updated=Object.assign({},l,{approved:true,approvedBy:match.name,approvedAt:ts,leadStatus:'approved'});
+    var updated=isReject
+      ?Object.assign({},l,{rejected:true,rejectedBy:match.name,rejectedAt:new Date().toISOString(),leadStatus:'rejected',approved:false})
+      :Object.assign({},l,{approved:true,approvedBy:match.name,approvedAt:new Date().toISOString(),leadStatus:'approved',rejected:false});
     syncLead(updated);
     return updated;
   });
-  S.auditLog=S.auditLog.concat([{_id:Date.now(),leadId:(S.leads.filter(function(l){return l._id===leadId;})[0]||{}).leadId||'n/a',user:match.name,field:'Approval',prev:'Pending',next:'Approved by '+match.name,ts:ts}]);
+  S.auditLog=S.auditLog.concat([{_id:Date.now(),leadId:(S.leads.filter(function(l){return l._id===leadId;})[0]||{}).leadId||'n/a',user:match.name,field:'Approval',prev:'Pending',next:(S.approvalAction==='reject'?'Rejected by ':'Approved by ')+match.name,ts:ts}]);
   S.currentApprover=match.name;
-  flash('Lead approved by '+match.name+'!');
+  flash(S.approvalAction==='reject'?('Lead rejected by '+match.name+'.'):('Lead approved by '+match.name+'!'));
   S.approvalModal=false;S.approvalTargetId=null;S.approvalAction=null;
   render();
 }
@@ -2351,7 +2338,7 @@ function rApprovalModal(){
   var lead=S.leads.filter(function(l){return l._id===S.approvalTargetId;})[0]||{};
   return '<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px">'+
     '<div style="background:#fff;border-radius:16px;padding:32px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border-top:4px solid #2D6A4F">'+
-      '<div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:4px">&#128272; Authorisation Required</div>'+
+      '<div style="font-size:18px;font-weight:800;color:'+(S.approvalAction==='reject'?'#991b1b':'#1A4731')+';margin-bottom:4px">'+(S.approvalAction==='reject'?'&#9940; Reject Lead':'&#128272; Authorisation Required')+'</div>'+
       '<div style="font-size:13px;color:#5A7A65;margin-bottom:22px;line-height:1.6">This action requires approval from an authorised user. Please enter your credentials to proceed.</div>'+
       '<div style="background:#E8F5EE;border:1px solid #C8E6D4;border-radius:10px;padding:12px 14px;margin-bottom:18px">'+
         '<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">LEAD BEING APPROVED</div>'+
@@ -2365,7 +2352,7 @@ function rApprovalModal(){
        '</div>'+
       '<div style="display:flex;gap:10px">'+
         '<button id="apr-cancel" style="flex:1;padding:12px;border-radius:10px;border:1px solid #C8E6D4;background:#E8F5EE;color:#5A7A65;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>'+
-        '<button id="apr-confirm" style="flex:2;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">&#10003; Approve Lead</button>'+
+        '<button id="apr-confirm" style="flex:2;padding:12px;border-radius:10px;border:none;background:'+(S.approvalAction==='reject'?'#dc2626':'linear-gradient(135deg,#1A4731,#2D6A4F)')+';color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">'+(S.approvalAction==='reject'?'Reject Lead':'&#10003; Approve Lead')+'</button>'+
       '</div>'+
     '</div>'+
   '</div>';
@@ -3865,105 +3852,277 @@ function rGantt(){
 }
 
 
-function rApprovals(){
-  var pending=S.leads.filter(function(l){return l.leadStatus==='pending';});
-  var approved=S.leads.filter(function(l){return l.leadStatus==='approved';});
-  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
+function rConvertModal(){
+  var out='';
+  // ── Conversion confirmation modal ────────────────────────────────────────
+  if(S.convertModal){
+    var cl=S.leads.filter(function(x){return x._id===S.convertModal;})[0];
+    if(cl){
+      out+='<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;">';
+      out+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:440px;">';
+      out+='<div style="padding:18px 22px;border-bottom:1px solid #D8E3DC;"><div style="font-size:16px;font-weight:700;color:#1A1A1A;">Convert Lead to Deal Pipeline?</div>';
+      out+='<div style="font-size:12px;color:#5F6B65;margin-top:4px;line-height:1.5;">This will create a new deal record and move this approved lead into the Deal Pipeline for execution.</div></div>';
+      out+='<div style="padding:16px 22px;">';
+      [['Business Name',cl.bizName],['Service Type',cl.serviceType],['Owner / Contact',cl.ownerContact],['Documents',(cl.files||[]).length+' file'+((cl.files||[]).length!==1?'s':'')]].forEach(function(r){
+        out+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:12px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:13px;font-weight:600;color:#1A1A1A;">'+e(String(r[1]||'\u2014'))+'</span></div>';
+      });
+      out+='</div>';
+      out+='<div style="padding:14px 22px;border-top:1px solid #D8E3DC;display:flex;justify-content:flex-end;gap:8px;">';
+      out+='<button id="convert-cancel" class="btn btn-ghost">Cancel</button>';
+      out+='<button id="convert-confirm" data-id="'+e(cl._id)+'" class="btn">&#9889; Convert Lead</button>';
+      out+='</div></div></div>';
+    }
+  }
 
+  return out;
+}
+
+
+function rApprovals(){
+  var pending=S.leads.filter(function(l){return leadStage(l)==='Submitted'||leadStage(l)==='Under Review';});
+  var moreinfo=S.leads.filter(function(l){return leadStage(l)==='More Info Required';});
+  var approved=S.leads.filter(function(l){return leadStage(l)==='Approved';});
+  var ready=approved.filter(function(l){return leadReadiness(l)==='Ready to Convert';});
+  var rejected=S.leads.filter(function(l){return leadStage(l)==='Rejected';});
+  var convertedDeals=S.deals.filter(function(d){return d.convertedFromLeadId||d.convertedFromLead;});
+
+  // Average review time (created → approved)
+  var revTimes=[];
+  S.leads.concat([]).forEach(function(l){
+    if(l.approvedAt&&l.createdAt){
+      var a=new Date(l.approvedAt).getTime(),c=new Date(l.createdAt).getTime();
+      if(!isNaN(a)&&!isNaN(c)&&a>c) revTimes.push(a-c);
+    }
+  });
+  var avgMs=revTimes.length?revTimes.reduce(function(x,y){return x+y;},0)/revTimes.length:0;
+  var avgLabel=avgMs?(avgMs<3600000?Math.round(avgMs/60000)+'m':avgMs<86400000?(avgMs/3600000).toFixed(1)+'h':(avgMs/86400000).toFixed(1)+'d'):'\u2014';
+
+  var tab=S.apqTab||'pending';
   var html='<div>';
 
-  // Header
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">APPROVALS</div>';
-  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Lead Approval Queue</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Submitted leads awaiting review and approval before conversion to deals</div>';
-  html+='<div style="display:flex;gap:20px;margin-top:18px">';
-  [
-    [pending.length,'Pending Approval','#fed7aa','#c2410c'],
-    [approved.length,'Approved','#86efac','#16a34a'],
-    [S.leads.filter(function(l){return l.converted;}).length,'Converted to Deal','#c4b5fd','#7c3aed']
-  ].forEach(function(x){
-    html+='<div style="background:'+x[2]+'30;border:1px solid '+x[2]+'60;border-radius:10px;padding:12px 20px;text-align:center">';
-    html+='<div style="font-size:28px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div>';
-    html+='<div style="font-size:10px;font-weight:700;color:'+x[2]+';letter-spacing:.7px">'+x[1].toUpperCase()+'</div>';
-    html+='</div>';
-  });
+  // ── Header ───────────────────────────────────────────────────────────────
+  html+='<div class="page-header"><div class="page-header-left"><h1>Lead Approval Queue</h1><p>Review submitted leads, approve qualified opportunities, and convert them into deal records</p></div>';
+  html+='<div class="page-header-actions">';
+  html+='<button class="btn btn-ghost btn-sm" onclick="render();">&#8635; Refresh</button>';
+  html+='<button class="btn" onclick="S.tab=\'leads\';S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();" style="font-size:12px;">+ New Lead</button>';
   html+='</div></div>';
 
-  // Pending queue
-  html+='<div style="margin-bottom:24px">';
-  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#9203; Pending Approval <span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+pending.length+'</span></div>';
-
-  if(pending.length===0){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:40px;text-align:center">';
-    html+='<div style="font-size:40px;margin-bottom:12px">&#10003;</div>';
-    html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:6px">All clear!</div>';
-    html+='<div style="font-size:13px;color:#5A7A65">No leads pending approval. Submit a lead to see it here.</div>';
+  // ── KPI row (clickable) ──────────────────────────────────────────────────
+  html+='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;">';
+  [['pending','Pending Review',pending.length+moreinfo.length,'#D97706'],['approved','Approved',approved.length,'#16a34a'],['ready','Ready to Convert',ready.length,'#275F45'],['converted','Converted to Deal',convertedDeals.length,'#2563eb'],['rejected','Rejected',rejected.length,'#dc2626'],[null,'Avg Review Time',avgLabel,'#7C3AED']].forEach(function(k){
+    var clickable=k[0]!==null;
+    html+='<div '+(clickable?'class="apq-kpi" data-tab="'+k[0]+'" ':'')+'style="background:#fff;border:1px solid '+(tab===k[0]?k[3]:'#D8E3DC')+';border-radius:6px;padding:10px 12px;'+(clickable?'cursor:pointer;':'')+(tab===k[0]?'box-shadow:0 0 0 1px '+k[3]+'30;':'')+'">';
+    html+='<div style="font-size:18px;font-weight:700;color:'+k[3]+';line-height:1;">'+k[2]+'</div>';
+    html+='<div style="font-size:9px;font-weight:600;color:#9BA8A2;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">'+k[1]+'</div>';
     html+='</div>';
-  } else {
-    pending.forEach(function(l){
-      var col=svcCol[l.serviceType]||'#2D6A4F';
-      html+='<div style="background:#fff;border:1px solid #fed7aa;border-left:5px solid #c2410c;border-radius:12px;padding:20px 24px;margin-bottom:14px">';
-      html+='<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px">';
+  });
+  html+='</div>';
 
-      // Left: lead info
-      html+='<div style="flex:1;min-width:0">';
-      html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
-      html+='<span class="badge-id">'+e(l.leadId||'n/a')+'</span>';
-      html+='<span style="background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">PENDING APPROVAL</span>';
-      if(l.serviceType) html+='<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>';
-      html+='</div>';
-      html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:4px">'+e(l.bizName||l.ownerContact||'Unnamed Lead')+'</div>';
-      if(l.ownerContact) html+='<div style="font-size:13px;color:#5A7A65;margin-bottom:8px">Contact: '+e(l.ownerContact)+'</div>';
-      html+='<div style="display:flex;gap:16px;flex-wrap:wrap">';
-      if(l.phone) html+='<span style="font-size:12px;color:#5A7A65">&#128222; '+e(l.phone)+'</span>';
-      if(l.email) html+='<span style="font-size:12px;color:#5A7A65">&#9993; '+e(l.email)+'</span>';
-      if(l.source) html+='<span style="font-size:12px;color:#5A7A65">Source: '+e(l.source)+'</span>';
-      if(l.priority) html+='<span style="font-size:12px;font-weight:700;color:'+(l.priority==='High Priority'?'#dc2626':l.priority==='Medium'?'#C8972A':'#2D6A4F')+'">'+e(l.priority)+'</span>';
-      html+='</div>';
-      if(l.projectBrief) html+='<div style="margin-top:10px;font-size:12px;color:#5A7A65;background:#f8fafc;border-radius:8px;padding:10px 12px;line-height:1.6;max-width:500px">'+e(l.projectBrief)+'</div>';
+  // ── Tabs ─────────────────────────────────────────────────────────────────
+  html+='<div style="display:flex;border-bottom:2px solid #D8E3DC;margin-bottom:14px;position:sticky;top:-24px;background:#F8FAF9;z-index:20;">';
+  [['pending','Pending Review ('+(pending.length+moreinfo.length)+')'],['approved','Approved ('+approved.length+')'],['ready','Ready to Convert ('+ready.length+')'],['converted','Converted ('+convertedDeals.length+')'],['rejected','Rejected ('+rejected.length+')']].forEach(function(t){
+    var on=tab===t[0];
+    html+='<button class="apq-tab" data-tab="'+t[0]+'" style="padding:8px 16px;font-size:13px;font-weight:'+(on?700:500)+';color:'+(on?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(on?'#275F45':'transparent')+';margin-bottom:-2px;font-family:Inter,sans-serif;white-space:nowrap;">'+t[1]+'</button>';
+  });
+  html+='</div>';
+
+  function timeWaiting(l){
+    var base=l.updatedAt||l.createdAt;
+    if(!base) return '\u2014';
+    return relTime(base).replace(' ago','');
+  }
+  function docsCell(l){
+    var n=(l.files||[]).length;
+    return n>0?'<span style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;">'+n+' File'+(n!==1?'s':'')+'</span>':'<span style="background:#FEF2F2;color:#dc2626;border:1px solid #FECACA;border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;">Missing</span>';
+  }
+  var svcShort2={'Business Consulting':'Consulting','Business Brokerage':'Brokerage','Business Funding':'Funding','Business Valuation':'Valuation'};
+
+  function tblOpen(cols){
+    var o='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;"><div style="overflow-x:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
+    cols.forEach(function(c){o+='<th>'+c+'</th>';});
+    return o+'</tr></thead><tbody>';
+  }
+  function emptyCompact(title,msg,sub){
+    return '<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:20px 24px;display:flex;align-items:center;gap:14px;">'+
+      '<div style="width:34px;height:34px;border-radius:50%;background:#ECFDF5;border:1px solid #A7F3D0;display:flex;align-items:center;justify-content:center;font-size:15px;color:#16a34a;flex-shrink:0;">&#10003;</div>'+
+      '<div><div style="font-size:13px;font-weight:600;color:#1A1A1A;">'+title+'</div>'+
+      '<div style="font-size:12px;color:#9BA8A2;">'+msg+(sub?' <span style="color:#C9D3CE;">'+sub+'</span>':'')+'</div></div></div>';
+  }
+
+  // ── Pending tab ──────────────────────────────────────────────────────────
+  if(tab==='pending'){
+    var pendAll=pending.concat(moreinfo);
+    if(!pendAll.length){
+      html+=emptyCompact('All caught up','There are no leads waiting for approval.','Approved and converted leads are available in the other tabs.');
+    } else {
+      html+=tblOpen(['LEAD','SERVICE','SUBMITTED BY','SUBMITTED','WAITING','DOCS','READINESS','PRIORITY','ACTIONS']);
+      pendAll.forEach(function(l){
+        var rdy=leadReadiness(l);
+        var rdc={'Ready to Convert':'#16a34a','Missing Documents':'#dc2626','Incomplete Details':'#D97706','Needs Approval':'#2563eb'}[rdy]||'#9BA8A2';
+        var stg=leadStage(l);
+        var prio=l.priority||'';
+        var pc={'High Priority':'#dc2626','Medium':'#D97706','Low':'#16a34a'}[prio]||'#9BA8A2';
+        html+='<tr class="apq-row" data-id="'+e(l._id)+'" style="cursor:pointer;'+(stg==='More Info Required'?'background:#FFFBF5;':'')+'">';
+        html+='<td style="min-width:160px;"><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(l.bizName||'Untitled')+'</div><div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(l.leadId||'')+(stg==='More Info Required'?' &middot; <span style="color:#D97706;font-weight:700;">Info Requested</span>':'')+'</div></td>';
+        html+='<td><span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;">'+e(svcShort2[l.serviceType]||l.serviceType||'\u2014')+'</span></td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;white-space:nowrap;">'+e(l.createdBy||l.ownerContact||'\u2014')+'</td>';
+        html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.updatedAt||l.createdAt))+'">'+(l.updatedAt||l.createdAt?relTime(l.updatedAt||l.createdAt):'\u2014')+'</td>';
+        html+='<td style="font-size:11px;font-weight:600;color:'+((Date.now()-new Date(l.updatedAt||l.createdAt||Date.now()).getTime())>172800000?'#dc2626':'#5F6B65')+';white-space:nowrap;">'+timeWaiting(l)+'</td>';
+        html+='<td>'+docsCell(l)+'</td>';
+        html+='<td><span style="background:'+rdc+'12;color:'+rdc+';border:1px solid '+rdc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+rdy+'</span></td>';
+        html+='<td>'+(prio?'<span style="font-size:11px;font-weight:600;color:'+pc+';white-space:nowrap;">'+e(prio.replace(' Priority',''))+'</span>':'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
+        html+='<td style="white-space:nowrap;"><div style="display:flex;gap:4px;">';
+        html+='<button class="apq-review btn btn-ghost btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;">Review</button>';
+        html+='<button class="aprbtn btn btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;">&#10003; Approve</button>';
+        html+='<button class="apq-info btn btn-ghost btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;color:#D97706;">Request Info</button>';
+        html+='<button class="apq-reject btn btn-ghost btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;color:#dc2626;">Reject</button>';
+        html+='</div></td></tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+  }
+
+  // ── Approved / Ready tabs ────────────────────────────────────────────────
+  else if(tab==='approved'||tab==='ready'){
+    var list=tab==='ready'?ready:approved;
+    if(!list.length){
+      html+=emptyCompact(tab==='ready'?'Nothing ready yet':'No approved leads','Approved leads will appear here once reviewed.','');
+    } else {
+      html+=tblOpen(['LEAD','SERVICE','CONTACT','APPROVED BY','APPROVED','CONVERSION','ACTION']);
+      list.forEach(function(l){
+        var rdy=leadReadiness(l);
+        html+='<tr class="apq-row" data-id="'+e(l._id)+'" style="cursor:pointer;">';
+        html+='<td style="min-width:160px;"><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(l.bizName||'Untitled')+'</div><div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(l.leadId||'')+'</div></td>';
+        html+='<td><span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:600;">'+e(svcShort2[l.serviceType]||l.serviceType||'\u2014')+'</span></td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;">'+e(l.ownerContact||'\u2014')+'</td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;">'+e(l.approvedBy||'\u2014')+'</td>';
+        html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.approvedAt))+'">'+(l.approvedAt?relTime(l.approvedAt):'\u2014')+'</td>';
+        html+='<td>'+(rdy==='Ready to Convert'?'<span style="background:#ECFDF5;color:#16a34a;border:1px solid #A7F3D0;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;">Ready to Convert</span>':'<span style="background:#FFFBEB;color:#D97706;border:1px solid #FDE68A;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;">'+rdy+'</span>')+'</td>';
+        html+='<td style="white-space:nowrap;">'+(rdy==='Ready to Convert'?'<button class="cnv btn btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;">&#9889; Convert to Deal</button>':'<button class="btn btn-sm" disabled title="'+e(rdy)+'" style="font-size:11px;background:#F8FAF9;color:#9BA8A2;border:1px solid #D8E3DC;cursor:not-allowed;">Convert</button>')+'</td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+  }
+
+  // ── Converted tab (sourced from deals with lead lineage) ─────────────────
+  else if(tab==='converted'){
+    if(!convertedDeals.length){
+      html+=emptyCompact('No conversions yet','Converted leads will appear here with a link to their deal.','');
+    } else {
+      html+=tblOpen(['LEAD ID','BUSINESS','DEAL ID','CONVERTED BY','CONVERTED','DEAL OWNER','ACTION']);
+      [].concat(convertedDeals).reverse().forEach(function(d){
+        html+='<tr>';
+        html+='<td><span class="badge-id">'+e(d.convertedFromLeadId||'\u2014')+'</span></td>';
+        html+='<td style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(d.bizName||'\u2014')+'</td>';
+        html+='<td><span class="badge-id">'+e(d.dealId||'')+'</span></td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;">'+e(d.convertedBy||'\u2014')+'</td>';
+        html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(d.convertedAt))+'">'+(d.convertedAt?relTime(d.convertedAt):'\u2014')+'</td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;">'+e(d.owner||'\u2014')+'</td>';
+        html+='<td><button class="apq-viewdeal btn btn-ghost btn-sm" data-id="'+e(d._id)+'" style="font-size:11px;">View Deal &rarr;</button></td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+  }
+
+  // ── Rejected tab ─────────────────────────────────────────────────────────
+  else if(tab==='rejected'){
+    if(!rejected.length){
+      html+=emptyCompact('No rejected leads','Rejected leads will appear here for record-keeping.','');
+    } else {
+      html+=tblOpen(['LEAD','SERVICE','CONTACT','REJECTED BY','REJECTED','ACTION']);
+      rejected.forEach(function(l){
+        html+='<tr class="apq-row" data-id="'+e(l._id)+'" style="cursor:pointer;">';
+        html+='<td style="min-width:160px;"><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(l.bizName||'Untitled')+'</div><div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(l.leadId||'')+'</div></td>';
+        html+='<td style="font-size:11px;color:#5F6B65;">'+e(svcShort2[l.serviceType]||l.serviceType||'\u2014')+'</td>';
+        html+='<td style="font-size:12px;">'+e(l.ownerContact||'\u2014')+'</td>';
+        html+='<td style="font-size:12px;">'+e(l.rejectedBy||'\u2014')+'</td>';
+        html+='<td style="font-size:10px;color:#9BA8A2;" title="'+e(fmtAudit(l.rejectedAt))+'">'+(l.rejectedAt?relTime(l.rejectedAt):'\u2014')+'</td>';
+        html+='<td><button class="aprbtn btn btn-ghost btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;">Re-approve</button></td>';
+        html+='</tr>';
+      });
+      html+='</tbody></table></div></div>';
+    }
+  }
+
+  // ── Review drawer ────────────────────────────────────────────────────────
+  if(S.apqDrawer){
+    var al=S.leads.filter(function(x){return x._id===S.apqDrawer;})[0];
+    if(al){
+      var ardy=leadReadiness(al);
+      var ardc={'Ready to Convert':'#16a34a','Missing Documents':'#dc2626','Incomplete Details':'#D97706','Needs Approval':'#2563eb','Already Converted':'#9BA8A2'}[ardy];
+      html+='<div id="apq-drawer-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;"></div>';
+      html+='<div style="position:fixed;top:0;right:0;bottom:0;width:430px;max-width:92vw;background:#fff;z-index:9001;box-shadow:-8px 0 32px rgba(0,0,0,.12);display:flex;flex-direction:column;">';
+      html+='<div style="padding:14px 18px;border-bottom:1px solid #D8E3DC;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">';
+      html+='<div><div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px;">Lead Review</div><div style="font-size:15px;font-weight:700;color:#1A1A1A;">'+e(al.bizName||'Untitled')+'</div><div style="font-size:11px;color:#9BA8A2;font-family:monospace;">'+e(al.leadId||'')+'</div></div>';
+      html+='<button id="apq-drawer-close" style="background:none;border:none;font-size:18px;color:#9BA8A2;cursor:pointer;">&#10005;</button></div>';
+      html+='<div style="flex:1;overflow-y:auto;padding:16px 18px;">';
+
+      // Summary
+      html+='<div style="margin-bottom:14px;">';
+      [['Service Type',al.serviceType],['Structure',al.ownershipStructure],['Owner / Contact',al.ownerContact],['Priority',al.priority],['Temperature',al.label],['Source',al.source]].forEach(function(r){
+        html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;text-align:right;max-width:240px;">'+e(r[1]||'\u2014')+'</span></div>';
+      });
       html+='</div>';
 
-      // Right: Approve button
-      html+='<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">';
-      html+='<button class="aprbtn btn" data-id="'+e(l._id)+'" style="background:linear-gradient(135deg,#1A4731,#2D6A4F);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">&#128272; Approve Lead</button>';
-      html+='<div style="font-size:11px;color:#5A7A65;text-align:right">'+e(l.label||'')+' lead</div>';
+      // Documents
+      html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Documents ('+(al.files||[]).length+')</div>';
+      if(!(al.files||[]).length){
+        html+='<div style="font-size:12px;color:#dc2626;padding:6px 0;">&#9888; No documents uploaded &mdash; required before conversion</div>';
+      } else {
+        (al.files||[]).forEach(function(f,fi){
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F8FAF9;border:1px solid #D8E3DC;border-radius:5px;margin-bottom:5px;">';
+          html+='<span style="font-size:13px;">&#128196;</span><div style="flex:1;font-size:11px;font-weight:500;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>';
+          if(f.data) html+='<button class="dl-lfile btn btn-ghost btn-sm" data-lid="'+e(al._id)+'" data-fi="'+fi+'" style="font-size:10px;padding:2px 7px;">&#8659;</button>';
+          html+='</div>';
+        });
+      }
       html+='</div>';
+
+      // Review checklist
+      html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Review Checklist</div>';
+      [['Business name provided',!!(al.bizName)],['Service type selected',!!(al.serviceType)],['Owner / contact assigned',!!(al.ownerContact)],['Documents uploaded',!!(al.files&&al.files.length>0)]].forEach(function(c){
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><div style="width:15px;height:15px;border-radius:50%;background:'+(c[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(c[1]?'&#10003;':'')+'</div><span style="font-size:12px;color:'+(c[1]?'#1A1A1A':'#9BA8A2')+';">'+c[0]+'</span></div>';
+      });
+      html+='<div style="margin-top:8px;"><span style="background:'+ardc+'12;color:'+ardc+';border:1px solid '+ardc+'30;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">'+ardy+'</span></div>';
+      html+='</div>';
+
+      // Decision panel
+      var aStg=leadStage(al);
+      html+='<div style="background:#F8FAF9;border:1px solid #D8E3DC;border-radius:6px;padding:12px;margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Approval Decision</div>';
+      if(aStg==='Approved'){
+        html+='<div style="font-size:12px;color:#16a34a;font-weight:600;margin-bottom:8px;">&#10003; Approved by '+e(al.approvedBy||'')+'</div>';
+        if(ardy==='Ready to Convert') html+='<button class="cnv btn btn-sm" data-id="'+e(al._id)+'" style="width:100%;">&#9889; Convert to Deal</button>';
+        else html+='<button class="btn btn-sm" disabled title="'+e(ardy)+'" style="width:100%;background:#fff;color:#9BA8A2;border:1px solid #D8E3DC;cursor:not-allowed;">Convert &mdash; '+ardy+'</button>';
+      } else if(aStg==='Rejected'){
+        html+='<div style="font-size:12px;color:#dc2626;font-weight:600;margin-bottom:8px;">Rejected by '+e(al.rejectedBy||'')+'</div>';
+        html+='<button class="aprbtn btn btn-ghost btn-sm" data-id="'+e(al._id)+'" style="width:100%;">Re-approve Lead</button>';
+      } else {
+        html+='<div style="display:flex;flex-direction:column;gap:7px;">';
+        html+='<button class="aprbtn btn btn-sm" data-id="'+e(al._id)+'" style="width:100%;">&#10003; Approve Lead</button>';
+        html+='<button class="apq-info btn btn-ghost btn-sm" data-id="'+e(al._id)+'" style="width:100%;color:#D97706;">Request More Info</button>';
+        html+='<button class="apq-reject btn btn-ghost btn-sm" data-id="'+e(al._id)+'" style="width:100%;color:#dc2626;">Reject Lead</button>';
+        html+='</div>';
+      }
+      html+='</div>';
+
+      // System details
+      html+=rAuditMeta([
+        ['Created',al.createdAt,al.createdBy],
+        ['Last Updated',al.updatedAt,al.updatedBy],
+        ['Approved',al.approvedAt,al.approvedBy],
+        ['Rejected',al.rejectedAt,al.rejectedBy]
+      ]);
 
       html+='</div></div>';
-    });
+    }
   }
-  html+='</div>';
 
-  // Approved leads
-  html+='<div>';
-  html+='<div style="font-size:16px;font-weight:800;color:#1A4731;margin-bottom:14px;display:flex;align-items:center;gap:10px">&#10003; Approved Leads <span style="background:#E8F5EE;border:1px solid #86efac;color:#16a34a;border-radius:20px;padding:2px 12px;font-size:12px;font-weight:700">'+approved.length+'</span></div>';
-
-  if(approved.length===0){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:32px;text-align:center;color:#5A7A65;font-size:13px">No approved leads yet.</div>';
-  } else {
-    html+='<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4"><table>';
-    html+='<thead><tr><th>LEAD ID</th><th>BUSINESS NAME</th><th>SERVICE TYPE</th><th>CONTACT</th><th>APPROVED BY</th><th>APPROVED AT</th><th>STATUS</th></tr></thead><tbody>';
-    approved.forEach(function(l,i){
-      var col=svcCol[l.serviceType]||'#2D6A4F';
-      html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-      html+='<td><span class="badge-id">'+e(l.leadId||'n/a')+'</span></td>';
-      html+='<td style="font-weight:600;color:#1A4731">'+e(l.bizName||l.ownerContact||'&mdash;')+'</td>';
-      html+='<td>'+(l.serviceType?'<span style="background:'+col+'18;color:'+col+';border:1px solid '+col+'30;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(l.serviceType)+'</span>':'&mdash;')+'</td>';
-      html+='<td style="color:#5A7A65">'+e(l.ownerContact||'&mdash;')+'</td>';
-      html+='<td><div style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:50%;background:#2D6A4F;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">'+(l.approvedBy||'?').charAt(0).toUpperCase()+'</span><span style="font-weight:600;color:#1A4731">'+e(l.approvedBy||'&mdash;')+'</span></div></td>';
-      html+='<td style="color:#5A7A65;font-size:12px;white-space:nowrap">'+e(l.approvedAt||'&mdash;')+'</td>';
-      html+='<td>'+(!l.converted?'<span style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Ready to Convert</span>':'<span style="background:#f0fdf4;color:#16a34a;border:1px solid #86efac;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">Converted</span>')+'</td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table></div>';
-  }
-  html+='</div>';
-
+  html+=rConvertModal();
   html+='</div>';
   return html;
 }
-
 
 function bind(){
   // tabs
@@ -4258,6 +4417,49 @@ function bind(){
     else if(c.type==='lead'){S.leads=S.leads.filter(function(x){return x._id!==c.id;});deleteLead(c.id);flash('Lead deleted.','err');}
     S.confirmModal=null;render();
   });
+  // ── Approval queue bindings ───────────────────────────────────────────────
+  document.querySelectorAll('.apq-kpi,.apq-tab').forEach(function(el){
+    el.addEventListener('click',function(){S.apqTab=el.dataset.tab;render();});
+  });
+  document.querySelectorAll('.apq-row').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      if(ev.target.closest('button,select,input')) return;
+      S.apqDrawer=el.dataset.id;render();
+    });
+  });
+  document.querySelectorAll('.apq-review').forEach(function(el){
+    el.addEventListener('click',function(ev){ev.stopPropagation();S.apqDrawer=el.dataset.id;render();});
+  });
+  var apqClose=document.getElementById('apq-drawer-close');
+  if(apqClose) apqClose.addEventListener('click',function(){S.apqDrawer=null;render();});
+  var apqOverlay=document.getElementById('apq-drawer-overlay');
+  if(apqOverlay) apqOverlay.addEventListener('click',function(){S.apqDrawer=null;render();});
+  document.querySelectorAll('.apq-reject').forEach(function(el){
+    el.addEventListener('click',function(ev){ev.stopPropagation();S.apqDrawer=null;openApprovalModal(el.dataset.id,'reject');});
+  });
+  document.querySelectorAll('.apq-info').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var note=prompt('What information is needed from the submitter?','');
+      if(note===null) return;
+      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var ts3=new Date().toLocaleString();
+      S.leads=S.leads.map(function(l){
+        if(l._id!==el.dataset.id) return l;
+        var u=Object.assign({},l,{leadStatus:'moreinfo',infoRequest:note,infoRequestedBy:actor,infoRequestedAt:new Date().toISOString()});
+        syncLead(u);return u;
+      });
+      var tgt=S.leads.filter(function(l){return l._id===el.dataset.id;})[0]||{};
+      var en={_id:Date.now(),leadId:tgt.leadId||'n/a',user:actor,field:'Review',prev:'Submitted',next:'More info requested'+(note?': '+note:''),ts:ts3};
+      S.auditLog=S.auditLog.concat([en]);syncAudit(en);
+      S.apqDrawer=null;
+      flash('Information request sent.');render();
+    });
+  });
+  document.querySelectorAll('.apq-viewdeal').forEach(function(el){
+    el.addEventListener('click',function(){S.tab='pipeline';S.pipeDrawer=el.dataset.id;render();});
+  });
+
   var aprConfirm=document.getElementById('apr-confirm');if(aprConfirm) aprConfirm.addEventListener('click',confirmApproval);
   var aprPass=document.getElementById('apr-pass');if(aprPass) aprPass.addEventListener('keydown',function(ev){if(ev.key==='Enter') confirmApproval();});
   var aprUser=document.getElementById('apr-user');if(aprUser) aprUser.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var p=document.getElementById('apr-pass');if(p) p.focus();}});
