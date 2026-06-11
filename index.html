@@ -659,7 +659,7 @@ function bContact(){
 window._dealQuick=function(id,field,value){
   S.deals=S.deals.map(function(d){
     if(d._id!==id) return d;
-    var upd={};upd[field]=value;
+    var upd={updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'};upd[field]=value;
     if(field==='pipelineStage'){
       if(value==='Completed') upd.status='Completed';
       else if(value==='On Hold') upd.status='On Hold';
@@ -672,6 +672,46 @@ window._dealQuick=function(id,field,value){
   });
   flash('Deal updated');render();
 };
+
+function fmtAudit(v){
+  if(!v) return '';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return String(v);
+  var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var h=d.getHours(),m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12;if(h===0)h=12;
+  return d.getDate()+' '+months[d.getMonth()]+' '+d.getFullYear()+', '+h+':'+(m<10?'0':'')+m+' '+ap;
+}
+function relTime(v){
+  if(!v) return '';
+  var d=new Date(v);if(isNaN(d.getTime())) return '';
+  var s=Math.floor((Date.now()-d.getTime())/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+' min ago';
+  if(s<86400) return Math.floor(s/3600)+' hr'+(Math.floor(s/3600)>1?'s':'')+' ago';
+  var days=Math.floor(s/86400);
+  if(days<30) return days+' day'+(days>1?'s':'')+' ago';
+  var mo=Math.floor(days/30);
+  if(mo<12) return mo+' month'+(mo>1?'s':'')+' ago';
+  return Math.floor(mo/12)+' yr'+(Math.floor(mo/12)>1?'s':'')+' ago';
+}
+function rAuditMeta(rows){
+  var items=rows.filter(function(r){return r[1];});
+  if(!items.length) return '';
+  var html='<div style="border-top:1px solid #EAEFEC;margin-top:16px;padding-top:12px;">';
+  html+='<div style="font-size:9px;font-weight:700;color:#B7C2BC;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">Record Metadata</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;">';
+  items.forEach(function(r){
+    var rel=relTime(r[1]);
+    html+='<div style="font-size:10.5px;color:#9BA8A2;line-height:1.5;" title="'+e(fmtAudit(r[1]))+(r[2]?' by '+e(r[2]):'')+'">';
+    html+='<span style="color:#B7C2BC;">'+r[0]+'</span> '+e(fmtAudit(r[1]));
+    if(r[2]) html+=' <span style="color:#B7C2BC;">by '+e(r[2])+'</span>';
+    if(rel) html+=' <span style="color:#C9D3CE;">&middot; '+rel+'</span>';
+    html+='</div>';
+  });
+  html+='</div></div>';
+  return html;
+}
+
 
 function bDeal(){return{dealId:'',bizName:'',serviceType:'',owner:'',email:'',phone:'',source:'',status:'Active',projectBrief:'',startDate:'',endDate:'',dealStatus:'draft',files:[],deliverables:[]}}
 
@@ -1286,7 +1326,7 @@ function rPipe(){
   } else {
     html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
     html+='<div style="overflow-x:auto;max-height:calc(100vh - 320px);overflow-y:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
-    html+='<th style="min-width:170px;">DEAL</th><th>CLIENT</th><th>SERVICE</th><th>STAGE</th><th>OWNER</th><th>PRIORITY</th><th style="min-width:110px;">PROGRESS</th><th style="min-width:120px;">NEXT ACTION</th><th>DUE</th><th>BLOCKER</th><th>FILES</th><th style="width:36px;"></th>';
+    html+='<th style="min-width:170px;">DEAL</th><th>CLIENT</th><th>SERVICE</th><th>STAGE</th><th>OWNER</th><th>PRIORITY</th><th style="min-width:110px;">PROGRESS</th><th style="min-width:120px;">NEXT ACTION</th><th>CREATED</th><th>UPDATED</th><th>DUE</th><th>BLOCKER</th><th>FILES</th><th style="width:36px;"></th>';
     html+='</tr></thead><tbody>';
 
     ds.forEach(function(d){
@@ -1321,6 +1361,9 @@ function rPipe(){
       html+='<td style="min-width:110px;"><div style="display:flex;align-items:center;gap:7px;"><div style="flex:1;height:5px;background:#F0F0F0;border-radius:3px;overflow:hidden;"><div style="width:'+prog+'%;height:100%;background:'+pc+';border-radius:3px;"></div></div><span style="font-size:11px;font-weight:600;color:'+pc+';width:30px;text-align:right;">'+prog+'%</span></div></td>';
       // Next action
       html+='<td style="font-size:11px;color:#5F6B65;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.nextAction?e(d.nextAction):'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
+      // Created / Updated (audit)
+      html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(d.createdAt))+(d.createdBy?' by '+e(d.createdBy):'')+'">'+(d.createdAt?relTime(d.createdAt):'&mdash;')+'</td>';
+      html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(d.updatedAt))+(d.updatedBy?' by '+e(d.updatedBy):'')+'">'+(d.updatedAt?relTime(d.updatedAt):'&mdash;')+'</td>';
       // Due
       html+='<td style="white-space:nowrap;">'+(due?'<span style="font-size:11px;font-weight:'+(over?'700':'500')+';color:'+(over?'#dc2626':'#5F6B65')+';">'+e(due)+(over?' &#9888;':'')+'</span>':'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
       // Blocker
@@ -1429,6 +1472,13 @@ function rPipe(){
       }
       html+='</div>';
 
+      html+=rAuditMeta([
+        ['Created',dd.createdAt,dd.createdBy],
+        ['Last Updated',dd.updatedAt,dd.updatedBy],
+        ['Converted from '+(dd.convertedFromLeadId||'lead'),dd.convertedAt,dd.convertedBy],
+        ['Lead Originally Created',dd.leadCreatedAt,dd.leadCreatedBy],
+        ['Completed',dd.completedAt,dd.completedBy]
+      ]);
       html+='</div>';
       // Drawer footer
       html+='<div style="padding:12px 18px;border-top:1px solid #D8E3DC;display:flex;gap:8px;">';
@@ -1570,7 +1620,7 @@ function rLeadsPipeline(){
   } else {
     html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
     html+='<div style="overflow-x:auto;max-height:calc(100vh - 330px);overflow-y:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
-    html+='<th style="min-width:170px;">LEAD</th><th>SERVICE</th><th>OWNER / CONTACT</th><th>TEMP</th><th>PRIORITY</th><th>STAGE</th><th>APPROVAL</th><th>DOCS</th><th style="min-width:130px;">READINESS</th><th style="min-width:130px;">CONVERT</th><th style="width:36px;"></th>';
+    html+='<th style="min-width:170px;">LEAD</th><th>SERVICE</th><th>OWNER / CONTACT</th><th>TEMP</th><th>PRIORITY</th><th>STAGE</th><th>APPROVAL</th><th>DOCS</th><th style="min-width:130px;">READINESS</th><th>CREATED</th><th>UPDATED</th><th style="min-width:130px;">CONVERT</th><th style="width:36px;"></th>';
     html+='</tr></thead><tbody>';
 
     ls.forEach(function(l){
@@ -1606,6 +1656,9 @@ function rLeadsPipeline(){
       html+='<td>'+(fcount>0?'<button class="lead-files-btn" data-id="'+e(l._id)+'" style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;">&#128206; '+fcount+' File'+(fcount!==1?'s':'')+'</button>':'<span style="background:#FEF2F2;color:#dc2626;border:1px solid #FECACA;border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;white-space:nowrap;">Missing Docs</span>')+'</td>';
       // Readiness
       html+='<td><span style="background:'+rdc+'12;color:'+rdc+';border:1px solid '+rdc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+rdy+'</span></td>';
+      // Created / Updated (audit)
+      html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.createdAt))+(l.createdBy?' by '+e(l.createdBy):'')+'">'+(l.createdAt?relTime(l.createdAt):'&mdash;')+'</td>';
+      html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.updatedAt))+(l.updatedBy?' by '+e(l.updatedBy):'')+'">'+(l.updatedAt?relTime(l.updatedAt):'&mdash;')+'</td>';
       // Convert
       html+='<td style="white-space:nowrap;">';
       if(l.converted){
@@ -1683,6 +1736,12 @@ function rLeadsPipeline(){
       }
       html+='</div>';
 
+      html+=rAuditMeta([
+        ['Created',dl.createdAt,dl.createdBy],
+        ['Last Updated',dl.updatedAt,dl.updatedBy],
+        ['Approved',dl.approvedAt,dl.approvedBy],
+        ['Converted',dl.convertedAt,dl.convertedBy]
+      ]);
       html+='</div>';
       // Drawer footer
       html+='<div style="padding:12px 18px;border-top:1px solid #D8E3DC;display:flex;gap:8px;">';
@@ -2113,7 +2172,7 @@ function persistDeal(status,msg){
   if(S.eid!==null){
     var existing=S.deals.filter(function(x){return x._id===S.eid;})[0]||{};
     var liveDelivs=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];
-    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:liveDelivs.length>0?liveDelivs:(f.deliverables||[])});
+    var updated=Object.assign({},existing,f,{_id:S.eid,files:(existing.files||[]).concat(S.dfiles),deliverables:liveDelivs.length>0?liveDelivs:(f.deliverables||[]),createdAt:existing.createdAt,createdBy:existing.createdBy,updatedAt:new Date().toISOString(),updatedBy:actor});
     // Track changed fields
     var changedFields=Object.keys(FLD).filter(function(k){return String(f[k]||'')!==String(existing[k]||'')&&k!=='dealStatus';});
     var dealEntries=changedFields.map(function(k){return {_id:'DA'+Date.now()+Math.random(),dealId:updated.dealId,dealRef:S.eid,user:actor,field:FLD[k],prev:String(existing[k]||'n/a'),next:String(f[k]||'n/a'),ts:ts2};});
@@ -2124,7 +2183,7 @@ function persistDeal(status,msg){
     flash(msg);S.eid=null;
   } else {
     var nid=nextDealId(f.serviceType);
-    var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:f.deliverables||[]});
+    var newDeal=Object.assign({},f,{_id:'D'+Date.now(),dealId:nid,files:S.dfiles,deliverables:f.deliverables||[],createdAt:new Date().toISOString(),createdBy:actor});
     S.deals=S.deals.concat([newDeal]);
     syncDeal(newDeal);
     // Log deal creation
@@ -2174,13 +2233,13 @@ function persistLead(lf, status, msg){
     var changed=Object.keys(FL).filter(function(k){return String(tracked[k]||'')!==String(old[k]||'');});
     var entries=changed.map(function(k){return {_id:Date.now()+Math.random(),leadId:lf.leadId||'n/a',user:S.auditUser,field:FL[k],prev:String(old[k]||'n/a'),next:String(tracked[k]||'n/a'),ts:ts};});
     if(entries.length>0){S.auditLog=S.auditLog.concat(entries);entries.forEach(function(en){syncAudit(en);});}
-    var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz});
+    var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz,createdAt:old.createdAt,createdBy:old.createdBy,updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:S.auditUser});
     S.leads=S.leads.map(function(x){return x._id===S.leid?updated:x;});
     syncLead(updated);
     flash(msg);S.leid=null;
   } else {
     var nid=nextLeadId(lf.serviceType);
-    var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz});
+    var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:new Date().toISOString(),createdBy:S.currentUser?S.currentUser.name:S.auditUser});
     S.leads=S.leads.concat([newLead]);
     var auditEntry={_id:Date.now(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
     S.auditLog=S.auditLog.concat([auditEntry]);
@@ -2219,7 +2278,8 @@ function cvt(id){
   if(!l.approved){flash('This lead must be approved by an authorised user before it can be converted to a deal.','err');return;}
 
   var nid=l.leadId;  // Keep the same ID from the lead
-  var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[]});
+  var convertor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
+  var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[],createdAt:new Date().toISOString(),createdBy:convertor,convertedFromLeadId:l.leadId||'',convertedFromLead:l._id,leadCreatedAt:l.createdAt||'',leadCreatedBy:l.createdBy||'',leadApprovedAt:l.approvedAt||'',leadApprovedBy:l.approvedBy||'',convertedAt:new Date().toISOString(),convertedBy:convertor});
   S.deals=S.deals.concat([newDeal2]);
   syncDeal(newDeal2);
   // Remove lead from pipeline after conversion - no duplication
@@ -3958,7 +4018,7 @@ function bind(){
       if(act==='view'){S.pipeDrawer=id;render();}
       else if(act==='edit'||act==='upload'){S.form=Object.assign({},bDeal(),d);S.eid=d._id;S.dfiles=d.files||[];S.tab='form';render();}
       else if(act==='complete'){
-        S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'Completed',status:'Completed',completedAt:new Date().toISOString()});syncDeal(u);return u;});
+        S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'Completed',status:'Completed',completedAt:new Date().toISOString(),completedBy:S.currentUser?S.currentUser.name:'Unknown',updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'});syncDeal(u);return u;});
         flash('Deal marked completed');render();
       }
       else if(act==='hold'){
@@ -3994,7 +4054,7 @@ function bind(){
     var id=drawerSave.dataset.id;
     var na=(document.getElementById('drawer-nextaction')||{}).value||'';
     var dt=(document.getElementById('drawer-duedate')||{}).value||'';
-    S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{nextAction:na,dueDate:dt});syncDeal(u);return u;});
+    S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{nextAction:na,dueDate:dt,updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'});syncDeal(u);return u;});
     flash('Deal updated');render();
   });
 
