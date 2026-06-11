@@ -3272,6 +3272,37 @@ function rContacts(){
 }
 
 
+function rClientForm(existing){
+  var cf=existing||S.clientForm||bClient();
+  var isEdit=!!existing;
+  return '<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;">' +
+    '<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;">' +
+      '<div style="padding:16px 20px;border-bottom:1px solid #D8E3DC;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#fff;z-index:2;">' +
+        '<div style="font-size:15px;font-weight:600;color:#1A1A1A;">'+(isEdit?'Edit Account':'New Client Account')+'</div>' +
+        '<button id="cf-cancel" style="background:none;border:none;font-size:18px;color:#9BA8A2;cursor:pointer;">&#10005;</button>' +
+      '</div>' +
+      '<div style="padding:20px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+          '<div style="grid-column:1/-1;"><div class="field-lbl">Company Name *</div><input id="cf-name" value="'+e(cf.companyName||'')+'" placeholder="e.g. Mensah Holdings Ltd."/></div>' +
+          '<div><div class="field-lbl">Status</div><select id="cf-status"><option'+(cf.status==='Prospect'?' selected':'')+'>Prospect</option><option'+(cf.status==='Active'?' selected':'')+'>Active</option><option'+(cf.status==='Inactive'?' selected':'')+'>Inactive</option></select></div>' +
+          '<div><div class="field-lbl">Industry</div><select id="cf-industry"><option value="">Select...</option>'+['Agriculture','Banking & Finance','Construction','Education','Energy','Healthcare','Hospitality','Manufacturing','Mining','Real Estate','Retail','Technology','Telecommunications','Transport & Logistics','Other'].map(function(x){return '<option'+(cf.industry===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>' +
+          '<div><div class="field-lbl">Company Size</div><select id="cf-size"><option value="">Select...</option>'+['1-10 employees','11-50 employees','51-200 employees','201-500 employees','500+ employees'].map(function(x){return '<option'+(cf.size===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>' +
+          '<div><div class="field-lbl">Location</div><input id="cf-location" value="'+e(cf.location||'')+'" placeholder="e.g. Accra, Ghana"/></div>' +
+          '<div><div class="field-lbl">Phone</div><input id="cf-phone" value="'+e(cf.phone||'')+'" placeholder="+233 xx xxx xxxx"/></div>' +
+          '<div><div class="field-lbl">Email</div><input id="cf-email" type="email" value="'+e(cf.email||'')+'"/></div>' +
+          '<div><div class="field-lbl">Website</div><input id="cf-website" value="'+e(cf.website||'')+'"/></div>' +
+          '<div style="grid-column:1/-1;"><div class="field-lbl">Notes</div><textarea id="cf-notes" style="min-height:60px;">'+e(cf.notes||'')+'</textarea></div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 20px;border-top:1px solid #D8E3DC;display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:#fff;">' +
+        '<button id="cf-cancel2" class="btn btn-ghost">Cancel</button>' +
+        '<button id="cf-save" class="btn">'+(isEdit?'Save Changes':'Create Account')+'</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+
 function rClients(){
   // ── If viewing a specific client ──────────────────────────────────────────
   if(S.clientView){
@@ -4492,6 +4523,8 @@ function bRF(){
   });
 
   // Cancel form
+  var cfCancel2=document.getElementById('cf-cancel2');
+  if(cfCancel2) cfCancel2.addEventListener('click',function(){S.showClientForm=false;S.editClientId=null;S.clientForm=null;render();});
   var cfCancel=document.getElementById('cf-cancel');
   if(cfCancel) cfCancel.addEventListener('click',function(){S.showClientForm=false;S.editClientId=null;S.clientForm=null;render();});
 
