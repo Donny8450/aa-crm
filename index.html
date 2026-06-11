@@ -749,6 +749,10 @@ function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'
 
 function render(){
   try{
+    // Persist current view so refresh keeps the user on the same page
+    if(S.currentUser){
+      try{sessionStorage.setItem('aa_crm_view',JSON.stringify({tab:S.tab,leadsView:S.leadsView,contactsView:S.contactsView,apqTab:S.apqTab,pipeSavedView:S.pipeSavedView,leadSavedView:S.leadSavedView}));}catch(e){}
+    }
     // Save scroll position before rebuilding DOM
     var ca=document.querySelector('.content-area');
     var scrollTop=ca?ca.scrollTop:0;
@@ -5199,6 +5203,21 @@ S.form=bDeal();S.lform=bLead();
 // Restore session
 var _sess=sessionStorage.getItem('aa_crm_user');
 if(_sess){try{S.currentUser=JSON.parse(_sess);resetAutoLogout();}catch(e){}}
+// Restore last view so refresh keeps the user on the same page
+if(S.currentUser){
+  try{
+    var _view=JSON.parse(sessionStorage.getItem('aa_crm_view')||'null');
+    if(_view&&_view.tab){
+      S.tab=_view.tab;
+      if(_view.leadsView) S.leadsView=_view.leadsView;
+      if(_view.contactsView) S.contactsView=_view.contactsView;
+      if(_view.apqTab) S.apqTab=_view.apqTab;
+      if(_view.pipeSavedView) S.pipeSavedView=_view.pipeSavedView;
+      if(_view.leadSavedView) S.leadSavedView=_view.leadSavedView;
+      if(S.tab==='form'){S.tab='pipeline';}
+    }
+  }catch(e){}
+}
 render();
 loadFromSupabase();
 </script>
