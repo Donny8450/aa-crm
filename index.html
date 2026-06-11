@@ -522,6 +522,16 @@ var S={
   leadsView:'pipeline',
   leadSort:'newest',
   contactView:null,
+  leadSavedView:'all',
+  leadFStage:'All',
+  leadFApproval:'All',
+  leadFSvc:'All',
+  leadFPriority:'All',
+  leadFTemp:'All',
+  leadFDocs:'All',
+  leadDrawer:null,
+  leadMenu:null,
+  convertModal:null,
   pipeSavedView:'active',
   pipeStage:'All',
   pipeSvc:'All',
@@ -1441,181 +1451,267 @@ function rLeads(){
   return pipeHdr+rLeadsPipeline();
 }
 
+function leadStage(l){
+  if(l.converted) return 'Converted';
+  if(l.rejected||l.leadStatus==='rejected') return 'Rejected';
+  if(l.approved||l.leadStatus==='approved') return 'Approved';
+  if(l.leadStatus==='moreinfo') return 'More Info Required';
+  if(l.leadStatus==='review') return 'Under Review';
+  if(l.leadStatus==='pending') return 'Submitted';
+  return 'Draft';
+}
+function leadApproval(l){
+  if(l.rejected||l.leadStatus==='rejected') return 'Rejected';
+  if(l.approved||l.leadStatus==='approved') return 'Approved';
+  if(l.leadStatus==='moreinfo') return 'Needs Changes';
+  return 'Pending Review';
+}
+function leadReadiness(l){
+  if(l.converted) return 'Already Converted';
+  if(!(l.files&&l.files.length>0)) return 'Missing Documents';
+  if(!(l.bizName&&l.serviceType&&l.ownerContact)) return 'Incomplete Details';
+  if(!(l.approved||l.leadStatus==='approved')) return 'Needs Approval';
+  return 'Ready to Convert';
+}
+
 function rLeadsPipeline(){
-  var leads=[].concat(S.leads);
+  var STAGES=['Draft','Submitted','Under Review','More Info Required','Approved','Converted','Rejected'];
+  var stageCol={'Draft':'#9BA8A2','Submitted':'#2563eb','Under Review':'#7C3AED','More Info Required':'#D97706','Approved':'#16a34a','Converted':'#275F45','Rejected':'#dc2626'};
+  var readyCol={'Ready to Convert':'#16a34a','Missing Documents':'#dc2626','Incomplete Details':'#D97706','Needs Approval':'#2563eb','Already Converted':'#9BA8A2'};
+  var svcShort={'Business Consulting':'Consulting','Business Brokerage':'Brokerage','Business Funding':'Funding','Business Valuation':'Valuation'};
+  var me=S.currentUser?(S.currentUser.name||''):'';
 
-  // Filter by temperature label
-  if(S.flbl&&S.flbl!=='All') leads=leads.filter(function(l){return l.label===S.flbl;});
+  var ls=[].concat(S.leads);
+  var sv=S.leadSavedView||'all';
+  if(sv==='mine') ls=ls.filter(function(l){return me&&((l.ownerContact||'').toLowerCase().indexOf(me.toLowerCase())>=0||(l.createdBy||'')===me);});
+  else if(sv==='submitted') ls=ls.filter(function(l){return leadStage(l)==='Submitted';});
+  else if(sv==='review') ls=ls.filter(function(l){return leadStage(l)==='Under Review';});
+  else if(sv==='approved') ls=ls.filter(function(l){return leadStage(l)==='Approved';});
+  else if(sv==='ready') ls=ls.filter(function(l){return leadReadiness(l)==='Ready to Convert';});
+  else if(sv==='missingdocs') ls=ls.filter(function(l){return leadReadiness(l)==='Missing Documents';});
+  else if(sv==='converted') ls=ls.filter(function(l){return l.converted;});
+  else if(sv==='rejected') ls=ls.filter(function(l){return leadStage(l)==='Rejected';});
 
-  // Search filter
+  if(S.leadFStage!=='All') ls=ls.filter(function(l){return leadStage(l)===S.leadFStage;});
+  if(S.leadFApproval!=='All') ls=ls.filter(function(l){return leadApproval(l)===S.leadFApproval;});
+  if(S.leadFSvc!=='All') ls=ls.filter(function(l){return l.serviceType===S.leadFSvc;});
+  if(S.leadFPriority!=='All') ls=ls.filter(function(l){return (l.priority||'')===S.leadFPriority;});
+  if(S.leadFTemp!=='All') ls=ls.filter(function(l){return (l.label||'')===S.leadFTemp;});
+  if(S.leadFDocs==='Has Files') ls=ls.filter(function(l){return l.files&&l.files.length>0;});
+  else if(S.leadFDocs==='No Files') ls=ls.filter(function(l){return !(l.files&&l.files.length>0);});
   if(S.lsrch&&S.lsrch.trim()){
     var q=S.lsrch.trim().toLowerCase();
-    leads=leads.filter(function(l){
-      return (l.bizName||'').toLowerCase().indexOf(q)>=0||
-             (l.leadId||'').toLowerCase().indexOf(q)>=0||
-             (l.ownerContact||'').toLowerCase().indexOf(q)>=0||
-             (l.serviceType||'').toLowerCase().indexOf(q)>=0;
-    });
+    ls=ls.filter(function(l){return (l.bizName||'').toLowerCase().indexOf(q)>=0||(l.leadId||'').toLowerCase().indexOf(q)>=0||(l.ownerContact||'').toLowerCase().indexOf(q)>=0||(l.serviceType||'').toLowerCase().indexOf(q)>=0;});
   }
 
-  // Sort
-  var srt=S.leadSort||'newest';
-  if(srt==='newest') leads=leads.reverse();
-  else if(srt==='biz') leads=leads.sort(function(a,b){return (a.bizName||'').localeCompare(b.bizName||'');});
-  else if(srt==='svc') leads=leads.sort(function(a,b){return (a.serviceType||'').localeCompare(b.serviceType||'');});
-  else if(srt==='status') leads=leads.sort(function(a,b){return (a.leadStatus||'').localeCompare(b.leadStatus||'');});
-  else if(srt==='label') leads=leads.sort(function(a,b){return (b.label||'').localeCompare(a.label||'');});
+  // KPIs
+  var kTotal=S.leads.length;
+  var kNew=S.leads.filter(function(l){return leadStage(l)==='Draft';}).length;
+  var kSub=S.leads.filter(function(l){return leadStage(l)==='Submitted';}).length;
+  var kRev=S.leads.filter(function(l){return leadStage(l)==='Under Review';}).length;
+  var kApp=S.leads.filter(function(l){return leadStage(l)==='Approved';}).length;
+  var kReady=S.leads.filter(function(l){return leadReadiness(l)==='Ready to Convert';}).length;
+  var kConv=S.leads.filter(function(l){return l.converted;}).length;
+  var kRej=S.leads.filter(function(l){return leadStage(l)==='Rejected';}).length;
 
-  var svcCol={'Business Consulting':'#275F45','Business Brokerage':'#D97706','Business Funding':'#7C3AED','Business Valuation':'#0E7490'};
-  var svcBg={'Business Consulting':'#EAF3EE','Business Brokerage':'#FFFBEB','Business Funding':'#F5F3FF','Business Valuation':'#F0FDFA'};
+  var html='<div>';
 
-  var html='';
-
-  // ── Filter bar ──────────────────────────────────────────────────────────────
-  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
-
-  // Temperature filters
-  [['All',S.leads.length,'#5F6B65'],['Hot',S.leads.filter(function(l){return l.label==='Hot';}).length,'#DC2626'],['Warm',S.leads.filter(function(l){return l.label==='Warm';}).length,'#D97706'],['Cold',S.leads.filter(function(l){return l.label==='Cold';}).length,'#1D4ED8']].forEach(function(f){
-    var on=S.flbl===f[0]||(f[0]==='All'&&(!S.flbl||S.flbl==='All'));
-    html+='<button class="fbtn'+(on?' on':'')+'" data-fl="'+f[0]+'" style="'+(on?'background:'+f[2]+'18;color:'+f[2]+';border-color:'+f[2]+';font-weight:600;':'')+'">'+(f[0]==='Hot'?'🔥':f[0]==='Warm'?'🟡':f[0]==='Cold'?'❄️':'')+' '+f[0]+' <strong>'+f[1]+'</strong></button>';
-  });
-
-  // Search
-  html+='<div style="flex:1;min-width:200px;position:relative;">';
-  html+='<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9BA8A2;font-size:13px;">&#128269;</span>';
-  html+='<input id="lsr" value="'+e(S.lsrch||'')+'" placeholder="Search leads..." style="padding-left:30px;width:100%;"/>';
-  html+='</div>';
-
-  // Sort dropdown
-  html+='<select id="lead-sort" style="padding:7px 10px;font-size:12px;border:1px solid #D8E3DC;border-radius:4px;font-family:inherit;color:#1A1A1A;background:#fff;">';
-  [['newest','Newest First'],['biz','Business Name'],['svc','Service Type'],['status','Status'],['label','Temperature']].forEach(function(o){
-    html+='<option value="'+o[0]+'"'+(srt===o[0]?' selected':'')+'>'+o[1]+'</option>';
-  });
-  html+='</select>';
-
-  // Export
+  // Header
+  html+='<div class="page-header"><div class="page-header-left"><h1>Lead Qualification Pipeline</h1><p>Review, approve, and convert qualified leads into the deal pipeline</p></div>';
+  html+='<div class="page-header-actions">';
   html+='<button class="btn btn-ghost btn-sm" id="exl">&#8659; Export CSV</button>';
+  html+='<button class="btn" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();">+ New Lead</button>';
+  html+='</div></div>';
+
+  // KPI row
+  html+='<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:12px;">';
+  [['Total',kTotal,'#1A1A1A'],['Drafts',kNew,'#9BA8A2'],['Submitted',kSub,'#2563eb'],['Under Review',kRev,'#7C3AED'],['Approved',kApp,'#16a34a'],['Ready',kReady,'#275F45'],['Converted',kConv,'#275F45'],['Rejected',kRej,'#dc2626']].forEach(function(k){
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:9px 11px;"><div style="font-size:17px;font-weight:700;color:'+k[2]+';line-height:1;">'+k[1]+'</div><div style="font-size:9px;font-weight:600;color:#9BA8A2;text-transform:uppercase;letter-spacing:.4px;margin-top:3px;white-space:nowrap;">'+k[0]+'</div></div>';
+  });
   html+='</div>';
 
-  // ── Table ───────────────────────────────────────────────────────────────────
-  if(leads.length===0){
-    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:64px 24px;text-align:center;">';
-    html+='<div style="font-size:32px;margin-bottom:12px;opacity:.3;">&#9711;</div>';
-    html+='<div style="font-size:15px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.leads.length===0?'No leads yet':'No leads match this filter')+'</div>';
-    html+='<div style="font-size:13px;color:#5F6B65;">'+(S.leads.length===0?'Click &ldquo;+ New Lead&rdquo; to capture your first lead':'Try a different filter or clear the search')+'</div>';
-    html+='</div>';
+  // Saved views
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+  [['all','All Leads'],['mine','My Leads'],['submitted','Submitted'],['review','Under Review'],['approved','Approved'],['ready','Ready to Convert'],['missingdocs','Missing Documents'],['converted','Converted'],['rejected','Rejected']].forEach(function(v){
+    html+='<button class="lead-sv fbtn'+(sv===v[0]?' on':'')+'" data-sv="'+v[0]+'">'+v[1]+'</button>';
+  });
+  html+='</div>';
+
+  // Filter bar
+  html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:8px 10px;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+  html+='<div style="flex:1;min-width:160px;position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#9BA8A2;font-size:12px;">&#128269;</span><input id="lsr" value="'+e(S.lsrch||'')+'" placeholder="Search business, ID, owner, service..." style="padding-left:26px;width:100%;height:30px;padding-top:0;padding-bottom:0;font-size:12px;"/></div>';
+  function lfsel(id,label,opts,cur){
+    var o='<select id="'+id+'" style="font-size:11px;padding:4px 6px;border:1px solid #D8E3DC;border-radius:4px;color:#1A1A1A;font-family:Inter,sans-serif;height:30px;background:#fff;max-width:145px;">';
+    o+='<option value="All"'+(cur==='All'?' selected':'')+'>'+label+'</option>';
+    opts.forEach(function(x){o+='<option'+(cur===x?' selected':'')+'>'+e(x)+'</option>';});
+    return o+'</select>';
+  }
+  html+=lfsel('lf-stage','All Stages',STAGES,S.leadFStage);
+  html+=lfsel('lf-approval','Approval',['Pending Review','Approved','Rejected','Needs Changes'],S.leadFApproval);
+  html+=lfsel('lf-svc','All Services',['Business Consulting','Business Brokerage','Business Funding','Business Valuation'],S.leadFSvc);
+  html+=lfsel('lf-priority','Priority',['High Priority','Medium','Low'],S.leadFPriority);
+  html+=lfsel('lf-temp','Temperature',['Hot','Warm','Cold'],S.leadFTemp);
+  html+=lfsel('lf-docs','Documents',['Has Files','No Files'],S.leadFDocs);
+  html+='<span style="font-size:11px;color:#9BA8A2;white-space:nowrap;">'+ls.length+' lead'+(ls.length!==1?'s':'')+'</span>';
+  html+='</div>';
+
+  // Table
+  if(!ls.length){
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:56px;text-align:center;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">&#9711;</div><div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.leads.length===0?'No leads yet':'No leads match this view')+'</div><div style="font-size:12px;color:#9BA8A2;">'+(S.leads.length===0?'Click "+ New Lead" to capture your first lead':'Try a different view or clear the filters')+'</div></div>';
   } else {
     html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
-
-    // Sort-able header
-    function sortTh(label, key){
-      var isActive=srt===key;
-      return '<th style="cursor:pointer;white-space:nowrap;user-select:none;" class="sort-th" data-sort="'+key+'">'+label+(isActive?' &#9650;':'')+'</th>';
-    }
-
-    html+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">';
-    html+='<table><thead><tr>';
-    html+='<th>LEAD ID</th>';
-    html+=sortTh('BUSINESS NAME','biz');
-    html+=sortTh('SERVICE TYPE','svc');
-    html+='<th>STRUCTURE</th>';
-    html+='<th>OWNER / CONTACT</th>';
-    html+='<th>PRIORITY</th>';
-    html+='<th>STAGE</th>';
-    html+=sortTh('LABEL','label');
-    html+='<th>SOURCE</th>';
-    html+='<th>FILES</th>';
-    html+=sortTh('STATUS','status');
-    html+='<th>ACTIONS</th>';
+    html+='<div style="overflow-x:auto;max-height:calc(100vh - 330px);overflow-y:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
+    html+='<th style="min-width:170px;">LEAD</th><th>SERVICE</th><th>OWNER / CONTACT</th><th>TEMP</th><th>PRIORITY</th><th>STAGE</th><th>APPROVAL</th><th>DOCS</th><th style="min-width:130px;">READINESS</th><th style="min-width:130px;">CONVERT</th><th style="width:36px;"></th>';
     html+='</tr></thead><tbody>';
 
-    leads.forEach(function(l,i){
-      var sc=svcCol[l.serviceType]||'#5F6B65';
-      var sb=svcBg[l.serviceType]||'#F8FAF9';
-      var lc=l.label==='Hot'?'#DC2626':l.label==='Warm'?'#D97706':'#1D4ED8';
-      var lb=l.label==='Hot'?'#FEF2F2':l.label==='Warm'?'#FFFBEB':'#EFF6FF';
-      var pct=l.pctComplete||0;
-      var bc=pct>=65?'#275F45':pct>=35?'#D97706':'#1D4ED8';
+    ls.forEach(function(l){
+      var stg=leadStage(l);
+      var stc=stageCol[stg]||'#9BA8A2';
+      var apr=leadApproval(l);
+      var aprCol={'Pending Review':'#D97706','Approved':'#16a34a','Rejected':'#dc2626','Needs Changes':'#7C3AED'}[apr];
+      var rdy=leadReadiness(l);
+      var rdc=readyCol[rdy];
+      var tc=l.label==='Hot'?'#dc2626':l.label==='Warm'?'#D97706':'#2563eb';
+      var prio=l.priority||'';
+      var pc={'High Priority':'#dc2626','Medium':'#D97706','Low':'#16a34a'}[prio]||'#9BA8A2';
+      var fcount=(l.files||[]).length;
+      var canConvert=rdy==='Ready to Convert';
+      var menuOpen=S.leadMenu===l._id;
 
-      html+='<tr>';
-
-      // Lead ID + status badges
-      html+='<td style="white-space:nowrap;">';
-      html+='<span class="badge-id">'+e(l.leadId||'n/a')+'</span> ';
-      if(l.converted) html+='<span class="badge badge-success" style="font-size:10px;">Converted</span>';
-      else if(l.approved) html+='<span class="badge badge-success" style="font-size:10px;">&#10003; Approved</span>';
-      else if(l.leadStatus==='pending') html+='<span class="badge badge-warning" style="font-size:10px;">Pending</span>';
-      else html+='<span class="badge badge-neutral" style="font-size:10px;">Draft</span>';
-      html+='</td>';
-
-      // Business name
-      html+='<td style="font-weight:600;color:#1A1A1A;min-width:140px;">'+e(l.bizName||'—')+'</td>';
-
-      // Service type
-      html+='<td><span style="background:'+sb+';color:'+sc+';border-radius:3px;padding:2px 8px;font-size:11px;font-weight:600;white-space:nowrap;">'+e(l.serviceType||'—')+'</span></td>';
-
-      // Structure
-      html+='<td style="color:#5F6B65;font-size:12px;white-space:nowrap;">'+e(l.ownershipStructure||'—')+'</td>';
-
-      // Contact
-      html+='<td style="font-weight:500;min-width:120px;">'+e(l.ownerContact||'—')+'</td>';
-
+      html+='<tr class="lead-row" data-id="'+e(l._id)+'" style="cursor:pointer;">';
+      // Lead
+      html+='<td style="min-width:170px;"><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(l.bizName||'Untitled')+'</div><div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(l.leadId||'')+'</div></td>';
+      // Service
+      html+='<td><span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;">'+e(svcShort[l.serviceType]||l.serviceType||'\u2014')+'</span></td>';
+      // Owner
+      html+='<td style="font-size:12px;color:#1A1A1A;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;">'+e(l.ownerContact||'\u2014')+'</td>';
+      // Temp
+      html+='<td>'+(l.label?'<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:'+tc+';"><span style="width:6px;height:6px;border-radius:50%;background:'+tc+';"></span>'+e(l.label)+'</span>':'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
       // Priority
-      html+='<td>';
-      if(l.priority) html+='<span class="badge '+(l.priority==='High Priority'?'badge-error':l.priority==='Medium'?'badge-warning':'badge-success')+'" style="font-size:11px;">'+e(l.priority)+'</span>';
-      else html+='<span style="color:#9BA8A2;">—</span>';
-      html+='</td>';
-
-      // Stage (progress bar)
-      html+='<td style="min-width:100px;"><div style="display:flex;align-items:center;gap:6px;"><div style="flex:1;height:5px;background:#F8FAF9;border-radius:3px;border:1px solid #D8E3DC;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div><span style="font-size:11px;font-weight:600;color:'+bc+';width:28px;">'+pct+'%</span></div></td>';
-
-      // Temperature label
-      html+='<td><span style="background:'+lb+';color:'+lc+';border-radius:3px;padding:2px 8px;font-size:11px;font-weight:600;">'+(l.label==='Hot'?'🔥':l.label==='Warm'?'🟡':'❄️')+' '+e(l.label||'—')+'</span></td>';
-
-      // Source
-      html+='<td style="color:#5F6B65;font-size:12px;">'+e(l.source||'—')+'</td>';
-
-      // Files
-      html+='<td>';
-      if(l.files&&l.files.length>0){
-        l.files.forEach(function(f,fi){
-          html+='<button class="dl-lfile btn btn-ghost btn-xs" data-lid="'+e(l._id)+'" data-fi="'+fi+'" style="margin-bottom:2px;display:block;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+e(f.name)+'">&#128229; '+e(f.name)+'</button>';
-        });
-      } else {
-        html+='<span style="color:#DC2626;font-size:11px;">None</span>';
-      }
-      html+='</td>';
-
-      // Status
-      html+='<td><span class="badge '+(l.leadStatus==='pending'?'badge-warning':l.leadStatus==='approved'||l.approved?'badge-success':'badge-neutral')+'" style="font-size:11px;">'+e(l.leadStatus||'draft')+'</span></td>';
-
-      // Actions
+      html+='<td>'+(prio?'<span style="font-size:11px;font-weight:600;color:'+pc+';white-space:nowrap;">'+e(prio.replace(' Priority',''))+'</span>':'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
+      // Stage
+      html+='<td><span style="background:'+stc+'14;color:'+stc+';border:1px solid '+stc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+stg+'</span></td>';
+      // Approval
+      html+='<td><span style="font-size:11px;font-weight:600;color:'+aprCol+';white-space:nowrap;">'+apr+'</span></td>';
+      // Docs
+      html+='<td>'+(fcount>0?'<button class="lead-files-btn" data-id="'+e(l._id)+'" style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;">&#128206; '+fcount+' File'+(fcount!==1?'s':'')+'</button>':'<span style="background:#FEF2F2;color:#dc2626;border:1px solid #FECACA;border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;white-space:nowrap;">Missing Docs</span>')+'</td>';
+      // Readiness
+      html+='<td><span style="background:'+rdc+'12;color:'+rdc+';border:1px solid '+rdc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+rdy+'</span></td>';
+      // Convert
       html+='<td style="white-space:nowrap;">';
-      html+='<div style="display:flex;gap:4px;align-items:center;">';
       if(l.converted){
-        html+='<span class="badge badge-success" style="font-size:11px;">Converted</span>';
-      } else if(l.approved){
-        html+='<button class="btn btn-secondary btn-sm cnv" data-id="'+l._id+'" style="font-size:11px;">&#9889; Convert</button>';
-      } else if(l.leadStatus==='pending'){
-        html+='<span class="badge badge-warning" style="font-size:11px;">&#9203; Pending</span>';
+        html+='<span style="font-size:11px;font-weight:700;color:#275F45;">&#10003; Converted</span> <button class="lead-viewdeal-btn btn btn-ghost btn-sm" data-id="'+e(l._id)+'" style="font-size:10px;">View Deal</button>';
+      } else if(canConvert){
+        html+='<button class="cnv btn btn-sm" data-id="'+e(l._id)+'" style="font-size:11px;">&#9889; Convert</button>';
       } else {
-        html+='<span class="badge badge-neutral" style="font-size:11px;">&#128274; Awaiting</span>';
+        html+='<button class="btn btn-sm" disabled title="'+e(rdy)+'" style="font-size:11px;background:#F8FAF9;color:#9BA8A2;border:1px solid #D8E3DC;cursor:not-allowed;">Convert</button>';
       }
-      html+='<button class="btn btn-ghost btn-sm ell" data-id="'+l._id+'" style="font-size:11px;">Edit</button>';
-      if(S.currentUser&&S.currentUser.role==='admin'){
-        html+='<button class="btn btn-danger btn-sm dll" data-id="'+l._id+'" style="font-size:11px;">&#10005;</button>';
+      html+='</td>';
+      // Menu
+      html+='<td style="position:relative;"><button class="lead-menu-btn" data-id="'+e(l._id)+'" style="background:none;border:none;color:#9BA8A2;cursor:pointer;font-size:16px;padding:2px 6px;font-family:Inter,sans-serif;line-height:1;">&#8942;</button>';
+      if(menuOpen){
+        html+='<div class="lead-menu" style="position:absolute;right:8px;top:28px;z-index:100;background:#fff;border:1px solid #D8E3DC;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:160px;padding:4px 0;">';
+        var items=[['view','&#128065; View Lead'],['edit','&#9998; Edit Lead']];
+        if(!l.converted&&!(l.approved||l.leadStatus==='approved')&&S.currentUser&&S.currentUser.role!=='staff') items.push(['approve','&#10003; Approve Lead']);
+        if(canConvert) items.push(['convert','&#9889; Convert to Deal']);
+        if(!l.converted&&S.currentUser&&S.currentUser.role!=='staff') items.push(['reject','&#9940; Reject Lead']);
+        items.push(['delete','&#10005; Delete']);
+        items.forEach(function(m){
+          html+='<button class="lead-menu-item" data-id="'+e(l._id)+'" data-act="'+m[0]+'" style="display:block;width:100%;text-align:left;background:none;border:none;padding:7px 14px;font-size:12px;color:'+(m[0]==='delete'||m[0]==='reject'?'#dc2626':'#1A1A1A')+';cursor:pointer;font-family:Inter,sans-serif;">'+m[1]+'</button>';
+        });
+        html+='</div>';
       }
-      html+='</div></td>';
-
-      html+='</tr>';
+      html+='</td></tr>';
     });
-
     html+='</tbody></table></div></div>';
   }
 
+  // ── Lead detail drawer ───────────────────────────────────────────────────
+  if(S.leadDrawer){
+    var dl=S.leads.filter(function(x){return x._id===S.leadDrawer;})[0];
+    if(dl){
+      var dstg=leadStage(dl);var dstc=stageCol[dstg]||'#9BA8A2';
+      var drdy=leadReadiness(dl);var drdc=readyCol[drdy];
+      html+='<div id="lead-drawer-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:9000;"></div>';
+      html+='<div style="position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:#fff;z-index:9001;box-shadow:-8px 0 32px rgba(0,0,0,.12);display:flex;flex-direction:column;">';
+      html+='<div style="padding:14px 18px;border-bottom:1px solid #D8E3DC;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">';
+      html+='<div><div style="font-size:15px;font-weight:700;color:#1A1A1A;">'+e(dl.bizName||'Untitled')+'</div><div style="font-size:11px;color:#9BA8A2;font-family:monospace;margin-top:2px;">'+e(dl.leadId||'')+'</div></div>';
+      html+='<button id="lead-drawer-close" style="background:none;border:none;font-size:18px;color:#9BA8A2;cursor:pointer;flex-shrink:0;">&#10005;</button></div>';
+      html+='<div style="flex:1;overflow-y:auto;padding:16px 18px;">';
+
+      // Status badges
+      html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">';
+      html+='<span style="background:'+dstc+'14;color:'+dstc+';border:1px solid '+dstc+'30;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">'+dstg+'</span>';
+      html+='<span style="background:'+drdc+'12;color:'+drdc+';border:1px solid '+drdc+'30;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">'+drdy+'</span>';
+      if(dl.label) html+='<span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:600;">'+e(dl.label)+'</span>';
+      html+='</div>';
+
+      // Summary
+      html+='<div style="border-top:1px solid #D8E3DC;padding-top:12px;margin-bottom:14px;">';
+      [['Service Type',dl.serviceType],['Owner / Contact',dl.ownerContact],['Structure',dl.ownershipStructure],['Priority',dl.priority],['Source',dl.source],['Start Date',dl.startDate]].forEach(function(r){
+        html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;text-align:right;max-width:230px;">'+e(r[1]||'\u2014')+'</span></div>';
+      });
+      html+='</div>';
+
+      // Conversion checklist
+      html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Conversion Checklist</div>';
+      [['Business name provided',!!(dl.bizName)],['Service type selected',!!(dl.serviceType)],['Owner / contact assigned',!!(dl.ownerContact)],['Documents uploaded',!!(dl.files&&dl.files.length>0)],['Lead approved',!!(dl.approved||dl.leadStatus==='approved')]].forEach(function(c){
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><div style="width:15px;height:15px;border-radius:50%;background:'+(c[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(c[1]?'&#10003;':'')+'</div><span style="font-size:12px;color:'+(c[1]?'#1A1A1A':'#9BA8A2')+';">'+c[0]+'</span></div>';
+      });
+      html+='</div>';
+
+      // Documents
+      html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Documents ('+(dl.files||[]).length+')</div>';
+      if(!(dl.files||[]).length){
+        html+='<div style="font-size:12px;color:#dc2626;padding:8px 0;">&#9888; No documents uploaded</div>';
+      } else {
+        (dl.files||[]).forEach(function(f,fi){
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F8FAF9;border:1px solid #D8E3DC;border-radius:5px;margin-bottom:5px;">';
+          html+='<span style="font-size:13px;">&#128196;</span><div style="flex:1;font-size:11px;font-weight:500;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>';
+          if(f.data) html+='<button class="dl-lfile btn btn-ghost btn-sm" data-lid="'+e(dl._id)+'" data-fi="'+fi+'" style="font-size:10px;padding:2px 7px;">&#8659;</button>';
+          html+='</div>';
+        });
+      }
+      html+='</div>';
+
+      html+='</div>';
+      // Drawer footer
+      html+='<div style="padding:12px 18px;border-top:1px solid #D8E3DC;display:flex;gap:8px;">';
+      if(dl.converted){
+        html+='<button class="lead-viewdeal-btn btn btn-sm" data-id="'+e(dl._id)+'" style="flex:1;">View Deal in Pipeline</button>';
+      } else if(drdy==='Ready to Convert'){
+        html+='<button class="lead-drawer-convert btn btn-sm" data-id="'+e(dl._id)+'" style="flex:1;">&#9889; Convert to Deal</button>';
+      } else {
+        html+='<button class="ell btn btn-ghost btn-sm" data-id="'+e(dl._id)+'" style="flex:1;">&#9998; Edit Lead</button>';
+      }
+      html+='<button id="lead-drawer-close2" class="btn btn-ghost btn-sm" style="flex:1;">Close</button>';
+      html+='</div></div>';
+    }
+  }
+
+  // ── Conversion confirmation modal ────────────────────────────────────────
+  if(S.convertModal){
+    var cl=S.leads.filter(function(x){return x._id===S.convertModal;})[0];
+    if(cl){
+      html+='<div style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;">';
+      html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:440px;">';
+      html+='<div style="padding:18px 22px;border-bottom:1px solid #D8E3DC;"><div style="font-size:16px;font-weight:700;color:#1A1A1A;">Convert Lead to Deal Pipeline?</div>';
+      html+='<div style="font-size:12px;color:#5F6B65;margin-top:4px;line-height:1.5;">This will create a new deal record and move this approved lead into the Deal Pipeline for execution.</div></div>';
+      html+='<div style="padding:16px 22px;">';
+      [['Business Name',cl.bizName],['Service Type',cl.serviceType],['Owner / Contact',cl.ownerContact],['Documents',(cl.files||[]).length+' file'+((cl.files||[]).length!==1?'s':'')]].forEach(function(r){
+        html+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:12px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:13px;font-weight:600;color:#1A1A1A;">'+e(String(r[1]||'\u2014'))+'</span></div>';
+      });
+      html+='</div>';
+      html+='<div style="padding:14px 22px;border-top:1px solid #D8E3DC;display:flex;justify-content:flex-end;gap:8px;">';
+      html+='<button id="convert-cancel" class="btn btn-ghost">Cancel</button>';
+      html+='<button id="convert-confirm" data-id="'+e(cl._id)+'" class="btn">&#9889; Convert Lead</button>';
+      html+='</div></div></div>';
+    }
+  }
+
+  html+='</div>';
   return html;
 }
-
 
 function rLeadForm(){
 
@@ -3952,7 +4048,82 @@ function bind(){
       render();
     });
   });
-  document.querySelectorAll('.cnv').forEach(function(el){el.addEventListener('click',function(){cvt(el.dataset.id);});});
+  // Lead pipeline — saved views, filters, drawer, menu, convert modal
+  document.querySelectorAll('.lead-sv').forEach(function(el){
+    el.addEventListener('click',function(){S.leadSavedView=el.dataset.sv;render();});
+  });
+  [['lf-stage','leadFStage'],['lf-approval','leadFApproval'],['lf-svc','leadFSvc'],['lf-priority','leadFPriority'],['lf-temp','leadFTemp'],['lf-docs','leadFDocs']].forEach(function(p){
+    var el=document.getElementById(p[0]);
+    if(el) el.addEventListener('change',function(){S[p[1]]=el.value;render();});
+  });
+
+  document.querySelectorAll('.lead-row').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      if(ev.target.closest('button,select,input,.lead-menu')) return;
+      S.leadDrawer=el.dataset.id;S.leadMenu=null;render();
+    });
+  });
+  document.querySelectorAll('.lead-files-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){ev.stopPropagation();S.leadDrawer=el.dataset.id;S.leadMenu=null;render();});
+  });
+  document.querySelectorAll('.lead-menu-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){ev.stopPropagation();S.leadMenu=S.leadMenu===el.dataset.id?null:el.dataset.id;render();});
+  });
+  document.querySelectorAll('.lead-menu-item').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var id=el.dataset.id, act=el.dataset.act;
+      var l=S.leads.filter(function(x){return x._id===id;})[0];
+      S.leadMenu=null;
+      if(!l){render();return;}
+      if(act==='view'){S.leadDrawer=id;render();}
+      else if(act==='edit'){S.lform=Object.assign({},l);S.leid=l._id;S.lfiles=l.files||[];S.biz=l.bizStructure||'';S.leadsView='form';render();}
+      else if(act==='approve'){openApprovalModal(id,'approve');}
+      else if(act==='convert'){S.convertModal=id;render();}
+      else if(act==='reject'){openApprovalModal(id,'reject');}
+      else if(act==='delete'){
+        if(S.currentUser&&S.currentUser.role!=='admin'){flash('Only Admins can delete leads.','err');render();return;}
+        S.confirmModal={type:'lead',id:id,name:l.bizName||l.leadId||'This lead'};render();
+      }
+    });
+  });
+  if(S.leadMenu){
+    setTimeout(function(){
+      document.addEventListener('click',function closeLMenu(ev){
+        if(!ev.target.closest('.lead-menu,.lead-menu-btn')){S.leadMenu=null;render();}
+        document.removeEventListener('click',closeLMenu);
+      });
+    },0);
+  }
+  ['lead-drawer-close','lead-drawer-close2','lead-drawer-overlay'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('click',function(){S.leadDrawer=null;render();});
+  });
+  document.querySelectorAll('.lead-drawer-convert').forEach(function(el){
+    el.addEventListener('click',function(){S.leadDrawer=null;S.convertModal=el.dataset.id;render();});
+  });
+  document.querySelectorAll('.lead-viewdeal-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var l=S.leads.filter(function(x){return x._id===el.dataset.id;})[0];
+      S.leadDrawer=null;
+      var deal=l?S.deals.filter(function(d){return d.bizName===l.bizName||d.convertedFromLead===l._id;})[0]:null;
+      S.tab='pipeline';
+      if(deal) S.pipeDrawer=deal._id;
+      render();
+    });
+  });
+  var convCancel=document.getElementById('convert-cancel');
+  if(convCancel) convCancel.addEventListener('click',function(){S.convertModal=null;render();});
+  var convConfirm=document.getElementById('convert-confirm');
+  if(convConfirm) convConfirm.addEventListener('click',function(){
+    var id=convConfirm.dataset.id;
+    S.convertModal=null;
+    cvt(id);
+  });
+
+  // Convert buttons in table open the confirmation modal (preserving cvt workflow behind confirm)
+  document.querySelectorAll('.cnv').forEach(function(el){el.addEventListener('click',function(ev){ev.stopPropagation();S.convertModal=el.dataset.id;render();});});
   document.querySelectorAll('.aprbtn').forEach(function(el){el.addEventListener('click',function(){openApprovalModal(el.dataset.id,'approve');});});
   var aprCancel=document.getElementById('apr-cancel');if(aprCancel) aprCancel.addEventListener('click',closeApprovalModal);
   var cNo=document.getElementById('confirm-no');
