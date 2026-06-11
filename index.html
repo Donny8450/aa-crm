@@ -673,6 +673,25 @@ window._dealQuick=function(id,field,value){
   flash('Deal updated');render();
 };
 
+function canSeeAll(){return !!(S.currentUser&&S.currentUser.role!=='staff');}
+function visLeads(){
+  if(canSeeAll()) return S.leads;
+  var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
+  if(!n) return [];
+  return S.leads.filter(function(l){
+    return (l.createdBy||'').toLowerCase().trim()===n||(l.ownerContact||'').toLowerCase().trim()===n||(l.updatedBy||'').toLowerCase().trim()===n;
+  });
+}
+function visDeals(){
+  if(canSeeAll()) return S.deals;
+  var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
+  if(!n) return [];
+  return S.deals.filter(function(d){
+    return (d.createdBy||'').toLowerCase().trim()===n||(d.owner||'').toLowerCase().trim()===n||(d.convertedBy||'').toLowerCase().trim()===n;
+  });
+}
+
+
 function fmtAudit(v){
   if(!v) return '';
   var d=new Date(v);
@@ -800,12 +819,12 @@ function rApp(){
           '<div class="sidebar-item'+(S.contactsView==="individual"?' active':'')+' " style="padding-left:46px;font-size:11px;" onclick="S.contactsView=\'individual\';S.contactView=null;render();return false;"><span class="si-icon" style="font-size:11px;">&#128100;</span><span>Individual Contacts</span>'+((S.individualContacts||[]).length>0?'<span class="si-badge">'+S.individualContacts.length+'</span>':'')+'</div>'
         :'')+
 
-        '<div class="sidebar-item'+(S.tab==="leads"?' active':'')+'" data-tab="leads"><span class="si-icon">&#9711;</span><span>Leads</span>'+(S.leads.length>0?'<span class="si-badge">'+S.leads.length+'</span>':'')+'</div>'+
+        '<div class="sidebar-item'+(S.tab==="leads"?' active':'')+'" data-tab="leads"><span class="si-icon">&#9711;</span><span>Leads</span>'+(visLeads().length>0?'<span class="si-badge">'+visLeads().length+'</span>':'')+'</div>'+
         (S.tab==="leads"?
           '<div class="sidebar-item'+(S.leadsView==="form"?' active':'')+' " style="padding-left:32px;font-size:12px;" onclick="S.leadsView=\'form\';S.lform=bLead();S.lfiles=[];S.leid=null;render();return false;"><span class="si-icon" style="font-size:12px;">&#65291;</span><span>New Lead</span></div>'+
           '<div class="sidebar-item'+(S.leadsView==="pipeline"?' active':'')+' " style="padding-left:32px;font-size:12px;" onclick="S.leadsView=\'pipeline\';render();return false;"><span class="si-icon" style="font-size:12px;">&#9776;</span><span>Leads Pipeline</span></div>'
         :'')+
-        '<div class="sidebar-item'+(S.tab==="pipeline"?' active':'')+'" data-tab="pipeline"><span class="si-icon">&#9889;</span><span>Pipeline</span>'+(S.deals.length>0?'<span class="si-badge">'+S.deals.length+'</span>':'')+'</div>'+
+        '<div class="sidebar-item'+(S.tab==="pipeline"?' active':'')+'" data-tab="pipeline"><span class="si-icon">&#9889;</span><span>Pipeline</span>'+(visDeals().length>0?'<span class="si-badge">'+visDeals().length+'</span>':'')+'</div>'+
         '<div class="sidebar-item'+(S.tab==="gantt"?' active':'')+'" data-tab="gantt"><span class="si-icon">&#9638;</span><span>Gantt / Projects</span></div>'+
         '<div class="sidebar-item'+(S.tab==="approvals"?' active':'')+'" data-tab="approvals"><span class="si-icon">&#10003;</span><span>Approvals</span>'+(pendingCount>0?'<span class="si-badge">'+pendingCount+'</span>':'')+'</div>'+
       '</div>'+
@@ -869,14 +888,15 @@ function rApp(){
 }
 
 function rDash(){
-  var totalDeals=S.deals.length;
-  var totalLeads=S.leads.length;
+  var VL=visLeads(),VD=visDeals();
+  var totalDeals=VD.length;
+  var totalLeads=VL.length;
   var totalClients=S.clients.length;
-  var activeDeals=S.deals.filter(function(d){return d.status==='Active';}).length;
-  var pendingLeads=S.leads.filter(function(l){return l.leadStatus==='pending';}).length;
-  var hotLeads=S.leads.filter(function(l){return l.label==='Hot';}).length;
-  var completedDeals=S.deals.filter(function(d){return d.status==='Completed';}).length;
-  var allDlvs=[];S.deals.forEach(function(d){(d.deliverables||[]).forEach(function(dlv){allDlvs.push(dlv);});});
+  var activeDeals=VD.filter(function(d){return d.status==='Active';}).length;
+  var pendingLeads=VL.filter(function(l){return l.leadStatus==='pending';}).length;
+  var hotLeads=VL.filter(function(l){return l.label==='Hot';}).length;
+  var completedDeals=VD.filter(function(d){return d.status==='Completed';}).length;
+  var allDlvs=[];VD.forEach(function(d){(d.deliverables||[]).forEach(function(dlv){allDlvs.push(dlv);});});
   var avgProg=allDlvs.length?Math.round(allDlvs.reduce(function(a,d){return a+(d.progress||0);},0)/allDlvs.length):0;
 
   var svcMap={'Business Consulting':'Consulting','Business Brokerage':'Brokerage','Business Funding':'Funding','Business Valuation':'Valuation'};
@@ -919,7 +939,7 @@ function rDash(){
   // Recent deals
   html+='<div class="tbl-wrap-card">';
   html+='<div class="card-header"><div class="card-header-title">Recent Deals</div><button class="btn btn-ghost btn-sm" data-tab="pipeline">View all</button></div>';
-  var recentDeals=[].concat(S.deals).reverse().slice(0,6);
+  var recentDeals=[].concat(VD).reverse().slice(0,6);
   if(!recentDeals.length){
     html+='<div class="empty" style="padding:32px;"><div class="empty-icon">&#9889;</div><h3>No deals yet</h3><p>Add your first deal to get started</p></div>';
   } else {
@@ -940,7 +960,7 @@ function rDash(){
   // Recent leads
   html+='<div class="tbl-wrap-card">';
   html+='<div class="card-header"><div class="card-header-title">Recent Leads</div><button class="btn btn-ghost btn-sm" data-tab="leads">View all</button></div>';
-  var recentLeads=[].concat(S.leads).reverse().slice(0,6);
+  var recentLeads=[].concat(VL).reverse().slice(0,6);
   if(!recentLeads.length){
     html+='<div class="empty" style="padding:32px;"><div class="empty-icon">&#9711;</div><h3>No leads yet</h3><p>Capture your first lead</p></div>';
   } else {
@@ -971,7 +991,7 @@ function rDash(){
   } else {
     html+='<table><thead><tr><th>ID</th><th>Company</th><th>Status</th><th>Deals</th></tr></thead><tbody>';
     recentClients.forEach(function(c){
-      var cDeals=S.deals.filter(function(d){return d.clientId===c._id;}).length;
+      var cDeals=VD.filter(function(d){return d.clientId===c._id;}).length;
       var cs=c.status==='Active'?'badge-success':c.status==='Prospect'?'badge-warning':'badge-neutral';
       html+='<tr>'+
         '<td><span class="badge-id">'+e(c.clientId||'')+'</span></td>'+
@@ -990,7 +1010,7 @@ function rDash(){
   html+='<div class="card-body">';
   var svcs=['Business Consulting','Business Brokerage','Business Funding','Business Valuation'];
   svcs.forEach(function(svc){
-    var count=S.deals.filter(function(d){return d.serviceType===svc;}).length;
+    var count=VD.filter(function(d){return d.serviceType===svc;}).length;
     var pct=totalDeals>0?Math.round(count/totalDeals*100):0;
     var col=svcCol[svc]||'#275F45';
     html+='<div style="margin-bottom:14px;">'+
@@ -1250,7 +1270,8 @@ function rPipe(){
   var me=S.currentUser?(S.currentUser.name||''):'';
 
   // ── Saved view base filter ───────────────────────────────────────────────
-  var ds=[].concat(S.deals);
+  var VISD=visDeals();
+  var ds=[].concat(VISD);
   var sv=S.pipeSavedView||'active';
   if(sv==='active') ds=ds.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';});
   else if(sv==='mine') ds=ds.filter(function(d){return (d.owner||'').toLowerCase().indexOf(me.toLowerCase())>=0&&me;});
@@ -1270,17 +1291,17 @@ function rPipe(){
   else if(S.pipeBlocked==='Clear') ds=ds.filter(function(d){return !d.blocker||d.blocker==='None';});
   if(S.srch){var q=S.srch.toLowerCase();ds=ds.filter(function(d){return (d.bizName||'').toLowerCase().indexOf(q)>=0||(d.dealId||'').toLowerCase().indexOf(q)>=0||(d.owner||'').toLowerCase().indexOf(q)>=0;});}
 
-  var owners=[];S.deals.forEach(function(d){if(d.owner&&owners.indexOf(d.owner)<0) owners.push(d.owner);});
+  var owners=[];VISD.forEach(function(d){if(d.owner&&owners.indexOf(d.owner)<0) owners.push(d.owner);});
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
   var monthStr=new Date().toISOString().slice(0,7);
-  var kActive=S.deals.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';}).length;
-  var kNew=S.deals.filter(function(d){return dealStage(d)==='New Deal';}).length;
-  var kDueWk=S.deals.filter(isDueThisWeek).length;
-  var kOver=S.deals.filter(isOverdue).length;
-  var kBlocked=S.deals.filter(function(d){return d.blocker&&d.blocker!=='None';}).length;
-  var kWaiting=S.deals.filter(function(d){return d.blocker==='Waiting on Client';}).length;
-  var kDoneMo=S.deals.filter(function(d){return dealStage(d)==='Completed'&&(d.completedAt||'').slice(0,7)===monthStr;}).length;
+  var kActive=VISD.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';}).length;
+  var kNew=VISD.filter(function(d){return dealStage(d)==='New Deal';}).length;
+  var kDueWk=VISD.filter(isDueThisWeek).length;
+  var kOver=VISD.filter(isOverdue).length;
+  var kBlocked=VISD.filter(function(d){return d.blocker&&d.blocker!=='None';}).length;
+  var kWaiting=VISD.filter(function(d){return d.blocker==='Waiting on Client';}).length;
+  var kDoneMo=VISD.filter(function(d){return dealStage(d)==='Completed'&&(d.completedAt||'').slice(0,7)===monthStr;}).length;
 
   var html='<div>';
 
@@ -1322,7 +1343,7 @@ function rPipe(){
 
   // ── Table ────────────────────────────────────────────────────────────────
   if(!ds.length){
-    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:56px;text-align:center;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">&#9889;</div><div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.deals.length===0?'No deals in the pipeline yet':'No deals match this view')+'</div><div style="font-size:12px;color:#9BA8A2;">'+(S.deals.length===0?'Convert an approved lead or create a deal to get started':'Try a different view or clear the filters')+'</div></div>';
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:56px;text-align:center;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">&#9889;</div><div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(VISD.length===0?'No deals in the pipeline yet':'No deals match this view')+'</div><div style="font-size:12px;color:#9BA8A2;">'+(VISD.length===0?'Convert an approved lead or create a deal to get started':'Try a different view or clear the filters')+'</div></div>';
   } else {
     html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
     html+='<div style="overflow-x:auto;max-height:calc(100vh - 320px);overflow-y:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
@@ -1540,7 +1561,8 @@ function rLeadsPipeline(){
   var svcShort={'Business Consulting':'Consulting','Business Brokerage':'Brokerage','Business Funding':'Funding','Business Valuation':'Valuation'};
   var me=S.currentUser?(S.currentUser.name||''):'';
 
-  var ls=[].concat(S.leads);
+  var VIS=visLeads();
+  var ls=[].concat(VIS);
   var sv=S.leadSavedView||'all';
   if(sv==='mine') ls=ls.filter(function(l){return me&&((l.ownerContact||'').toLowerCase().indexOf(me.toLowerCase())>=0||(l.createdBy||'')===me);});
   else if(sv==='submitted') ls=ls.filter(function(l){return leadStage(l)==='Submitted';});
@@ -1564,14 +1586,14 @@ function rLeadsPipeline(){
   }
 
   // KPIs
-  var kTotal=S.leads.length;
-  var kNew=S.leads.filter(function(l){return leadStage(l)==='Draft';}).length;
-  var kSub=S.leads.filter(function(l){return leadStage(l)==='Submitted';}).length;
-  var kRev=S.leads.filter(function(l){return leadStage(l)==='Under Review';}).length;
-  var kApp=S.leads.filter(function(l){return leadStage(l)==='Approved';}).length;
-  var kReady=S.leads.filter(function(l){return leadReadiness(l)==='Ready to Convert';}).length;
-  var kConv=S.leads.filter(function(l){return l.converted;}).length;
-  var kRej=S.leads.filter(function(l){return leadStage(l)==='Rejected';}).length;
+  var kTotal=VIS.length;
+  var kNew=VIS.filter(function(l){return leadStage(l)==='Draft';}).length;
+  var kSub=VIS.filter(function(l){return leadStage(l)==='Submitted';}).length;
+  var kRev=VIS.filter(function(l){return leadStage(l)==='Under Review';}).length;
+  var kApp=VIS.filter(function(l){return leadStage(l)==='Approved';}).length;
+  var kReady=VIS.filter(function(l){return leadReadiness(l)==='Ready to Convert';}).length;
+  var kConv=VIS.filter(function(l){return l.converted;}).length;
+  var kRej=VIS.filter(function(l){return leadStage(l)==='Rejected';}).length;
 
   var html='<div>';
 
@@ -1616,7 +1638,7 @@ function rLeadsPipeline(){
 
   // Table
   if(!ls.length){
-    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:56px;text-align:center;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">&#9711;</div><div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(S.leads.length===0?'No leads yet':'No leads match this view')+'</div><div style="font-size:12px;color:#9BA8A2;">'+(S.leads.length===0?'Click "+ New Lead" to capture your first lead':'Try a different view or clear the filters')+'</div></div>';
+    html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;padding:56px;text-align:center;"><div style="font-size:28px;opacity:.3;margin-bottom:10px;">&#9711;</div><div style="font-size:14px;font-weight:600;color:#1A1A1A;margin-bottom:4px;">'+(VIS.length===0?'No leads yet':'No leads match this view')+'</div><div style="font-size:12px;color:#9BA8A2;">'+(VIS.length===0?'Click "+ New Lead" to capture your first lead':'Try a different view or clear the filters')+'</div></div>';
   } else {
     html+='<div style="background:#fff;border:1px solid #D8E3DC;border-radius:6px;overflow:hidden;">';
     html+='<div style="overflow-x:auto;max-height:calc(100vh - 330px);overflow-y:auto;"><table><thead><tr style="position:sticky;top:0;z-index:10;background:#F8FAF9;">';
@@ -3616,6 +3638,7 @@ function rClients(){
 
 
 function rGantt(){
+  var GD=visDeals();
   var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
   var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
 
@@ -3644,7 +3667,7 @@ function rGantt(){
   });
 
   // Collect all rows
-  var allDeals=S.deals.filter(function(d){return (d.deliverables||[]).length>0;});
+  var allDeals=GD.filter(function(d){return (d.deliverables||[]).length>0;});
   if(S.ganttSearch&&S.ganttSearch.trim()){
     var gsq=S.ganttSearch.toLowerCase().trim();
     allDeals=allDeals.filter(function(d){
@@ -3690,7 +3713,7 @@ function rGantt(){
   html+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center">';
   html+='<span style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px">VIEW PROJECT:</span>';
   html+='<button class="gantt-proj-sel" data-proj="all" style="padding:7px 16px;border-radius:20px;border:2px solid '+(S.ganttProject==='all'||!S.ganttProject?'#1A4731':'#C8E6D4')+';background:'+(S.ganttProject==='all'||!S.ganttProject?'#1A4731':'#fff')+';color:'+(S.ganttProject==='all'||!S.ganttProject?'#fff':'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s">All Projects ('+(allDeals.length)+')</button>';
-  S.deals.filter(function(d){return (d.deliverables||[]).length>0;}).forEach(function(d){
+  GD.filter(function(d){return (d.deliverables||[]).length>0;}).forEach(function(d){
     var c2=svcColors[d.serviceType]||'#2D6A4F';
     var on=S.ganttProject===d._id;
     html+='<button class="gantt-proj-sel" data-proj="'+e(d._id)+'" style="padding:7px 16px;border-radius:20px;border:2px solid '+(on?c2:'#C8E6D4')+';background:'+(on?c2:'#fff')+';color:'+(on?'#fff':'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(d.bizName||d.dealId||'Deal')+'</button>';
