@@ -376,7 +376,17 @@ function sbReq(method, table, body, query){
   var opts = {method:method, headers:Object.assign({},SB_HEADERS)};
   if(body) opts.body = JSON.stringify(body);
   if(method==='POST') opts.headers['Prefer'] = 'resolution=merge-duplicates,return=minimal';
-  return fetch(url, opts);
+  return fetch(url, opts).then(function(r){
+    if(!r.ok){
+      // Surface real HTTP errors (RLS denied, missing table, paused project)
+      return r.text().then(function(t){
+        var msg=method+' '+table+' failed ('+r.status+')';
+        console.error('Supabase error:',msg,t);
+        throw new Error(msg);
+      });
+    }
+    return r;
+  });
 }
 
 function sbUpsert(table, id, data){
@@ -450,14 +460,14 @@ function loadFromSupabase(){
 }
 
 function syncIndContact(ct){
-  sbUpsert('individual_contacts', ct._id, ct).catch(function(){flash('Sync error.','err');});
+  sbUpsert('individual_contacts', ct._id, ct).catch(function(err){flash('Contact NOT saved to database: '+err.message,'err');});
 }
 function deleteIndContact(id){
   sbReq('DELETE','individual_contacts',null,'?id=eq.'+id).catch(function(){});
 }
 
 function syncClient(client){
-  sbUpsert('clients', client._id, client).catch(function(){flash('Sync error.','err');});
+  sbUpsert('clients', client._id, client).catch(function(err){flash('Client NOT saved to database: '+err.message,'err');});
 }
 
 function deleteClient(id){
