@@ -532,6 +532,11 @@ var S={
   leadSort:'newest',
   contactView:null,
   apqTab:'pending',
+  ovFilterSvc:'All',
+  ovFilterOwner:'All',
+  ovFilterStatus:'All',
+  ovFilterPrio:'All',
+  ovFilterRange:'30',
   apqDrawer:null,
   leadSavedView:'all',
   leadFStage:'All',
@@ -2481,287 +2486,261 @@ function dcsv(rows,fn){
 }
 
 function rOverview(){
-  // ── Computed metrics ──────────────────────────────────────────────────────
-  var totalDeals=S.deals.length;
-  var totalLeads=S.leads.length;
-  var activeDeals=S.deals.filter(function(d){return d.status==='Active';}).length;
-  var completedDeals=S.deals.filter(function(d){return d.status==='Completed';}).length;
-  var onHoldDeals=S.deals.filter(function(d){return d.status==='On Hold';}).length;
-  var cancelledDeals=S.deals.filter(function(d){return d.status==='Cancelled';}).length;
+  // Strict palette — green primary, neutral greys, single accent
+  var C={
+    primary:'#275F45',
+    primaryD:'#1A4731',
+    neutral1:'#475569',
+    neutral2:'#94A3B8',
+    neutral3:'#CBD5E1',
+    bg:'#F1F5F9',
+    accent:'#C8972A',
+    danger:'#991B1B',
+    success:'#16A34A',
+    text:'#0F172A',
+    sub:'#64748B',
+    bord:'#E2E8F0'
+  };
+  // Service & stage palette: only green tints + grey/accent — no rainbow
+  var SVC_C={'Business Consulting':C.primary,'Business Brokerage':C.accent,'Business Funding':C.neutral1,'Business Valuation':C.neutral2};
+  var STAGE_C={'Draft':C.neutral3,'Submitted':C.neutral2,'Under Review':C.neutral1,'More Info Required':C.accent,'Approved':C.primary,'Converted':C.primaryD,'Rejected':C.danger};
 
-  // Leads by label
-  var hotLeads=S.leads.filter(function(l){return l.label==='Hot';}).length;
-  var warmLeads=S.leads.filter(function(l){return l.label==='Warm';}).length;
-  var coldLeads=S.leads.filter(function(l){return l.label==='Cold';}).length;
+  function pass(d,isDeal){
+    if(S.ovFilterSvc!=='All'&&d.serviceType!==S.ovFilterSvc) return false;
+    if(S.ovFilterOwner!=='All'&&(d.owner||d.ownerContact||'')!==S.ovFilterOwner) return false;
+    if(S.ovFilterPrio!=='All'&&(d.priority||'')!==S.ovFilterPrio) return false;
+    if(isDeal&&S.ovFilterStatus!=='All'&&(d.status||'')!==S.ovFilterStatus) return false;
+    var d0=d.createdAt||d.startDate||'';
+    if(d0&&S.ovFilterRange!=='all'){
+      var days=parseInt(S.ovFilterRange,10);
+      if(!isNaN(days)){var cutoff=Date.now()-days*86400000;if(new Date(d0).getTime()<cutoff) return false;}
+    }
+    return true;
+  }
+  var deals=S.deals.filter(function(d){return pass(d,true);});
+  var leads=S.leads.filter(function(l){return pass(l,false);});
 
-  // Leads by status — 'pending' = submitted awaiting approval
-  var pendingLeads=S.leads.filter(function(l){return l.leadStatus==='pending';}).length;
-  var draftLeads=S.leads.filter(function(l){return l.leadStatus==='draft';}).length;
-  var approvedLeads=S.leads.filter(function(l){return l.leadStatus==='approved';}).length;
-  // Converted leads are deleted from leads table when converted — track via deals created from leads
-  var convertedDeals=S.deals.filter(function(d){return d.source&&d.source!=='';}).length;
+  var k={
+    deals:deals.length,
+    active:deals.filter(function(d){return d.status==='Active';}).length,
+    completed:deals.filter(function(d){return d.status==='Completed';}).length,
+    hold:deals.filter(function(d){return d.status==='On Hold';}).length,
+    draft:leads.filter(function(l){return leadStage(l)==='Draft';}).length,
+    pending:leads.filter(function(l){return leadStage(l)==='Submitted'||leadStage(l)==='Under Review';}).length,
+    approved:leads.filter(function(l){return leadStage(l)==='Approved';}).length,
+    hot:leads.filter(function(l){return l.label==='Hot';}).length,
+    warm:leads.filter(function(l){return l.label==='Warm';}).length,
+    cold:leads.filter(function(l){return l.label==='Cold';}).length
+  };
+  var allDlvs=[];deals.forEach(function(d){(d.deliverables||[]).forEach(function(dl){allDlvs.push(dl);});});
+  k.dlvs=allDlvs.length;
+  k.avgProg=allDlvs.length?Math.round(allDlvs.reduce(function(a,d){return a+(d.progress||0);},0)/allDlvs.length):0;
 
-  // Deals by service type (including Valuation)
-  var svcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Business Valuation':0,'Other':0};
-  S.deals.forEach(function(d){
-    if(svcCounts[d.serviceType]!==undefined) svcCounts[d.serviceType]++;
-    else svcCounts['Other']++;
-  });
+  var owners=[];S.deals.concat(S.leads).forEach(function(r){var n=r.owner||r.ownerContact||'';if(n&&owners.indexOf(n)<0) owners.push(n);});
+  var lastRef=new Date().toLocaleString();
 
-  // Leads by service type (including Valuation)
-  var leadSvcCounts={'Business Consulting':0,'Business Brokerage':0,'Business Funding':0,'Business Valuation':0,'Other':0};
-  S.leads.forEach(function(l){
-    if(leadSvcCounts[l.serviceType]!==undefined) leadSvcCounts[l.serviceType]++;
-    else leadSvcCounts['Other']++;
-  });
+  var html='<div style="color:'+C.text+';">';
 
-  // Deliverables progress
-  var allDlvs=[];
-  S.deals.forEach(function(d){(d.deliverables||[]).forEach(function(dlv){allDlvs.push(dlv);});});
-  var totalDlvs=allDlvs.length;
-  var doneDlvs=allDlvs.filter(function(d){return d.progress===100;}).length;
-  var inProgDlvs=allDlvs.filter(function(d){return d.progress>0&&d.progress<100;}).length;
-  var avgProgress=totalDlvs?Math.round(allDlvs.reduce(function(a,d){return a+(d.progress||0);},0)/totalDlvs):0;
+  // ── Slim header bar (single row) ─────────────────────────────────────────
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 10px;border-bottom:1px solid '+C.bord+';margin-bottom:12px;">';
+  html+='<div style="display:flex;align-items:baseline;gap:10px;">';
+  html+='<span style="font-size:14px;font-weight:700;letter-spacing:-0.1px;color:'+C.text+';">Management Overview</span>';
+  html+='<span style="font-size:11px;color:'+C.sub+';">Deals, leads, approvals & deliverable progress</span>';
+  html+='</div>';
+  html+='<div style="display:flex;align-items:center;gap:10px;">';
+  html+='<span style="font-size:10px;color:'+C.neutral2+';">Last refreshed '+lastRef+'</span>';
+  html+='<button onclick="render();" style="font-size:11px;padding:3px 9px;border:1px solid '+C.bord+';background:#fff;color:'+C.neutral1+';border-radius:3px;cursor:pointer;font-family:Inter,sans-serif;">Refresh</button>';
+  html+='<button id="ov-export" style="font-size:11px;padding:3px 9px;border:1px solid '+C.bord+';background:#fff;color:'+C.neutral1+';border-radius:3px;cursor:pointer;font-family:Inter,sans-serif;">Export</button>';
+  html+='</div></div>';
 
-  // Rates
-  var approvalRate=totalLeads>0?Math.round(approvedLeads/totalLeads*100):0;
-  var totalProcessed=totalLeads+S.deals.length;
+  // ── Main grid: filter panel (right) + dashboard ─────────────────────────
+  html+='<div style="display:grid;grid-template-columns:1fr 180px;gap:12px;align-items:start;">';
 
-  // Service colours
-  var svcCol={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed','Business Valuation':'#0e7490','Other':'#94a3b8'};
+  // ── Dashboard column ─────────────────────────────────────────────────────
+  html+='<div>';
 
-  // Donut chart helper
-  function donut(segments,size){
-    var total=segments.reduce(function(a,s){return a+s.value;},0);
-    if(!total) return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:#E8F5EE;display:flex;align-items:center;justify-content:center"><span style="font-size:12px;color:#5A7A65">No data</span></div>';
-    var gradient='conic-gradient(';
-    var cum=0;
-    var parts=segments.map(function(s){
-      var pct=total>0?s.value/total*100:0;
-      var from=cum;cum+=pct;
-      return s.color+' '+from.toFixed(1)+'% '+cum.toFixed(1)+'%';
-    });
-    gradient+=parts.join(',')+')'
-    var inner=Math.round(size*0.6);
-    return '<div style="position:relative;width:'+size+'px;height:'+size+'px;border-radius:50%;background:'+gradient+';display:flex;align-items:center;justify-content:center">'+
-      '<div style="width:'+inner+'px;height:'+inner+'px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center">'+
-        '<div style="font-size:'+(size>140?22:16)+'px;font-weight:900;color:#1A4731">'+total+'</div>'+
-        '<div style="font-size:10px;color:#5A7A65;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Total</div>'+
+  // KPI grid — single row of 12 micro tiles
+  function tile(label,val){
+    return '<div style="background:#fff;border:1px solid '+C.bord+';padding:7px 9px;border-radius:3px;">'+
+      '<div style="font-size:8.5px;font-weight:700;color:'+C.neutral2+';text-transform:uppercase;letter-spacing:.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+label+'</div>'+
+      '<div style="font-size:16px;font-weight:700;color:'+C.text+';line-height:1.1;margin-top:3px;font-variant-numeric:tabular-nums;">'+val+'</div>'+
+    '</div>';
+  }
+  html+='<div style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-bottom:12px;">';
+  html+=tile('Total Deals',k.deals);
+  html+=tile('Active',k.active);
+  html+=tile('Completed',k.completed);
+  html+=tile('On Hold',k.hold);
+  html+=tile('Draft',k.draft);
+  html+=tile('Pending',k.pending);
+  html+=tile('Approved',k.approved);
+  html+=tile('Hot',k.hot);
+  html+=tile('Warm',k.warm);
+  html+=tile('Cold',k.cold);
+  html+=tile('Deliverables',k.dlvs);
+  html+=tile('Avg %',k.avgProg+'%');
+  html+='</div>';
+
+  function card(title,content,opts){
+    opts=opts||{};
+    return '<div style="background:#fff;border:1px solid '+C.bord+';border-radius:3px;padding:10px 12px;height:'+(opts.h||220)+'px;display:flex;flex-direction:column;">'+
+      '<div style="font-size:10px;font-weight:700;color:'+C.neutral1+';text-transform:uppercase;letter-spacing:.6px;padding-bottom:6px;border-bottom:1px solid '+C.bord+';margin-bottom:8px;">'+title+'</div>'+
+      '<div style="flex:1;overflow:hidden;">'+content+'</div>'+
+    '</div>';
+  }
+  function empty(){return '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:'+C.neutral2+';font-size:10px;">No data</div>';}
+  function hBar(label,count,total,color){
+    var pct=total>0?Math.round(count/total*100):0;
+    return '<div style="margin-bottom:7px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;">'+
+        '<span style="font-size:10.5px;color:'+C.text+';font-weight:500;">'+e(label)+'</span>'+
+        '<span style="font-size:10.5px;color:'+C.sub+';font-variant-numeric:tabular-nums;"><strong style="color:'+C.text+';">'+count+'</strong> &middot; '+pct+'%</span>'+
       '</div>'+
+      '<div style="height:5px;background:'+C.bg+';border-radius:2px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+color+';"></div></div>'+
     '</div>';
   }
 
-  // Bar chart helper
-  function barChart(items,maxVal,height,accentCol){
-    if(!items.length||!maxVal) return '<div style="color:#5A7A65;font-size:12px;padding:20px;text-align:center">No data yet</div>';
-    return '<div style="display:flex;align-items:flex-end;gap:6px;height:'+height+'px;padding-top:10px">'+
-      items.map(function(item){
-        var pct=maxVal>0?item.value/maxVal*100:0;
-        var barH=Math.max(4,Math.round(pct*(height-30)/100));
-        var col=item.color||accentCol||'#2D6A4F';
-        return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end">'+
-          '<div style="font-size:11px;font-weight:700;color:'+col+'">'+item.value+'</div>'+
-          '<div style="width:100%;height:'+barH+'px;background:'+col+';border-radius:4px 4px 0 0;min-height:4px"></div>'+
-          '<div style="font-size:9px;color:#5A7A65;text-align:center;line-height:1.3;max-width:100%;overflow:hidden;word-break:break-word">'+e(item.label)+'</div>'+
-        '</div>';
-      }).join('')+
+  var svcs=['Business Consulting','Business Brokerage','Business Funding','Business Valuation'];
+
+  // Row 1
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">';
+  var c1='';
+  if(!deals.length) c1=empty();
+  else svcs.forEach(function(svc){var n=deals.filter(function(d){return d.serviceType===svc;}).length;c1+=hBar(svc.replace('Business ',''),n,deals.length,SVC_C[svc]);});
+  html+=card('Deal Mix by Service Type',c1);
+
+  var c2='';
+  if(!leads.length) c2=empty();
+  else [['Hot',C.danger],['Warm',C.accent],['Cold',C.neutral2]].forEach(function(t){var n=leads.filter(function(l){return l.label===t[0];}).length;c2+=hBar(t[0],n,leads.length,t[1]);});
+  html+=card('Lead Temperature Mix',c2);
+
+  var gP=k.avgProg;
+  var rot=(gP*1.8)-90;
+  var gauge='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;">'+
+    '<div style="position:relative;width:140px;height:70px;overflow:hidden;">'+
+      '<div style="position:absolute;top:0;left:0;width:140px;height:140px;border-radius:50%;border:9px solid '+C.bg+';box-sizing:border-box;"></div>'+
+      '<div style="position:absolute;top:0;left:0;width:140px;height:140px;border-radius:50%;border:9px solid '+C.primary+';box-sizing:border-box;clip-path:polygon(0 0,100% 0,100% 50%,0 50%);transform:rotate('+rot+'deg);transform-origin:70px 70px;"></div>'+
+    '</div>'+
+    '<div style="font-size:28px;font-weight:700;color:'+C.text+';line-height:1;margin-top:-2px;font-variant-numeric:tabular-nums;">'+gP+'<span style="font-size:14px;color:'+C.sub+';">%</span></div>'+
+    '<div style="font-size:9.5px;color:'+C.sub+';text-transform:uppercase;letter-spacing:.5px;margin-top:6px;">'+k.dlvs+' deliverables tracked</div>'+
+  '</div>';
+  html+=card('Average Deliverable Progress',gauge);
+  html+='</div>';
+
+  // Row 2
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">';
+  var c3='';
+  if(!deals.length) c3=empty();
+  else [['Active',C.primary],['Completed',C.success],['On Hold',C.accent],['Cancelled',C.danger]].forEach(function(st){var n=deals.filter(function(d){return d.status===st[0];}).length;if(n>0||st[0]==='Active'||st[0]==='Completed') c3+=hBar(st[0],n,deals.length,st[1]);});
+  html+=card('Deals by Status',c3);
+
+  var c4='';
+  if(!leads.length) c4=empty();
+  else svcs.forEach(function(svc){var n=leads.filter(function(l){return l.serviceType===svc;}).length;c4+=hBar(svc.replace('Business ',''),n,leads.length,SVC_C[svc]);});
+  html+=card('Leads by Service Type',c4);
+
+  var c5='';
+  var stages=['Draft','Submitted','Under Review','More Info Required','Approved','Converted','Rejected'];
+  if(!leads.length) c5=empty();
+  else { var any=false; stages.forEach(function(st){var n=leads.filter(function(l){return leadStage(l)===st;}).length;if(n>0){c5+=hBar(st,n,leads.length,STAGE_C[st]);any=true;}}); if(!any)c5=empty(); }
+  html+=card('Approval Funnel',c5);
+  html+='</div>';
+
+  // Row 3
+  html+='<div style="display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:8px;">';
+  var snap='';
+  var snapLeads=[].concat(leads).reverse().slice(0,6);
+  if(!snapLeads.length) snap=empty();
+  else {
+    snap+='<table style="width:100%;border-collapse:collapse;font-size:10.5px;">';
+    snapLeads.forEach(function(l){
+      var stg=leadStage(l);var sc=STAGE_C[stg]||C.neutral2;
+      snap+='<tr style="border-bottom:1px solid '+C.bord+';">'+
+        '<td style="padding:5px 0;"><div style="font-weight:600;color:'+C.text+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">'+e(l.bizName||l.ownerContact||'\u2014')+'</div><div style="font-size:9px;color:'+C.neutral2+';font-family:monospace;">'+e(l.leadId||'')+'</div></td>'+
+        '<td style="padding:5px 0;text-align:right;"><span style="background:'+sc+'14;color:'+sc+';border:1px solid '+sc+'30;border-radius:2px;padding:1px 5px;font-size:9px;font-weight:700;white-space:nowrap;">'+stg+'</span></td>'+
+      '</tr>';
+    });
+    snap+='</table>';
+  }
+  html+=card('Lead Pipeline Snapshot',snap);
+
+  var dprog='';
+  if(!allDlvs.length) dprog=empty();
+  else {
+    var ds=deals.map(function(d){
+      var dl=(d.deliverables||[]);
+      var avg=dl.length?Math.round(dl.reduce(function(a,x){return a+(x.progress||0);},0)/dl.length):0;
+      return {name:d.bizName||d.dealId||'\u2014',pct:avg,count:dl.length};
+    }).filter(function(x){return x.count>0;}).sort(function(a,b){return a.pct-b.pct;}).slice(0,6);
+    ds.forEach(function(p){
+      var pc=p.pct===100?C.success:p.pct>=60?C.primary:p.pct>=30?C.accent:C.danger;
+      dprog+='<div style="margin-bottom:7px;">'+
+        '<div style="display:flex;justify-content:space-between;font-size:10.5px;margin-bottom:3px;align-items:baseline;"><span style="color:'+C.text+';font-weight:500;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(p.name)+'</span><span style="color:'+C.sub+';font-variant-numeric:tabular-nums;"><strong style="color:'+pc+';">'+p.pct+'%</strong></span></div>'+
+        '<div style="height:4px;background:'+C.bg+';border-radius:2px;overflow:hidden;"><div style="width:'+p.pct+'%;height:100%;background:'+pc+';"></div></div>'+
+      '</div>';
+    });
+  }
+  html+=card('Deliverable Progress by Deal',dprog);
+
+  var alerts=[];
+  if(k.pending>0) alerts.push([k.pending+' lead'+(k.pending!==1?'s':'')+' pending approval',C.accent]);
+  if(k.hold>0) alerts.push([k.hold+' deal'+(k.hold!==1?'s':'')+' on hold',C.accent]);
+  var overdue=S.deals.filter(isOverdue).length;
+  if(overdue>0) alerts.push([overdue+' deal'+(overdue!==1?'s':'')+' overdue',C.danger]);
+  var blocked=S.deals.filter(function(d){return d.blocker&&d.blocker!=='None';}).length;
+  if(blocked>0) alerts.push([blocked+' deal'+(blocked!==1?'s':'')+' blocked',C.danger]);
+  var noDocs=S.leads.filter(function(l){return !l.converted&&!(l.files&&l.files.length>0);}).length;
+  if(noDocs>0) alerts.push([noDocs+' lead'+(noDocs!==1?'s':'')+' missing documents',C.neutral1]);
+  var waiting=S.deals.filter(function(d){return d.blocker==='Waiting on Client';}).length;
+  if(waiting>0) alerts.push([waiting+' deal'+(waiting!==1?'s':'')+' waiting on client',C.accent]);
+  var lowProg=deals.filter(function(d){var dl=d.deliverables||[];if(!dl.length||d.status!=='Active') return false;var p=dl.reduce(function(a,x){return a+(x.progress||0);},0)/dl.length;return p<25;}).length;
+  if(lowProg>0) alerts.push([lowProg+' active deal'+(lowProg!==1?'s':'')+' under 25% progress',C.accent]);
+
+  var alertHtml='';
+  if(!alerts.length) alertHtml='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:'+C.success+';"><div style="font-size:11px;font-weight:700;">All clear</div><div style="font-size:10px;color:'+C.neutral2+';margin-top:2px;">No items need attention</div></div>';
+  else alerts.forEach(function(a){
+    alertHtml+='<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-left:2px solid '+a[1]+';background:'+a[1]+'08;border-radius:0 2px 2px 0;margin-bottom:4px;">'+
+      '<span style="font-size:10.5px;color:'+C.text+';flex:1;">'+a[0]+'</span>'+
     '</div>';
+  });
+  html+=card('Management Attention',alertHtml);
+  html+='</div>';
+
+  html+='</div>'; // close dashboard col
+
+  // ── Right filter panel ──────────────────────────────────────────────────
+  html+='<aside style="background:#fff;border:1px solid '+C.bord+';border-radius:3px;padding:12px;position:sticky;top:8px;">';
+  html+='<div style="font-size:10px;font-weight:700;color:'+C.neutral1+';text-transform:uppercase;letter-spacing:.7px;padding-bottom:8px;border-bottom:1px solid '+C.bord+';margin-bottom:10px;">Filters</div>';
+  function fLabel(t){return '<div style="font-size:9.5px;font-weight:600;color:'+C.neutral2+';text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;margin-top:8px;">'+t+'</div>';}
+  function fSel(id,opts,cur,firstLabel){
+    var o='<select id="'+id+'" style="width:100%;font-size:11px;padding:5px 7px;border:1px solid '+C.bord+';border-radius:3px;color:'+C.text+';font-family:Inter,sans-serif;background:#fff;">';
+    o+='<option value="All"'+(cur==='All'?' selected':'')+'>'+(firstLabel||'All')+'</option>';
+    opts.forEach(function(x){o+='<option'+(cur===x?' selected':'')+'>'+e(x)+'</option>';});
+    return o+'</select>';
   }
-
-  var html='<div>';
-
-  // ── Page Header ───────────────────────────────────────────────────────────
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:32px 36px;margin-bottom:24px;position:relative;overflow:hidden">';
-  html+='<div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(200,151,42,.12)"></div>';
-  html+='<div style="position:absolute;bottom:-60px;left:200px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.05)"></div>';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">MANAGEMENT OVERVIEW &nbsp;&middot;&nbsp; AFRICAN ASPIRATIONS</div>';
-  html+='<div style="font-size:28px;font-weight:900;color:#fff;margin-bottom:4px">Pipeline Summary</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6);margin-bottom:20px">Real-time view of deals, leads and deliverable progress</div>';
-  html+='<div style="display:flex;gap:24px;flex-wrap:wrap">';
-  [
-    [totalDeals,'Total Deals','#C8972A'],
-    [totalLeads,'Active Leads','#fff'],
-    [pendingLeads,'Pending Approval','#fed7aa'],
-    [approvedLeads,'Approved Leads','#86efac'],
-    [approvalRate+'%','Approval Rate','#a5b4fc']
-  ].forEach(function(x){
-    html+='<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:'+x[2]+'">'+x[0]+'</div><div style="font-size:11px;color:rgba(255,255,255,.55);font-weight:600;letter-spacing:.7px;margin-top:2px">'+x[1].toUpperCase()+'</div></div>';
-  });
-  html+='</div></div>';
-
-  // ── KPI Cards ─────────────────────────────────────────────────────────────
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px">';
-  [
-    ['Active Deals',activeDeals,'#2D6A4F','#E8F5EE','&#9889;'],
-    ['Completed Deals',completedDeals,'#16a34a','#f0fdf4','&#9989;'],
-    ['On Hold',onHoldDeals,'#C8972A','#FDF8EE','&#9208;'],
-    ['Cancelled',cancelledDeals,'#dc2626','#fef2f2','&#10060;'],
-    ['Draft Leads',draftLeads,'#2563eb','#eff6ff','&#128221;'],
-    ['Pending Approval',pendingLeads,'#c2410c','#fff7ed','&#9203;'],
-    ['Approved Leads',approvedLeads,'#16a34a','#f0fdf4','&#128505;'],
-    ['Hot Leads',hotLeads,'#2D6A4F','#E8F5EE','&#128293;'],
-    ['Warm Leads',warmLeads,'#C8972A','#FDF8EE','&#9728;'],
-    ['Cold Leads',coldLeads,'#2563eb','#eff6ff','&#10052;'],
-    ['Total Deliverables',totalDlvs,'#1A4731','#E8F5EE','&#128203;'],
-    ['Avg Progress',avgProgress+'%','#C8972A','#FDF8EE','&#128200;']
-  ].forEach(function(x){
-    html+='<div style="background:'+x[3]+';border:1px solid '+x[2]+'30;border-radius:12px;padding:16px 18px;border-top:3px solid '+x[2]+'">';
-    html+='<div style="font-size:22px;margin-bottom:6px">'+x[4]+'</div>';
-    html+='<div style="font-size:28px;font-weight:900;color:'+x[2]+';line-height:1">'+x[1]+'</div>';
-    html+='<div style="font-size:11px;font-weight:700;color:'+x[2]+';opacity:.7;margin-top:4px;letter-spacing:.5px">'+x[0].toUpperCase()+'</div>';
-    html+='</div>';
-  });
+  html+=fLabel('Date Range');
+  html+='<select id="ov-range" style="width:100%;font-size:11px;padding:5px 7px;border:1px solid '+C.bord+';border-radius:3px;font-family:Inter,sans-serif;background:#fff;">';
+  [['7','Last 7 days'],['30','Last 30 days'],['90','Last 90 days'],['365','Last 12 months'],['all','All time']].forEach(function(o){html+='<option value="'+o[0]+'"'+(S.ovFilterRange===o[0]?' selected':'')+'>'+o[1]+'</option>';});
+  html+='</select>';
+  html+=fLabel('Service Type');
+  html+=fSel('ov-svc',['Business Consulting','Business Brokerage','Business Funding','Business Valuation'],S.ovFilterSvc,'All Services');
+  html+=fLabel('Owner');
+  html+=fSel('ov-owner',owners,S.ovFilterOwner,'All Owners');
+  html+=fLabel('Deal Status');
+  html+=fSel('ov-status',['Active','Completed','On Hold','Cancelled'],S.ovFilterStatus,'All Statuses');
+  html+=fLabel('Priority');
+  html+=fSel('ov-prio',['High Priority','High','Medium','Low'],S.ovFilterPrio,'All Priorities');
+  html+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid '+C.bord+';font-size:10.5px;color:'+C.sub+';line-height:1.5;">';
+  html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span>Deals</span><strong style="color:'+C.text+';font-variant-numeric:tabular-nums;">'+deals.length+'</strong></div>';
+  html+='<div style="display:flex;justify-content:space-between;"><span>Leads</span><strong style="color:'+C.text+';font-variant-numeric:tabular-nums;">'+leads.length+'</strong></div>';
   html+='</div>';
+  html+='</aside>';
 
-  // ── Donuts: Deal Mix + Lead Temperature ───────────────────────────────────
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-
-  // Deal mix by service type
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
-  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deal Mix by Service Type</div>';
-  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalDeals+' deal'+(totalDeals!==1?'s':'')+' total</div>';
-  var dealSegs=[
-    {label:'Consulting',value:svcCounts['Business Consulting'],color:'#2D6A4F'},
-    {label:'Brokerage',value:svcCounts['Business Brokerage'],color:'#C8972A'},
-    {label:'Funding',value:svcCounts['Business Funding'],color:'#7c3aed'},
-    {label:'Valuation',value:svcCounts['Business Valuation'],color:'#0e7490'},
-    {label:'Other',value:svcCounts['Other'],color:'#94a3b8'}
-  ].filter(function(s){return s.value>0;});
-  html+='<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
-  html+=donut(dealSegs,140);
-  html+='<div style="display:flex;flex-direction:column;gap:8px">';
-  dealSegs.forEach(function(s){
-    var pct=totalDeals>0?Math.round(s.value/totalDeals*100):0;
-    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+e(s.label)+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto;padding-left:8px">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
-  });
-  if(!dealSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No deals yet</div>';
-  html+='</div></div></div>';
-
-  // Lead temperature donut
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
-  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Lead Temperature Mix</div>';
-  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:16px">'+totalLeads+' lead'+(totalLeads!==1?'s':'')+' in pipeline</div>';
-  var leadSegs=[
-    {label:'Hot &#128293;',value:hotLeads,color:'#2D6A4F'},
-    {label:'Warm &#9728;',value:warmLeads,color:'#C8972A'},
-    {label:'Cold &#10052;',value:coldLeads,color:'#2563eb'}
-  ].filter(function(s){return s.value>0;});
-  html+='<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
-  html+=donut(leadSegs,140);
-  html+='<div style="display:flex;flex-direction:column;gap:8px">';
-  leadSegs.forEach(function(s){
-    var pct=totalLeads>0?Math.round(s.value/totalLeads*100):0;
-    html+='<div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:3px;background:'+s.color+';flex-shrink:0"></div><div style="font-size:12px;color:#1A4731;font-weight:600">'+s.label+'</div><div style="font-size:13px;font-weight:800;color:'+s.color+';margin-left:auto;padding-left:8px">'+s.value+' <span style="font-size:10px;opacity:.7">('+pct+'%)</span></div></div>';
-  });
-  if(!leadSegs.length) html+='<div style="font-size:12px;color:#5A7A65">No leads yet</div>';
-  html+='</div></div></div>';
-  html+='</div>';
-
-  // ── Bar Charts: Deals by Status + Leads by Service Type ──────────────────
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
-  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Deals by Status</div>';
-  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Current distribution</div>';
-  var statusItems=[
-    {label:'Active',value:activeDeals,color:'#2D6A4F'},
-    {label:'Completed',value:completedDeals,color:'#16a34a'},
-    {label:'On Hold',value:onHoldDeals,color:'#C8972A'},
-    {label:'Cancelled',value:cancelledDeals,color:'#dc2626'}
-  ].filter(function(x){return x.value>0;});
-  var maxStatus=Math.max.apply(null,[1].concat(statusItems.map(function(x){return x.value;})));
-  html+=barChart(statusItems,maxStatus,160,'#2D6A4F');
-  html+='</div>';
-
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:22px">';
-  html+='<div style="font-size:14px;font-weight:800;color:#1A4731;margin-bottom:4px">Leads by Service Type</div>';
-  html+='<div style="font-size:11px;color:#5A7A65;margin-bottom:14px">Enquiry breakdown</div>';
-  var leadSvcItems=[
-    {label:'Consulting',value:leadSvcCounts['Business Consulting'],color:'#2D6A4F'},
-    {label:'Brokerage',value:leadSvcCounts['Business Brokerage'],color:'#C8972A'},
-    {label:'Funding',value:leadSvcCounts['Business Funding'],color:'#7c3aed'},
-    {label:'Valuation',value:leadSvcCounts['Business Valuation'],color:'#0e7490'},
-    {label:'Other',value:leadSvcCounts['Other'],color:'#94a3b8'}
-  ].filter(function(x){return x.value>0;});
-  var maxLeadSvc=Math.max.apply(null,[1].concat(leadSvcItems.map(function(x){return x.value;})));
-  html+=barChart(leadSvcItems,maxLeadSvc,160,'#2D6A4F');
-  html+='</div>';
-  html+='</div>';
-
-  // ── Lead Pipeline Snapshot + Deliverable Progress ─────────────────────────
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
-
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
-  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128203; Lead Pipeline Snapshot</div></div>';
-  var snapRows=[
-    ['Total Leads in Pipeline',totalLeads,'#1A4731'],
-    ['Draft',draftLeads,'#2563eb'],
-    ['Pending Approval',pendingLeads,'#c2410c'],
-    ['Approved',approvedLeads,'#16a34a'],
-    ['Hot Leads',hotLeads,'#2D6A4F'],
-    ['Warm Leads',warmLeads,'#C8972A'],
-    ['Cold Leads',coldLeads,'#2563eb'],
-    ['Approval Rate',approvalRate+'%','#7c3aed']
-  ];
-  snapRows.forEach(function(row,i){
-    html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 18px;border-bottom:1px solid #E8F5EE;background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-    html+='<div style="font-size:13px;color:#5A7A65;font-weight:500">'+row[0]+'</div>';
-    html+='<div style="font-size:16px;font-weight:900;color:'+row[2]+'">'+row[1]+'</div>';
-    html+='</div>';
-  });
-  html+='</div>';
-
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden">';
-  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128202; Deliverable Progress by Deal</div></div>';
-  html+='<div style="padding:16px 18px">';
-  if(!S.deals.length||!allDlvs.length){
-    html+='<div style="text-align:center;padding:20px;color:#5A7A65;font-size:13px">No deliverables yet.</div>';
-  } else {
-    S.deals.forEach(function(d){
-      var dlvs=d.deliverables||[];if(!dlvs.length) return;
-      var avg=Math.round(dlvs.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs.length);
-      var col=svcCol[d.serviceType]||'#2D6A4F';
-      var barCol=avg===100?'#16a34a':avg>=65?col:avg>=35?'#C8972A':'#94a3b8';
-      html+='<div style="margin-bottom:14px">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:5px">';
-      html+='<div><div style="font-size:12px;font-weight:700;color:#1A4731">'+e(d.bizName||d.dealId||'Deal')+'</div>';
-      html+='<div style="font-size:10px;color:'+col+';font-weight:600">'+e(d.serviceType||'')+'</div></div>';
-      html+='<span style="font-size:14px;font-weight:900;color:'+barCol+'">'+avg+'%</span>';
-      html+='</div>';
-      html+='<div style="height:10px;background:#E8F5EE;border-radius:5px;overflow:hidden">';
-      html+='<div style="width:'+avg+'%;height:100%;background:linear-gradient(90deg,'+barCol+','+barCol+'bb);border-radius:5px"></div>';
-      html+='</div>';
-      html+='<div style="font-size:10px;color:#5A7A65;margin-top:3px">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+' &nbsp;&middot;&nbsp; '+dlvs.filter(function(x){return x.progress===100;}).length+' completed</div>';
-      html+='</div>';
-    });
-  }
-  html+='</div></div>';
-  html+='</div>';
-
-  // ── Recent Activity ───────────────────────────────────────────────────────
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128336; Recent Activity Log</div></div>';
-  var recentAudit=[].concat(S.auditLog).reverse().slice(0,8);
-  if(!recentAudit.length){
-    html+='<div style="padding:24px;text-align:center;color:#5A7A65;font-size:13px">No activity recorded yet.</div>';
-  } else {
-    html+='<div style="overflow-x:auto"><table><thead><tr><th>LEAD ID</th><th>USER</th><th>ACTION</th><th>TIME</th></tr></thead><tbody>';
-    recentAudit.forEach(function(en,i){
-      html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-      html+='<td><span class="badge-id">'+e(en.leadId)+'</span></td>';
-      html+='<td style="font-weight:600;color:#1A4731">'+e(en.user||'?')+'</td>';
-      html+='<td>'+(en.field==='n/a'?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.next)+'</span>':'<span style="background:#FDF8EE;color:#C8972A;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600">'+e(en.field)+'</span>')+'</td>';
-      html+='<td style="color:#5A7A65;font-size:11px;white-space:nowrap">'+e(en.ts)+'</td>';
-      html+='</tr>';
-    });
-    html+='</tbody></table></div>';
-  }
   html+='</div>';
 
   html+='</div>';
   return html;
 }
-
 
 function rUsers(){
   var isAdmin=S.currentUser&&S.currentUser.role==='admin';
@@ -4422,6 +4401,14 @@ function bind(){
     S.confirmModal=null;render();
   });
   // ── Approval queue bindings ───────────────────────────────────────────────
+  // ── Management Overview filter bindings ──────────────────────────────────
+  [['ov-range','ovFilterRange'],['ov-svc','ovFilterSvc'],['ov-owner','ovFilterOwner'],['ov-status','ovFilterStatus'],['ov-prio','ovFilterPrio']].forEach(function(p){
+    var el=document.getElementById(p[0]);
+    if(el) el.addEventListener('change',function(){S[p[1]]=el.value;render();});
+  });
+  var ovExp=document.getElementById('ov-export');
+  if(ovExp) ovExp.addEventListener('click',function(){flash('Use Export CSV inside Leads / Pipeline tabs for raw data.');});
+
   document.querySelectorAll('.apq-kpi,.apq-tab').forEach(function(el){
     el.addEventListener('click',function(){S.apqTab=el.dataset.tab;render();});
   });
