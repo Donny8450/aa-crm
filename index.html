@@ -1818,7 +1818,13 @@ function rLeadForm(){
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
-          '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
+          '<div><div class="field-lbl">Owner / Main Contact of Business *</div>'+
+            '<select name="ownerContact" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">'+
+              '<option value="">Select an owner...</option>'+
+              S.users.map(function(u){return '<option'+(lf.ownerContact===u.name?' selected':'')+'>'+e(u.name)+'</option>';}).join('')+
+              (lf.ownerContact&&!S.users.filter(function(u){return u.name===lf.ownerContact;}).length?'<option selected>'+e(lf.ownerContact)+'</option>':'')+
+            '</select>'+
+            '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Pick from team members &mdash; ensures correct deal ownership after conversion</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Phone</div><input name="phone" value="'+e(lf.phone)+'" placeholder="+233 000 0000"/></div>'+
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
@@ -1901,7 +1907,13 @@ function rLL(){
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Sales Lead <span style="font-size:10px;font-weight:400;color:#5A7A65">(optional)</span></div><input name="salesLead" value="'+e(lf.salesLead||'')+'" placeholder="e.g. Name of sales person or referrer..."/></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
-          '<div><div class="field-lbl">Owner / Main Contact of Business *</div><input name="ownerContact" value="'+e(lf.ownerContact)+'" placeholder="e.g. Kwame Mensah"/></div>'+
+          '<div><div class="field-lbl">Owner / Main Contact of Business *</div>'+
+            '<select name="ownerContact" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">'+
+              '<option value="">Select an owner...</option>'+
+              S.users.map(function(u){return '<option'+(lf.ownerContact===u.name?' selected':'')+'>'+e(u.name)+'</option>';}).join('')+
+              (lf.ownerContact&&!S.users.filter(function(u){return u.name===lf.ownerContact;}).length?'<option selected>'+e(lf.ownerContact)+'</option>':'')+
+            '</select>'+
+            '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Pick from team members &mdash; ensures correct deal ownership after conversion</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Phone</div><input name="phone" value="'+e(lf.phone)+'" placeholder="+233 000 0000"/></div>'+
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
@@ -2289,19 +2301,78 @@ function subLead(){
 }
 
 function cvt(id){
-  var l=S.leads.filter(function(x){return x._id===id;})[0];if(!l) return;
-  if(!l.approved){flash('This lead must be approved by an authorised user before it can be converted to a deal.','err');return;}
+  var l=S.leads.filter(function(x){return x._id===id;})[0];
+  if(!l){flash('Lead not found.','err');return;}
 
-  var nid=l.leadId;  // Keep the same ID from the lead
+  // ── BLOCKER #3 GUARD: enforce readiness before conversion ────────────────
+  if(l.converted){flash('This lead has already been converted.','err');return;}
+  if(!(l.approved||l.leadStatus==='approved')){flash('Lead is not approved. Approve it first before converting.','err');return;}
+  if(!(l.files&&l.files.length>0)){flash('Cannot convert: required documents are missing.','err');return;}
+  if(!l.bizName||!l.bizName.trim()){flash('Cannot convert: business name is missing.','err');return;}
+  if(!l.serviceType){flash('Cannot convert: service type is missing.','err');return;}
+  if(!l.ownerContact||!l.ownerContact.trim()){flash('Cannot convert: owner/contact is missing.','err');return;}
+
+  // ── BLOCKER #7 GUARD: prevent double-convert race ─────────────────────────
+  var existing=S.deals.filter(function(d){return d.convertedFromLead===l._id;})[0];
+  if(existing){flash('Lead already linked to deal '+(existing.dealId||existing._id),'err');return;}
+
+  var nid=nextDealId(l.serviceType);
   var convertor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
-  var newDeal2=Object.assign({},bDeal(),{_id:'D'+Date.now(),dealId:nid,bizName:l.bizName||l.ownerContact||'',serviceType:l.serviceType||'',owner:l.ownerContact||'',email:l.email||'',phone:l.phone||'',source:l.source||'',projectBrief:l.projectBrief||'',startDate:l.startDate||'',endDate:l.endDate||'',status:'Active',files:l.files||[],deliverables:[],createdAt:new Date().toISOString(),createdBy:convertor,convertedFromLeadId:l.leadId||'',convertedFromLead:l._id,leadCreatedAt:l.createdAt||'',leadCreatedBy:l.createdBy||'',leadApprovedAt:l.approvedAt||'',leadApprovedBy:l.approvedBy||'',convertedAt:new Date().toISOString(),convertedBy:convertor});
+  var convTs=new Date().toISOString();
+
+  var newDeal2=Object.assign({},bDeal(),{
+    _id:'D'+Date.now(),
+    dealId:nid,
+    bizName:l.bizName||l.ownerContact||'',
+    serviceType:l.serviceType||'',
+    owner:l.ownerContact||'',
+    email:l.email||'',phone:l.phone||'',source:l.source||'',
+    projectBrief:l.projectBrief||'',
+    startDate:l.startDate||'',endDate:l.endDate||'',
+    status:'Active',
+    files:l.files||[],
+    deliverables:[],
+    // Audit lineage
+    createdAt:convTs, createdBy:convertor,
+    convertedFromLeadId:l.leadId||'',
+    convertedFromLead:l._id,
+    leadCreatedAt:l.createdAt||'',
+    leadCreatedBy:l.createdBy||'',
+    leadApprovedAt:l.approvedAt||'',
+    leadApprovedBy:l.approvedBy||'',
+    convertedAt:convTs,
+    convertedBy:convertor
+  });
+
   S.deals=S.deals.concat([newDeal2]);
   syncDeal(newDeal2);
-  // Remove lead from pipeline after conversion - no duplication
-  S.leads=S.leads.filter(function(x){return x._id!==id;});
-  deleteLead(id);
-  flash('"'+l.contactPerson+'" converted to Pipeline!');
-  S.tab='pipeline';render();
+
+  // ── BLOCKER #1 FIX: stamp lead as converted ──────────────────────────────
+  S.leads=S.leads.map(function(x){
+    if(x._id!==l._id) return x;
+    var u=Object.assign({},x,{
+      converted:true,
+      convertedAt:convTs,
+      convertedBy:convertor,
+      convertedToDealId:newDeal2.dealId,
+      convertedToDealRef:newDeal2._id,
+      leadStatus:'converted',
+      updatedAt:convTs,
+      updatedBy:convertor
+    });
+    syncLead(u);
+    return u;
+  });
+
+  // Audit entries on both sides
+  var en1={_id:Date.now(),leadId:l.leadId||'',user:convertor,field:'Conversion',prev:'Approved',next:'Converted to '+nid,ts:new Date().toLocaleString()};
+  S.auditLog=S.auditLog.concat([en1]);syncAudit(en1);
+  var en2={_id:Date.now()+1,dealRef:newDeal2._id,dealId:nid,user:convertor,field:'Created',prev:'',next:'Converted from lead '+(l.leadId||''),ts:new Date().toLocaleString()};
+  S.dealAuditLog=S.dealAuditLog.concat([en2]);
+
+  S.convertModal=null;
+  flash('Lead converted to deal '+nid+'!');
+  render();
 }
 
 function openApprovalModal(leadId, action){
@@ -2327,11 +2398,39 @@ function confirmApproval(){
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
   var isReject=S.approvalAction==='reject';
+  var aprTs=new Date().toISOString();
+  // ── BLOCKER #5: capture optional reason for reject ────────────────────────
+  var reason=(document.getElementById('apr-reason')||{}).value||'';
+  if(isReject&&!reason.trim()){
+    var errEl=document.getElementById('apr-err');
+    if(errEl){errEl.textContent='A rejection reason is required.';errEl.style.display='block';}
+    return;
+  }
   S.leads=S.leads.map(function(l){
     if(l._id!==leadId) return l;
     var updated=isReject
-      ?Object.assign({},l,{rejected:true,rejectedBy:match.name,rejectedAt:new Date().toISOString(),leadStatus:'rejected',approved:false})
-      :Object.assign({},l,{approved:true,approvedBy:match.name,approvedAt:new Date().toISOString(),leadStatus:'approved',rejected:false});
+      ?Object.assign({},l,{
+          rejected:true,
+          rejectedBy:match.name,
+          rejectedAt:aprTs,
+          rejectionReason:reason.trim(),
+          leadStatus:'rejected',
+          approved:false,
+          // ── BLOCKER #13 FIX: clear stale approval stamp on reject ─────────
+          approvedAt:'', approvedBy:'',
+          updatedAt:aprTs, updatedBy:match.name
+        })
+      :Object.assign({},l,{
+          approved:true,
+          approvedBy:match.name,
+          approvedAt:aprTs,
+          leadStatus:'approved',
+          rejected:false,
+          // BLOCKER #13: clear stale rejection on re-approve
+          rejectedAt:'', rejectedBy:'', rejectionReason:'',
+          // ── BLOCKER #2 FIX: stamp updatedAt on approval ───────────────────
+          updatedAt:aprTs, updatedBy:match.name
+        });
     syncLead(updated);
     return updated;
   });
@@ -4079,7 +4178,8 @@ function rApprovals(){
         if(ardy==='Ready to Convert') html+='<button class="cnv btn btn-sm" data-id="'+e(al._id)+'" style="width:100%;">&#9889; Convert to Deal</button>';
         else html+='<button class="btn btn-sm" disabled title="'+e(ardy)+'" style="width:100%;background:#fff;color:#9BA8A2;border:1px solid #D8E3DC;cursor:not-allowed;">Convert &mdash; '+ardy+'</button>';
       } else if(aStg==='Rejected'){
-        html+='<div style="font-size:12px;color:#dc2626;font-weight:600;margin-bottom:8px;">Rejected by '+e(al.rejectedBy||'')+'</div>';
+        html+='<div style="font-size:12px;color:#dc2626;font-weight:600;margin-bottom:4px;">Rejected by '+e(al.rejectedBy||'')+'</div>';
+        if(al.rejectionReason) html+='<div style="font-size:11px;color:#5F6B65;background:#FEF2F2;border:1px solid #FECACA;padding:6px 10px;border-radius:4px;margin-bottom:8px;line-height:1.5;"><strong style="color:#991B1B;">Reason:</strong> '+e(al.rejectionReason)+'</div>';
         html+='<button class="aprbtn btn btn-ghost btn-sm" data-id="'+e(al._id)+'" style="width:100%;">Re-approve Lead</button>';
       } else {
         html+='<div style="display:flex;flex-direction:column;gap:7px;">';
