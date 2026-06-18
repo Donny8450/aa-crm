@@ -1282,7 +1282,8 @@ function rPipe(){
 
   // ── Saved view base filter ───────────────────────────────────────────────
   var VISD=visDeals();
-  var ds=[].concat(VISD);
+  // Hide archived/reverted deals from active pipeline
+  var ds=[].concat(VISD).filter(function(d){return !d.archived;});
   var sv=S.pipeSavedView||'active';
   if(sv==='active') ds=ds.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';});
   else if(sv==='mine') ds=ds.filter(function(d){return (d.owner||'').toLowerCase().indexOf(me.toLowerCase())>=0&&me;});
@@ -1306,13 +1307,14 @@ function rPipe(){
 
   // ── KPIs ─────────────────────────────────────────────────────────────────
   var monthStr=new Date().toISOString().slice(0,7);
-  var kActive=VISD.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';}).length;
-  var kNew=VISD.filter(function(d){return dealStage(d)==='New Deal';}).length;
-  var kDueWk=VISD.filter(isDueThisWeek).length;
-  var kOver=VISD.filter(isOverdue).length;
-  var kBlocked=VISD.filter(function(d){return d.blocker&&d.blocker!=='None';}).length;
-  var kWaiting=VISD.filter(function(d){return d.blocker==='Waiting on Client';}).length;
-  var kDoneMo=VISD.filter(function(d){return dealStage(d)==='Completed'&&(d.completedAt||'').slice(0,7)===monthStr;}).length;
+  var _activeVISD=VISD.filter(function(d){return !d.archived;});
+  var kActive=_activeVISD.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';}).length;
+  var kNew=_activeVISD.filter(function(d){return dealStage(d)==='New Deal';}).length;
+  var kDueWk=_activeVISD.filter(isDueThisWeek).length;
+  var kOver=_activeVISD.filter(isOverdue).length;
+  var kBlocked=_activeVISD.filter(function(d){return d.blocker&&d.blocker!=='None';}).length;
+  var kWaiting=_activeVISD.filter(function(d){return d.blocker==='Waiting on Client';}).length;
+  var kDoneMo=_activeVISD.filter(function(d){return dealStage(d)==='Completed'&&(d.completedAt||'').slice(0,7)===monthStr;}).length;
 
   var html='<div>';
 
@@ -1406,7 +1408,13 @@ function rPipe(){
       html+='<td style="position:relative;"><button class="pipe-menu-btn" data-id="'+e(d._id)+'" style="background:none;border:none;color:#9BA8A2;cursor:pointer;font-size:16px;padding:2px 6px;font-family:Inter,sans-serif;line-height:1;">&#8942;</button>';
       if(menuOpen){
         html+='<div class="pipe-menu" style="position:absolute;right:8px;top:28px;z-index:100;background:#fff;border:1px solid #D8E3DC;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:160px;padding:4px 0;">';
-        [['view','&#128065; View Details'],['edit','&#9998; Edit Deal'],['upload','&#128206; Upload File'],['complete','&#10003; Mark Completed'],['hold','&#9208; Put On Hold'],['delete','&#10005; Delete']].forEach(function(m){
+        var menuItems=[['view','&#128065; View Details'],['edit','&#9998; Edit Deal'],['upload','&#128206; Upload File'],['complete','&#10003; Mark Completed'],['hold','&#9208; Put On Hold']];
+        // Revert option: managers/admins only, deal must be linked to a lead
+        if(d.convertedFromLead&&S.currentUser&&(S.currentUser.role==='admin'||S.currentUser.role==='manager')){
+          menuItems.push(['revert','&#8617; Revert to Lead']);
+        }
+        menuItems.push(['delete','&#10005; Delete']);
+        menuItems.forEach(function(m){
           html+='<button class="pipe-menu-item" data-id="'+e(d._id)+'" data-act="'+m[0]+'" style="display:block;width:100%;text-align:left;background:none;border:none;padding:7px 14px;font-size:12px;color:'+(m[0]==='delete'?'#dc2626':'#1A1A1A')+';cursor:pointer;font-family:Inter,sans-serif;">'+m[1]+'</button>';
         });
         html+='</div>';
@@ -1462,16 +1470,39 @@ function rPipe(){
         html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(String(r[1]))+'</span></div>';
       });
       html+='</div>';
+      // #12: clickable link back to original lead
+      if(dd.convertedFromLead){
+        var origLead=S.leads.filter(function(L){return L._id===dd.convertedFromLead;})[0];
+        if(origLead){
+          html+='<button class="goto-orig-lead btn btn-ghost btn-sm" data-lid="'+e(dd.convertedFromLead)+'" style="width:100%;margin-bottom:12px;justify-content:flex-start;font-size:11px;color:#275F45;">&#8617; View Original Lead '+e(dd.convertedFromLeadId||'')+'</button>';
+        }
+      }
 
-      // Files
-      html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Files ('+(dd.files||[]).length+')</div>';
-      if(!(dd.files||[]).length){
-        html+='<div style="font-size:12px;color:#9BA8A2;padding:8px 0;">No files attached</div>';
-      } else {
-        (dd.files||[]).forEach(function(f,fi){
+      // #15: split files by origin
+      var leadFiles=dd.convertedFromLead?(dd.files||[]):[];
+      var teamFiles=dd.teamFiles||(dd.convertedFromLead?[]:(dd.files||[]));
+      var totalFiles=leadFiles.length+teamFiles.length;
+
+      if(leadFiles.length>0){
+        html+='<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;">From Lead ('+leadFiles.length+')</div><span style="font-size:9px;color:#9BA8A2;background:#F8FAF9;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;">Read-only</span></div>';
+        leadFiles.forEach(function(f,fi){
           html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F8FAF9;border:1px solid #D8E3DC;border-radius:5px;margin-bottom:5px;">';
           html+='<span style="font-size:13px;">&#128196;</span><div style="flex:1;font-size:11px;font-weight:500;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>';
           if(f.data) html+='<button class="dl-file btn btn-ghost btn-sm" data-did="'+e(dd._id)+'" data-fi="'+fi+'" style="font-size:10px;padding:2px 7px;">&#8659;</button>';
+          html+='</div>';
+        });
+        html+='</div>';
+      }
+      html+='<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Team Uploads ('+teamFiles.length+')</div>';
+      if(!teamFiles.length){
+        html+='<div style="font-size:11px;color:#9BA8A2;padding:6px 0;">No team uploads yet</div>';
+      } else {
+        teamFiles.forEach(function(f,fi){
+          // adjust index for download — team files start after lead files
+          var realIdx=dd.convertedFromLead?(leadFiles.length+fi):fi;
+          html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#fff;border:1px solid #D8E3DC;border-radius:5px;margin-bottom:5px;">';
+          html+='<span style="font-size:13px;">&#128196;</span><div style="flex:1;font-size:11px;font-weight:500;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>';
+          if(f.data) html+='<button class="dl-file btn btn-ghost btn-sm" data-did="'+e(dd._id)+'" data-fi="'+realIdx+'" style="font-size:10px;padding:2px 7px;">&#8659;</button>';
           html+='</div>';
         });
       }
@@ -1750,6 +1781,23 @@ function rLeadsPipeline(){
       });
       html+='</div>';
 
+      // Reverted-from-deal banner
+      if(dl.revertedFromDealId){
+        html+='<div style="margin-bottom:14px;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #2563EB;border-radius:4px;">';
+        html+='<div style="font-size:10px;font-weight:700;color:#1E40AF;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Reverted from Deal '+e(dl.revertedFromDealId)+'</div>';
+        html+='<div style="font-size:12px;color:#1A1A1A;line-height:1.5;margin-bottom:4px;"><strong>Reason:</strong> '+e(dl.revertReason||'')+'</div>';
+        html+='<div style="font-size:10px;color:#9BA8A2;">Reverted by '+e(dl.revertedFromDealBy||'')+' &middot; '+(dl.revertedFromDealAt?relTime(dl.revertedFromDealAt):'')+'</div>';
+        html+='</div>';
+      }
+      // #10: Info request banner (submitter-facing)
+      if(dl.leadStatus==='moreinfo'&&dl.infoRequest){
+        html+='<div style="margin-bottom:14px;padding:10px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;">';
+        html+='<div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Action Required: More Info Requested</div>';
+        html+='<div style="font-size:12px;color:#1A1A1A;line-height:1.5;margin-bottom:6px;">'+e(dl.infoRequest)+'</div>';
+        html+='<div style="font-size:10px;color:#9BA8A2;margin-bottom:6px;">Requested by '+e(dl.infoRequestedBy||'')+' &middot; '+(dl.infoRequestedAt?relTime(dl.infoRequestedAt):'')+'</div>';
+        html+='<button class="ell btn btn-sm" data-id="'+e(dl._id)+'" style="font-size:11px;">Edit & Resubmit</button>';
+        html+='</div>';
+      }
       // Conversion checklist
       html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Conversion Checklist</div>';
       [['Business name provided',!!(dl.bizName)],['Service type selected',!!(dl.serviceType)],['Owner / contact assigned',!!(dl.ownerContact)],['Documents uploaded',!!(dl.files&&dl.files.length>0)],['Lead approved',!!(dl.approved||dl.leadStatus==='approved')]].forEach(function(c){
@@ -2258,6 +2306,8 @@ function mvStage(){
 }
 
 function persistLead(lf, status, msg){
+  // #14: track lastSubmittedAt on submission
+  var _isSubmission=(status==='submitted');
   var ts=new Date().toLocaleString();
   lf.leadStatus=status;
   if(S.leid!==null){
@@ -2266,13 +2316,33 @@ function persistLead(lf, status, msg){
     var changed=Object.keys(FL).filter(function(k){return String(tracked[k]||'')!==String(old[k]||'');});
     var entries=changed.map(function(k){return {_id:Date.now()+Math.random(),leadId:lf.leadId||'n/a',user:S.auditUser,field:FL[k],prev:String(old[k]||'n/a'),next:String(tracked[k]||'n/a'),ts:ts};});
     if(entries.length>0){S.auditLog=S.auditLog.concat(entries);entries.forEach(function(en){syncAudit(en);});}
-    var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz,createdAt:old.createdAt,createdBy:old.createdBy,updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:S.auditUser});
+    var critical=['bizName','serviceType','ownerContact','salesLead'];
+    var wasApproved=!!(old.approved||old.leadStatus==='approved');
+    var criticalChanged=wasApproved&&critical.some(function(k){return (old[k]||'')!==(lf[k]||'');});
+    var actor=S.currentUser?S.currentUser.name:S.auditUser;
+    var nowIso=new Date().toISOString();
+    var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz,createdAt:old.createdAt,createdBy:old.createdBy,updatedAt:nowIso,updatedBy:actor});
+    if(_isSubmission){updated.lastSubmittedAt=nowIso;if(!updated.firstSubmittedAt) updated.firstSubmittedAt=old.firstSubmittedAt||old.createdAt||nowIso;}
+    if(criticalChanged){
+      // #8: Soft-lock — revert to Under Review, clear approval, audit-log
+      updated.approved=false;
+      updated.approvedAt='';
+      updated.approvedBy='';
+      updated.leadStatus='review';
+      updated.revertedToReviewAt=nowIso;
+      updated.revertedToReviewBy=actor;
+      var changedFields=critical.filter(function(k){return (old[k]||'')!==(lf[k]||'');}).map(function(k){return k+': '+(old[k]||'(empty)')+' → '+(lf[k]||'(empty)');}).join('; ');
+      var entry={_id:Date.now(),leadId:lf.leadId||'',user:actor,field:'Approval Reverted',prev:'Approved',next:'Under Review (critical fields changed: '+changedFields+')',ts:new Date().toLocaleString()};
+      S.auditLog=S.auditLog.concat([entry]);
+      if(typeof syncAudit==='function') syncAudit(entry);
+      setTimeout(function(){flash('Lead reverted to Under Review — critical fields changed.','err');},0);
+    }
     S.leads=S.leads.map(function(x){return x._id===S.leid?updated:x;});
     syncLead(updated);
     flash(msg);S.leid=null;
   } else {
     var nid=nextLeadId(lf.serviceType);
-    var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:new Date().toISOString(),createdBy:S.currentUser?S.currentUser.name:S.auditUser});
+    var _now=new Date().toISOString();var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:_now,createdBy:S.currentUser?S.currentUser.name:S.auditUser});if(_isSubmission){newLead.lastSubmittedAt=_now;newLead.firstSubmittedAt=_now;}
     S.leads=S.leads.concat([newLead]);
     var auditEntry={_id:Date.now(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
     S.auditLog=S.auditLog.concat([auditEntry]);
@@ -2306,6 +2376,84 @@ function subLead(){
   persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
   sendApprovalNotification(lf);
 }
+
+function revertDealToLead(dealId){
+  if(!S.currentUser||(S.currentUser.role!=='admin'&&S.currentUser.role!=='manager')){
+    flash('Only Managers and Admins can revert a deal.','err');return;
+  }
+  var d=S.deals.filter(function(x){return x._id===dealId;})[0];
+  if(!d){flash('Deal not found.','err');return;}
+  if(d.archived){flash('Deal is already archived.','err');return;}
+  if(!d.convertedFromLead){
+    flash('Cannot revert: deal has no linked lead.','err');return;
+  }
+  var lead=S.leads.filter(function(L){return L._id===d.convertedFromLead;})[0];
+  if(!lead){
+    flash('Cannot revert: original lead no longer exists.','err');return;
+  }
+  var reason=prompt('Reason for reverting this deal back to a lead?\n(e.g. needs document updates, scope changed)','');
+  if(!reason||!reason.trim()){flash('Revert cancelled — reason required.','err');return;}
+
+  var actor=S.currentUser.name;
+  var ts=new Date().toISOString();
+
+  // Restore lead: clear converted state, move files back, mark for re-review
+  S.leads=S.leads.map(function(L){
+    if(L._id!==lead._id) return L;
+    var u=Object.assign({},L,{
+      converted:false,
+      convertedAt:'',
+      convertedBy:'',
+      convertedToDealId:'',
+      convertedToDealRef:'',
+      // Reset approval too — team needs to fix and resubmit
+      approved:false,
+      approvedAt:'',
+      approvedBy:'',
+      leadStatus:'review',
+      // Restore files from deal (lead.files was cleared on conversion)
+      files:(d.files||[]).concat(d.teamFiles||[]),
+      revertedFromDealId:d.dealId,
+      revertedFromDealAt:ts,
+      revertedFromDealBy:actor,
+      revertReason:reason.trim(),
+      lastSubmittedAt:ts,  // treat as fresh submission for SLA
+      updatedAt:ts,
+      updatedBy:actor
+    });
+    syncLead(u);
+    return u;
+  });
+
+  // Archive the deal — keep audit trail, hide from active pipeline
+  S.deals=S.deals.map(function(x){
+    if(x._id!==dealId) return x;
+    var u=Object.assign({},x,{
+      archived:true,
+      archivedAt:ts,
+      archivedBy:actor,
+      revertReason:reason.trim(),
+      status:'Reverted',
+      updatedAt:ts,
+      updatedBy:actor
+    });
+    syncDeal(u);
+    return u;
+  });
+
+  // Audit log on both sides
+  var en1={_id:Date.now(),leadId:lead.leadId||'',user:actor,field:'Reverted from Deal',prev:'Converted',next:'Under Review — '+reason.trim(),ts:new Date().toLocaleString()};
+  S.auditLog=S.auditLog.concat([en1]);
+  if(typeof syncAudit==='function') syncAudit(en1);
+  var en2={_id:Date.now()+1,dealRef:d._id,dealId:d.dealId,user:actor,field:'Deal Reverted',prev:'Active',next:'Archived — reverted to lead: '+reason.trim(),ts:new Date().toLocaleString()};
+  S.dealAuditLog=S.dealAuditLog.concat([en2]);
+
+  S.pipeDrawer=null;
+  S.pipeMenu=null;
+  flash('Deal '+d.dealId+' reverted. Lead '+lead.leadId+' is now Under Review for resubmission.');
+  render();
+}
+
 
 function cvt(id){
   var l=S.leads.filter(function(x){return x._id===id;})[0];
@@ -2367,7 +2515,11 @@ function cvt(id){
       convertedToDealRef:newDeal2._id,
       leadStatus:'converted',
       updatedAt:convTs,
-      updatedBy:convertor
+      updatedBy:convertor,
+      // #6: files transferred to deal; clear from lead to avoid double-storage
+      filesTransferredAt:convTs,
+      filesTransferredCount:(x.files||[]).length,
+      files:[]
     });
     syncLead(u);
     return u;
@@ -4018,7 +4170,8 @@ function rApprovals(){
   html+='</div>';
 
   function timeWaiting(l){
-    var base=l.updatedAt||l.createdAt;
+    // #14: prefer lastSubmittedAt for accurate waiting calc
+    var base=l.lastSubmittedAt||l.updatedAt||l.createdAt;
     if(!base) return '\u2014';
     return relTime(base).replace(' ago','');
   }
@@ -4058,7 +4211,7 @@ function rApprovals(){
         html+='<td><span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;">'+e(svcShort2[l.serviceType]||l.serviceType||'\u2014')+'</span></td>';
         html+='<td style="font-size:12px;color:#1A1A1A;white-space:nowrap;">'+e(l.createdBy||l.salesLead||'\u2014')+'</td>';
         html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.updatedAt||l.createdAt))+'">'+(l.updatedAt||l.createdAt?relTime(l.updatedAt||l.createdAt):'\u2014')+'</td>';
-        html+='<td style="font-size:11px;font-weight:600;color:'+((Date.now()-new Date(l.updatedAt||l.createdAt||Date.now()).getTime())>172800000?'#dc2626':'#5F6B65')+';white-space:nowrap;">'+timeWaiting(l)+'</td>';
+        html+='<td style="font-size:11px;font-weight:600;color:'+((Date.now()-new Date(l.lastSubmittedAt||l.updatedAt||l.createdAt||Date.now()).getTime())>172800000?'#dc2626':'#5F6B65')+';white-space:nowrap;">'+timeWaiting(l)+'</td>';
         html+='<td>'+docsCell(l)+'</td>';
         html+='<td><span style="background:'+rdc+'12;color:'+rdc+';border:1px solid '+rdc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+rdy+'</span></td>';
         html+='<td>'+(prio?'<span style="font-size:11px;font-weight:600;color:'+pc+';white-space:nowrap;">'+e(prio.replace(' Priority',''))+'</span>':'<span style="color:#D8E3DC;">&mdash;</span>')+'</td>';
@@ -4171,6 +4324,14 @@ function rApprovals(){
       }
       html+='</div>';
 
+      // #10: Show info request if pending
+      if(al.leadStatus==='moreinfo'&&al.infoRequest){
+        html+='<div style="margin-bottom:14px;padding:10px 12px;background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;">';
+        html+='<div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">More Information Requested</div>';
+        html+='<div style="font-size:12px;color:#1A1A1A;line-height:1.5;margin-bottom:4px;">'+e(al.infoRequest)+'</div>';
+        html+='<div style="font-size:10px;color:#9BA8A2;">Requested by '+e(al.infoRequestedBy||'')+' &middot; '+(al.infoRequestedAt?relTime(al.infoRequestedAt):'')+'</div>';
+        html+='</div>';
+      }
       // Review checklist
       html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Review Checklist</div>';
       [['Business name provided',!!(al.bizName)],['Service type selected',!!(al.serviceType)],['Lead Owner assigned',!!(al.salesLead)],['Main Business Contact added',!!(al.ownerContact)],['Documents uploaded',!!(al.files&&al.files.length>0)]].forEach(function(c){
@@ -4219,7 +4380,7 @@ function rApprovals(){
 function bind(){
   // tabs
   document.querySelectorAll('[data-tab]').forEach(function(el){
-    el.addEventListener('click',function(){S.tab=el.dataset.tab;if(S.tab==='form'&&S.eid===null){S.form=bDeal();S.dfiles=[];}render();});
+    el.addEventListener('click',function(){S.tab=el.dataset.tab;if(S.tab==='form'&&S.eid===null){S.form=bDeal();S.dfiles=[];}S.convertModal=null;S.approvalModal=null;S.confirmModal=null;S.leadDrawer=null;S.pipeDrawer=null;S.apqDrawer=null;S.contactView=null;S.clientView=null;S.pipeMenu=null;S.leadMenu=null;render();});
   });
   document.querySelectorAll('[data-goto]').forEach(function(el){
     el.addEventListener('click',function(){S.tab=el.dataset.goto;render();});
@@ -4295,6 +4456,9 @@ function bind(){
         S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'Completed',status:'Completed',completedAt:new Date().toISOString(),completedBy:S.currentUser?S.currentUser.name:'Unknown',updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'});syncDeal(u);return u;});
         flash('Deal marked completed');render();
       }
+      else if(act==='revert'){
+        revertDealToLead(id);
+      }
       else if(act==='hold'){
         S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'On Hold',status:'On Hold'});syncDeal(u);return u;});
         flash('Deal put on hold');render();
@@ -4315,6 +4479,19 @@ function bind(){
       });
     },0);
   }
+
+  // #12: jump to original lead
+  document.querySelectorAll('.goto-orig-lead').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      S.pipeDrawer=null;
+      S.tab='leads';
+      S.leadsView='pipeline';
+      S.leadDrawer=el.dataset.lid;
+      S.convertModal=null;S.approvalModal=null;
+      render();
+    });
+  });
 
   // Drawer close
   ['pipe-drawer-close','pipe-drawer-close2','pipe-drawer-overlay'].forEach(function(id){
@@ -4388,6 +4565,9 @@ function bind(){
   var lfi=document.getElementById('lfi');
   if(lfi) lfi.addEventListener('change',function(){
     Array.from(lfi.files).forEach(function(f){
+      // #11 guard: size limit pre-pilot
+      if(f.size>5*1024*1024){flash('"'+f.name+'" is over 5MB and was not uploaded. Compress or split it.','err');return;}
+      if(f.size>2*1024*1024){flash('"'+f.name+'" is large ('+(f.size/1048576).toFixed(1)+'MB) — may slow sync.','warn');}
       var reader=new FileReader();
       reader.onload=function(ev){
         S.lfiles=S.lfiles.concat([{name:f.name,size:f.size,data:ev.target.result,type:f.type}]);
