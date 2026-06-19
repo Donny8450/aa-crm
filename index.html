@@ -750,7 +750,97 @@ function selectServiceType(svcName){
   var ca=document.querySelector('.content-area');
   if(ca) ca.scrollTop=0;
 }
-function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
+function buildContactRegistry(){
+  // All known contacts (company + individual), de-duplicated by name.
+  var reg=[];
+  S.clients.forEach(function(c){
+    (c.contacts||[]).forEach(function(ct){
+      var nm=((ct.firstName||ct.name||'')+' '+(ct.lastName||'')).trim();
+      if(!nm) return;
+      reg.push({
+        id:'company:'+c._id+':'+ct.id,
+        kind:'company',
+        label:nm+' — '+(c.companyName||'Client'),
+        name:nm,
+        email:ct.email||'',
+        mobile:ct.mobile||ct.phone||'',
+        clientId:c._id,
+        clientName:c.companyName||'',
+        clientCode:c.clientId||''
+      });
+    });
+  });
+  (S.individualContacts||[]).forEach(function(ic){
+    var nm=((ic.firstName||'')+' '+(ic.lastName||'')).trim();
+    if(!nm) return;
+    reg.push({
+      id:'individual:'+ic._id,
+      kind:'individual',
+      label:nm+(ic.org?' — '+ic.org:'')+' (Individual)',
+      name:nm,
+      email:ic.email||'',
+      mobile:ic.mobile||'',
+      clientId:'',
+      clientName:'',
+      clientCode:''
+    });
+  });
+  // Sort: company contacts first (by client name), then individuals
+  reg.sort(function(a,b){
+    if(a.kind!==b.kind) return a.kind==='company'?-1:1;
+    return a.label.localeCompare(b.label);
+  });
+  return reg;
+}
+
+function renderMainContactSelect(lf){
+  var reg=buildContactRegistry();
+  // Determine current selection from lf.ownerContactRef OR fallback name match
+  var currentRef=lf.ownerContactRef||'';
+  if(!currentRef&&lf.ownerContact){
+    var m=reg.filter(function(r){return r.name===lf.ownerContact;})[0];
+    if(m) currentRef=m.id;
+  }
+  var html='<select name="ownerContactRef" id="mbc-select" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">';
+  html+='<option value="">Select a contact...</option>';
+  // Group: Company contacts grouped by client
+  var companyContacts=reg.filter(function(r){return r.kind==='company';});
+  var byClient={};
+  companyContacts.forEach(function(r){if(!byClient[r.clientName]) byClient[r.clientName]=[];byClient[r.clientName].push(r);});
+  Object.keys(byClient).sort().forEach(function(cn){
+    html+='<optgroup label="'+e(cn)+'">';
+    byClient[cn].forEach(function(r){
+      html+='<option value="'+e(r.id)+'" data-email="'+e(r.email)+'" data-mobile="'+e(r.mobile)+'" data-name="'+e(r.name)+'" data-clientid="'+e(r.clientId)+'" data-clientcode="'+e(r.clientCode)+'"'+(currentRef===r.id?' selected':'')+'>'+e(r.name)+'</option>';
+    });
+    html+='</optgroup>';
+  });
+  // Individual contacts group
+  var indiv=reg.filter(function(r){return r.kind==='individual';});
+  if(indiv.length){
+    html+='<optgroup label="Individual Contacts (no company)">';
+    indiv.forEach(function(r){
+      html+='<option value="'+e(r.id)+'" data-email="'+e(r.email)+'" data-mobile="'+e(r.mobile)+'" data-name="'+e(r.name)+'" data-clientid="" data-clientcode=""'+(currentRef===r.id?' selected':'')+'>'+e(r.name)+(r.label.indexOf(' — ')>-1?' ('+r.label.split(' — ')[1].replace(' (Individual)','')+')':'')+'</option>';
+    });
+    html+='</optgroup>';
+  }
+  // Legacy: a contact name that exists on the lead but no matching registry entry
+  if(lf.ownerContact&&!currentRef){
+    html+='<optgroup label="Existing on this lead">';
+    html+='<option value="legacy:'+e(lf.ownerContact)+'" data-email="'+e(lf.email||'')+'" data-mobile="'+e(lf.phone||'')+'" data-name="'+e(lf.ownerContact)+'" selected>'+e(lf.ownerContact)+' (existing)</option>';
+    html+='</optgroup>';
+  }
+  html+='<option value="__NEW__" style="font-weight:600;color:#275F45;">+ Add New Contact</option>';
+  html+='</select>';
+  // Hidden mirrors so persistLead still has plain name in lf.ownerContact
+  html+='<input type="hidden" name="ownerContact" id="mbc-name-hidden" value="'+e(lf.ownerContact||'')+'"/>';
+  html+='<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Pick an existing contact &mdash; phone &amp; email auto-fill. Choose &ldquo;+ Add New&rdquo; to enter manually.</div>';
+  // Client-mismatch warning placeholder
+  html+='<div id="mbc-client-warn" style="display:none;margin-top:6px;padding:6px 10px;background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;font-size:11px;color:#92400E;"></div>';
+  return html;
+}
+
+
+function bLead(){return{leadId:'',bizName:'',ownershipStructure:'',serviceType:'',bizStructure:'',salesLead:'',projectBrief:'',ownerContact:'',ownerContactRef:'',phone:'',email:'',source:'',priority:'',startDate:'',endDate:'',pctComplete:0,label:'Cold',leadStatus:'draft',approved:false,approvedBy:'',approvedAt:'',yearIncorp:'',annualSales:'',sde:'',buyerDown:'',totalSalePrice:'',numEmployees:'',kickoffMeeting:'',maSigned:''}}
 
 function render(){
   try{
@@ -1874,9 +1964,7 @@ function rLeadForm(){
             '</select>'+
             '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Internal team member responsible for this lead</div></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
-          '<div><div class="field-lbl">Main Business Contact *</div>'+
-            '<input name="ownerContact" value="'+e(lf.ownerContact||'')+'" placeholder="e.g. Kwame Mensah"/>'+
-            '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Client-side contact (the person at the prospective business)</div></div>'+
+          '<div><div class="field-lbl">Main Business Contact *</div>'+renderMainContactSelect(lf)+'</div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Phone</div><input name="phone" value="'+e(lf.phone)+'" placeholder="+233 000 0000"/></div>'+
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
@@ -1965,9 +2053,7 @@ function rLL(){
             '</select>'+
             '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Internal team member responsible for this lead</div></div>'+
           '<div><div class="field-lbl">Project Brief / Description</div><textarea name="projectBrief" placeholder="Describe the project or engagement..." style="min-height:90px">'+e(lf.projectBrief)+'</textarea></div>'+
-          '<div><div class="field-lbl">Main Business Contact *</div>'+
-            '<input name="ownerContact" value="'+e(lf.ownerContact||'')+'" placeholder="e.g. Kwame Mensah"/>'+
-            '<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Client-side contact (the person at the prospective business)</div></div>'+
+          '<div><div class="field-lbl">Main Business Contact *</div>'+renderMainContactSelect(lf)+'</div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Phone</div><input name="phone" value="'+e(lf.phone)+'" placeholder="+233 000 0000"/></div>'+
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
@@ -2217,7 +2303,7 @@ function gDF(){
 
 function gLF(){
   var lf=S.lform||bLead(),f1=document.getElementById('lf1'),f2=document.getElementById('af');
-  if(f1){['bizName','ownershipStructure','serviceType','projectBrief','ownerContact','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
+  if(f1){['bizName','ownershipStructure','serviceType','projectBrief','ownerContact','ownerContactRef','clientId','phone','email','source','startDate','endDate','salesLead'].forEach(function(k){var el=f1.querySelector('[name="'+k+'"]');if(el) lf[k]=el.value;});var ps=f1.querySelector('[name="pctComplete"]');if(ps) lf.pctComplete=parseInt(ps.value)||0;}
   // bizName read from Customer Overview form (f1) only
   var kr=document.querySelector('input[name="kickoffMeeting"]:checked');
   if(kr) lf.kickoffMeeting=kr.value;
