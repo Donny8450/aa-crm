@@ -609,7 +609,7 @@ var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
 var FLD={bizName:'Business Name',serviceType:'Service Type',owner:'Owner',email:'Email',phone:'Phone',source:'Source',status:'Status',projectBrief:'Project Brief',startDate:'Start Date',endDate:'End Date',consultFocus:'Consulting Focus',engagementType:'Engagement Type',consultFee:'Consulting Fee',sessions:'Sessions',consultDeliverables:'Deliverables Overview',txType:'Transaction Type',askingPrice:'Asking Price',annualRevenue:'Annual Revenue',sdeEbitda:'SDE/EBITDA',commission:'Commission %',listingStatus:'Listing Status',bizDescription:'Business Description',yearIncorp:'Year of Incorporation',numEmployees:'No. of Employees',annualSalesBrok:'Annual Sales',sde:'Seller Discretionary Earnings',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',fundingType:'Funding Type',fundingAmount:'Funding Amount',equityOffered:'Equity Offered %',useOfFunds:'Use of Funds',currRevenue:'Current Revenue',fundingStage:'Funding Stage',pitchSummary:'Pitch Summary',dealStatus:'Deal Status'};
-var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Main Business Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'End Date',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Lead Owner',serviceType:'Service Type'};
+var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Main Business Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'Expected Date to Sign MA',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Lead Owner',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
 function nextLeadId(serviceType){
@@ -1975,7 +1975,7 @@ function rLeadForm(){
           '</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Expected Start Date</div><input type="date" name="startDate" value="'+e(lf.startDate)+'"/></div>'+
-            '<div><div class="field-lbl">Expected End Date</div><input type="date" name="endDate" value="'+e(lf.endDate)+'" id="endDate"/><div id="date-err" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">End date cannot be before start date</div></div>'+
+            '<div><div class="field-lbl">Expected Date to Sign MA</div><input type="date" name="endDate" value="'+e(lf.endDate)+'" id="endDate"/><div id="date-err" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">Sign-MA date cannot be before start date</div></div>'+
           '</div>'+
           '<div>'+
             '<div class="field-lbl">Percentage Completed / Stage &nbsp;<span id="pct-lbl" style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(lf.pctComplete<=35?'background:#eff6ff;color:#2563eb':lf.pctComplete<=65?'background:#FDF8EE;color:#C8972A':'background:#E8F5EE;color:#2D6A4F')+'">'+lf.pctComplete+'% &mdash; '+(lf.pctComplete<=35?'Cold':lf.pctComplete<=65?'Warm':'Hot')+'</span></div>'+
@@ -1994,10 +1994,6 @@ function rLeadForm(){
           
           '<div class="grid2">'+
                       '</div>'+
-          '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb">'+
-            '<label class="ynb-yes"><input type="radio" name="kickoffMeeting" value="Yes" class="kbtn-r"'+(lf.kickoffMeeting==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
-            '<label class="ynb-no"><input type="radio" name="kickoffMeeting" value="No" class="kbtn-r"'+(lf.kickoffMeeting==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
-          '</div></div>'+
           '<div><div class="field-lbl">Has MA been signed?</div><div class="ynb">'+
             '<label class="ynb-yes"><input type="radio" name="maSigned" value="Yes" class="mbtn-r"'+(lf.maSigned==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
             '<label class="ynb-no"><input type="radio" name="maSigned" value="No" class="mbtn-r"'+(lf.maSigned==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
@@ -2064,7 +2060,7 @@ function rLL(){
           '</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Expected Start Date</div><input type="date" name="startDate" value="'+e(lf.startDate)+'"/></div>'+
-            '<div><div class="field-lbl">Expected End Date</div><input type="date" name="endDate" value="'+e(lf.endDate)+'" id="endDate"/><div id="date-err" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">End date cannot be before start date</div></div>'+
+            '<div><div class="field-lbl">Expected Date to Sign MA</div><input type="date" name="endDate" value="'+e(lf.endDate)+'" id="endDate"/><div id="date-err" style="font-size:11px;color:#dc2626;margin-top:4px;display:none">Sign-MA date cannot be before start date</div></div>'+
           '</div>'+
           '<div>'+
             '<div class="field-lbl">Percentage Completed / Stage &nbsp;<span id="pct-lbl" style="padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;'+(lf.pctComplete<=35?'background:#eff6ff;color:#2563eb':lf.pctComplete<=65?'background:#FDF8EE;color:#C8972A':'background:#E8F5EE;color:#2D6A4F')+'">'+lf.pctComplete+'% &mdash; '+(lf.pctComplete<=35?'Cold':lf.pctComplete<=65?'Warm':'Hot')+'</span></div>'+
@@ -2083,10 +2079,6 @@ function rLL(){
           
           '<div class="grid2">'+
                       '</div>'+
-          '<div><div class="field-lbl">Have you had a Kickoff Meeting yet?</div><div class="ynb">'+
-            '<label class="ynb-yes"><input type="radio" name="kickoffMeeting" value="Yes" class="kbtn-r"'+(lf.kickoffMeeting==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
-            '<label class="ynb-no"><input type="radio" name="kickoffMeeting" value="No" class="kbtn-r"'+(lf.kickoffMeeting==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
-          '</div></div>'+
           '<div><div class="field-lbl">Has MA been signed?</div><div class="ynb">'+
             '<label class="ynb-yes"><input type="radio" name="maSigned" value="Yes" class="mbtn-r"'+(lf.maSigned==="Yes"?' checked':'')+'/><span>&#9989; Yes</span></label>'+
             '<label class="ynb-no"><input type="radio" name="maSigned" value="No" class="mbtn-r"'+(lf.maSigned==="No"?' checked':'')+'/><span>&#10060; No</span></label>'+
@@ -2444,7 +2436,7 @@ function persistLead(lf, status, msg){
 function saveLead(){
   var lf=gLF();
   var pct=lf.pctComplete||0;lf.label=pct<=35?'Cold':pct<=65?'Warm':'Hot';
-  if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('End date cannot be before start date.','err');return;}
+  if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('Expected Sign-MA date cannot be before start date.','err');return;}
   persistLead(lf,'draft',S.leid!==null?'Draft updated!':'Draft saved!');
 }
 
@@ -2458,7 +2450,7 @@ function subLead(){
   var existingLead=S.leid!==null?S.leads.filter(function(x){return x._id===S.leid;})[0]:null;
   var existingFiles=existingLead?(existingLead.files||[]).length:0;
   if(S.lfiles.length===0&&existingFiles===0){flash('Please upload at least one document before submitting.','err');return;}
-  if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('End date cannot be before start date.','err');return;}
+  if(lf.startDate&&lf.endDate&&lf.endDate<lf.startDate){flash('Expected Sign-MA date cannot be before start date.','err');return;}
   persistLead(lf,'pending',S.leid!==null?'Lead updated and sent for approval!':'Lead submitted for approval!');
   sendApprovalNotification(lf);
 }
@@ -4831,7 +4823,7 @@ function bind(){
   var aprUser=document.getElementById('apr-user');if(aprUser) aprUser.addEventListener('keydown',function(ev){if(ev.key==='Enter'){var p=document.getElementById('apr-pass');if(p) p.focus();}});
   var exl=document.getElementById('exl');if(exl) exl.addEventListener('click',function(){
     if(!S.leads.length){flash('No leads.','err');return;}
-    dcsv([['Lead ID','Business Name','Service Type','Owner/Contact','Phone','Email','Source','Priority','Start Date','End Date','% Complete','Label','Project Brief','Structure','Kickoff','MA Signed']].concat(S.leads.map(function(l){return [l.leadId||'',l.bizName||'',l.serviceType||'',l.ownerContact||'',l.phone||'',l.email||'',l.source||'',l.priority||'',(l.startDate||''),(l.endDate||''),(l.pctComplete||0)+'%',l.label,l.projectBrief||'',l.bizStructure||'',l.kickoffMeeting||'',l.maSigned||''];})),'AA_Leads.csv');flash('Exported!');
+    dcsv([['Lead ID','Business Name','Service Type','Owner/Contact','Phone','Email','Source','Priority','Start Date','Expected MA Sign Date','% Complete','Label','Project Brief','Structure','MA Signed']].concat(S.leads.map(function(l){return [l.leadId||'',l.bizName||'',l.serviceType||'',l.ownerContact||'',l.phone||'',l.email||'',l.source||'',l.priority||'',(l.startDate||''),(l.endDate||''),(l.pctComplete||0)+'%',l.label,l.projectBrief||'',l.bizStructure||'',l.maSigned||''];})),'AA_Leads.csv');flash('Exported!');
   });
   // audit
   var au=document.getElementById('au');if(au) au.addEventListener('input',function(){S.auditUser=au.value;});
