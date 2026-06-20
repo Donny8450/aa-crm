@@ -548,6 +548,7 @@ var S={
   leadDrawer:null,
   leadMenu:null,
   convertModal:null,
+  newContactModal:false,
   pipeSavedView:'active',
   pipeStage:'All',
   pipeSvc:'All',
@@ -836,6 +837,68 @@ function renderMainContactSelect(lf){
   html+='<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Pick an existing contact &mdash; phone &amp; email auto-fill. Choose &ldquo;+ Add New&rdquo; to enter manually.</div>';
   // Client-mismatch warning placeholder
   html+='<div id="mbc-client-warn" style="display:none;margin-top:6px;padding:6px 10px;background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;font-size:11px;color:#92400E;"></div>';
+  return html;
+}
+
+
+function rNewContactModal(){
+  if(!S.newContactModal) return '';
+  // Q2(C): smart default — if a Client Account is already selected on the lead, default to Company Contact under that client
+  var lf=S.lform||{};
+  var presetClientId=lf.clientId||'';
+  var defKind=presetClientId?'company':'individual';
+  var curKind=S.newContactKind||defKind;
+  var curClientId=S.newContactClientId||presetClientId;
+
+  var html='<div id="ncm-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;">';
+  html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;">';
+
+  // Header
+  html+='<div style="padding:14px 18px;border-bottom:1px solid #D8E3DC;display:flex;align-items:center;justify-content:space-between;">';
+  html+='<div><div style="font-size:14px;font-weight:700;color:#1A1A1A;">Add New Contact</div><div style="font-size:11px;color:#9BA8A2;margin-top:2px;">This contact will be saved and selected on the lead</div></div>';
+  html+='<button id="ncm-cancel-x" style="background:none;border:none;font-size:18px;color:#9BA8A2;cursor:pointer;">&#10005;</button></div>';
+
+  // Body
+  html+='<div style="padding:18px;">';
+
+  // Kind toggle
+  html+='<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:#5F6B65;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Contact Type</div>';
+  html+='<div style="display:flex;gap:6px;">';
+  html+='<button type="button" class="ncm-kind" data-kind="company" style="flex:1;padding:8px 12px;font-size:12px;font-weight:600;border:1px solid '+(curKind==='company'?'#275F45':'#D8E3DC')+';background:'+(curKind==='company'?'#EAF3EE':'#fff')+';color:'+(curKind==='company'?'#275F45':'#5F6B65')+';border-radius:4px;cursor:pointer;font-family:Inter,sans-serif;">&#127970; Company Contact</button>';
+  html+='<button type="button" class="ncm-kind" data-kind="individual" style="flex:1;padding:8px 12px;font-size:12px;font-weight:600;border:1px solid '+(curKind==='individual'?'#275F45':'#D8E3DC')+';background:'+(curKind==='individual'?'#EAF3EE':'#fff')+';color:'+(curKind==='individual'?'#275F45':'#5F6B65')+';border-radius:4px;cursor:pointer;font-family:Inter,sans-serif;">&#128100; Individual Contact</button>';
+  html+='</div></div>';
+
+  // Client Account selector (only when company)
+  if(curKind==='company'){
+    html+='<div style="margin-bottom:12px;"><div class="field-lbl">Client Account *</div>';
+    if(!S.clients.length){
+      html+='<div style="font-size:11px;color:#dc2626;padding:8px 10px;background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;">No Client Accounts exist yet. Switch to Individual Contact, or create a Client Account first.</div>';
+    } else {
+      html+='<select id="ncm-client" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;background:#fff;">';
+      html+='<option value="">Select a client...</option>';
+      S.clients.forEach(function(c){html+='<option value="'+e(c._id)+'"'+(curClientId===c._id?' selected':'')+'>'+e(c.companyName)+'</option>';});
+      html+='</select>';
+    }
+    html+='</div>';
+  }
+
+  // Form fields
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+  html+='<div><div class="field-lbl">First Name *</div><input id="ncm-fname" placeholder="e.g. Kwame"/></div>';
+  html+='<div><div class="field-lbl">Last Name</div><input id="ncm-lname" placeholder="e.g. Mensah"/></div>';
+  html+='<div style="grid-column:1/-1;"><div class="field-lbl">Job Title</div><input id="ncm-title" placeholder="e.g. Managing Director"/></div>';
+  html+='<div><div class="field-lbl">Email</div><input id="ncm-email" type="email" placeholder="name@company.com"/></div>';
+  html+='<div><div class="field-lbl">Mobile</div><input id="ncm-mobile" placeholder="+233 xx xxx xxxx"/></div>';
+  html+='</div>';
+
+  html+='</div>';
+  // Footer
+  html+='<div style="padding:12px 18px;border-top:1px solid #D8E3DC;display:flex;justify-content:flex-end;gap:8px;">';
+  html+='<button id="ncm-cancel" class="btn btn-ghost btn-sm">Cancel</button>';
+  html+='<button id="ncm-save" class="btn btn-sm">Save & Select</button>';
+  html+='</div>';
+
+  html+='</div></div>';
   return html;
 }
 
@@ -2011,7 +2074,7 @@ function rLeadForm(){
       '</div>'+
 
     '</div>'+
-  '</div>';
+  '</div>'+rNewContactModal();
 }
 
 
@@ -2090,7 +2153,7 @@ function rLL(){
       '<div class="sbody'+(S.sec.doc?' on':'')+'">'+
         '<div style="display:flex;flex-direction:column;gap:13px">'+
             '<div><div class="field-lbl">Upload Document <span style="font-size:10px;font-weight:400;color:#c2410c">(required &mdash; at least 1)</span></div>'+
-            '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start;margin-top:4px;">'+'<div>'+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+'<div style="display:inline-flex;align-items:center;gap:6px;background:#EAF3EE;border:1px solid #C8E6D4;border-radius:20px;padding:4px 12px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:#275F45;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">4</div>'+'<span style="font-size:11px;font-weight:600;color:#275F45;">Step 4 of 5</span>'+'</div>'+'<span style="font-size:13px;font-weight:600;color:#1A1A1A;">Documents &amp; Submission</span>'+'</div>'+'<div style="font-size:12px;color:#5F6B65;margin-bottom:12px;line-height:1.5;">Upload supporting documents. Accepted: PDF, Word, Excel, PNG, JPG &mdash; max 10MB each.</div>'+'<label for="lfi" style="display:block;cursor:pointer;">'+'<div style="border:2px dashed '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:8px;background:'+(met?'#F0FDF4':'#FAFAFA')+';padding:24px 16px;text-align:center;margin-bottom:10px;">'+'<div style="font-size:26px;margin-bottom:6px;opacity:.5;">&#128196;</div>'+'<div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:3px;">Drop files here or click to upload</div>'+'<div style="font-size:11px;color:#9BA8A2;margin-bottom:10px;">Supported formats &middot; Max 10MB each</div>'+'<span style="display:inline-flex;align-items:center;gap:6px;background:#275F45;color:#fff;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;font-family:Inter,sans-serif;">&#8679; Browse Files</span>'+'<div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin-top:10px;">'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PDF</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">DOCX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">XLSX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PNG</span>'+'</div>'+'</div>'+'<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+'</label>'+(S.lfiles.length>0?  '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">'+  S.lfiles.map(function(f,fi){    var ext=(f.name||'file').split('.').pop().toUpperCase().slice(0,4);    var sz=f.size?((f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')):'File';    var ec={'PDF':'#DC2626','DOCX':'#2563EB','DOC':'#2563EB','XLSX':'#16A34A','XLS':'#16A34A','PPTX':'#D97706','JPG':'#7C3AED','PNG':'#7C3AED'}[ext]||'#5F6B65';    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid #D8E3DC;border-radius:6px;">'      +'<div style="width:30px;height:30px;border-radius:4px;background:'+ec+'14;border:1px solid '+ec+'25;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:'+ec+';flex-shrink:0;">'+ext+'</div>'      +'<div style="flex:1;min-width:0;">'        +'<div style="font-size:12px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>'        +'<div style="font-size:10px;color:#9BA8A2;">'+sz+'</div>'      +'</div>'      +(f.data?'<button type="button" class="dl-lfile-btn btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;flex-shrink:0;">&#8659;</button>':'')      +'<button type="button" class="del-lfile btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;color:#DC2626;flex-shrink:0;">&#10005;</button>'      +'</div>';  }).join('')+  '</div>':'')+'<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:'+(met?'#F0FDF4':'#F8FAF9')+';border:1px solid '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:6px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:'+(met?'#16A34A':'#9BA8A2')+';display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700;">'+(met?'&#10003;':'1')+'</div>'+'<div style="flex:1;">'+'<div style="font-size:12px;font-weight:600;color:'+(met?'#15803D':'#374151')+'">'+(met?'All required documents uploaded':'Documents Required')+'</div>'+'<div style="font-size:11px;color:'+(met?'#86EFAC':'#9BA8A2')+'">'+(met?'Ready to submit':'Upload at least 1 document before submitting')+'</div>'+'</div>'+'</div>'+'</div>'+'<div style="position:sticky;top:60px;">'+'<div style="background:#fff;border:1px solid #D8E3DC;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+'<div style="padding:14px 16px;background:#F8FAF9;border-bottom:1px solid #D8E3DC;">'+'<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Lead Completion</div>'+(function(){  var lf2=S.lform||{};  var rows=[['Business Name',!!(lf2.bizName&&lf2.bizName.trim())],['Service Type',!!(lf2.serviceType)],['Owner',!!(lf2.ownerContact&&lf2.ownerContact.trim())],['Documents',met],['Start Date',!!(lf2.startDate)]];  var done=rows.filter(function(r){return r[1];}).length;  var pct=Math.round(done/rows.length*100);  var bc=pct===100?'#16A34A':pct>=60?'#275F45':'#D97706';  var o='<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px;">';  o+='<span style="font-size:22px;font-weight:700;color:'+bc+';">'+pct+'%</span>';  o+='<span style="font-size:11px;color:#9BA8A2;">'+done+' of '+rows.length+'</span></div>';  o+='<div style="height:5px;background:#E8E8E8;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div>';  rows.forEach(function(r){    o+='<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #F8FAF9;">';    o+='<div style="width:14px;height:14px;border-radius:50%;background:'+(r[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(r[1]?'&#10003;':'')+'</div>';    o+='<span style="font-size:11px;color:'+(r[1]?'#1A1A1A':'#9BA8A2')+';flex:1;">'+r[0]+'</span>';    if(!r[1]) o+='<span style="font-size:9px;font-weight:700;color:#D97706;">Missing</span>';    o+='</div>';  });  return o;}())+'</div>'+'<div style="padding:14px 16px;display:flex;flex-direction:column;gap:7px;">'+'<button type="button" id="slb" style="width:100%;padding:9px 14px;background:#275F45;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">'+(isE?'&#10003; Update Lead':'&#9889; Submit for Approval')+'</button>'+'<button type="button" id="svd" style="width:100%;padding:8px 14px;background:#fff;color:#275F45;border:1px solid #275F45;border-radius:5px;font-size:12px;font-weight:500;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+(isE?'<button type="button" id="clb" style="width:100%;padding:7px 14px;background:transparent;color:#9BA8A2;border:1px solid #D8E3DC;border-radius:5px;font-size:11px;font-family:Inter,sans-serif;cursor:pointer;">Cancel</button>':'')+
+            '<div style="display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start;margin-top:4px;">'+'<div>'+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+'<div style="display:inline-flex;align-items:center;gap:6px;background:#EAF3EE;border:1px solid #C8E6D4;border-radius:20px;padding:4px 12px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:#275F45;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">4</div>'+'<span style="font-size:11px;font-weight:600;color:#275F45;">Step 4 of 5</span>'+'</div>'+'<span style="font-size:13px;font-weight:600;color:#1A1A1A;">Documents &amp; Submission</span>'+'</div>'+'<div style="font-size:12px;color:#5F6B65;margin-bottom:12px;line-height:1.5;">Upload supporting documents. Accepted: PDF, Word, Excel, PNG, JPG &mdash; max 10MB each.</div>'+'<label for="lfi" style="display:block;cursor:pointer;">'+'<div style="border:2px dashed '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:8px;background:'+(met?'#F0FDF4':'#FAFAFA')+';padding:24px 16px;text-align:center;margin-bottom:10px;">'+'<div style="font-size:26px;margin-bottom:6px;opacity:.5;">&#128196;</div>'+'<div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:3px;">Drop files here or click to upload</div>'+'<div style="font-size:11px;color:#9BA8A2;margin-bottom:10px;">Supported formats &middot; Max 10MB each</div>'+'<span style="display:inline-flex;align-items:center;gap:6px;background:#275F45;color:#fff;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;font-family:Inter,sans-serif;">&#8679; Browse Files</span>'+'<div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;margin-top:10px;">'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PDF</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">DOCX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">XLSX</span>'+'<span style="background:#fff;border:1px solid #D8E3DC;border-radius:3px;padding:1px 6px;font-size:10px;font-weight:600;color:#9BA8A2;">PNG</span>'+'</div>'+'</div>'+'<input type="file" id="lfi" multiple style="display:none;width:auto;padding:0;border:none;background:none"/>'+'</label>'+(S.lfiles.length>0?  '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">'+  S.lfiles.map(function(f,fi){    var ext=(f.name||'file').split('.').pop().toUpperCase().slice(0,4);    var sz=f.size?((f.size>1048576?(f.size/1048576).toFixed(1)+' MB':(f.size/1024).toFixed(0)+' KB')):'File';    var ec={'PDF':'#DC2626','DOCX':'#2563EB','DOC':'#2563EB','XLSX':'#16A34A','XLS':'#16A34A','PPTX':'#D97706','JPG':'#7C3AED','PNG':'#7C3AED'}[ext]||'#5F6B65';    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#fff;border:1px solid #D8E3DC;border-radius:6px;">'      +'<div style="width:30px;height:30px;border-radius:4px;background:'+ec+'14;border:1px solid '+ec+'25;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:'+ec+';flex-shrink:0;">'+ext+'</div>'      +'<div style="flex:1;min-width:0;">'        +'<div style="font-size:12px;font-weight:600;color:#1A1A1A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>'        +'<div style="font-size:10px;color:#9BA8A2;">'+sz+'</div>'      +'</div>'      +(f.data?'<button type="button" class="dl-lfile-btn btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;flex-shrink:0;">&#8659;</button>':'')      +'<button type="button" class="del-lfile btn btn-ghost btn-sm" data-fi="'+fi+'" style="font-size:11px;padding:3px 7px;color:#DC2626;flex-shrink:0;">&#10005;</button>'      +'</div>';  }).join('')+  '</div>':'')+'<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:'+(met?'#F0FDF4':'#F8FAF9')+';border:1px solid '+(met?'#A7F3D0':'#D8E3DC')+';border-radius:6px;">'+'<div style="width:18px;height:18px;border-radius:50%;background:'+(met?'#16A34A':'#9BA8A2')+';display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex-shrink:0;font-weight:700;">'+(met?'&#10003;':'1')+'</div>'+'<div style="flex:1;">'+'<div style="font-size:12px;font-weight:600;color:'+(met?'#15803D':'#374151')+'">'+(met?'All required documents uploaded':'Documents Required')+'</div>'+'<div style="font-size:11px;color:'+(met?'#86EFAC':'#9BA8A2')+'">'+(met?'Ready to submit':'Upload at least 1 document before submitting')+'</div>'+'</div>'+'</div>'+'</div>'+'<div style="position:sticky;top:60px;">'+'<div style="background:#fff;border:1px solid #D8E3DC;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);">'+'<div style="padding:14px 16px;background:#F8FAF9;border-bottom:1px solid #D8E3DC;">'+'<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;">Lead Completion</div>'+(function(){  var lf2=S.lform||{};  var rows=[['Business Name',!!(lf2.bizName&&lf2.bizName.trim())],['Service Type',!!(lf2.serviceType)],['Owner',!!(lf2.ownerContact&&lf2.ownerContact.trim())],['Documents',met],['Start Date',!!(lf2.startDate)]];  var done=rows.filter(function(r){return r[1];}).length;  var pct=Math.round(done/rows.length*100);  var bc=pct===100?'#16A34A':pct>=60?'#275F45':'#D97706';  var o='<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:5px;">';  o+='<span style="font-size:22px;font-weight:700;color:'+bc+';">'+pct+'%</span>';  o+='<span style="font-size:11px;color:#9BA8A2;">'+done+' of '+rows.length+'</span></div>';  o+='<div style="height:5px;background:#E8E8E8;border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;"></div></div>';  rows.forEach(function(r){    o+='<div style="display:flex;align-items:center;gap:7px;padding:4px 0;border-bottom:1px solid #F8FAF9;">';    o+='<div style="width:14px;height:14px;border-radius:50%;background:'+(r[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(r[1]?'&#10003;':'')+'</div>';    o+='<span style="font-size:11px;color:'+(r[1]?'#1A1A1A':'#9BA8A2')+';flex:1;">'+r[0]+'</span>';    if(!r[1]) o+='<span style="font-size:9px;font-weight:700;color:#D97706;">Missing</span>';    o+='</div>'+rNewContactModal();  });  return o;}())+'</div>'+'<div style="padding:14px 16px;display:flex;flex-direction:column;gap:7px;">'+'<button type="button" id="slb" style="width:100%;padding:9px 14px;background:#275F45;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">'+(isE?'&#10003; Update Lead':'&#9889; Submit for Approval')+'</button>'+'<button type="button" id="svd" style="width:100%;padding:8px 14px;background:#fff;color:#275F45;border:1px solid #275F45;border-radius:5px;font-size:12px;font-weight:500;font-family:Inter,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">&#128190; '+(isE?'Save Changes':'Save Draft')+'</button>'+(isE?'<button type="button" id="clb" style="width:100%;padding:7px 14px;background:transparent;color:#9BA8A2;border:1px solid #D8E3DC;border-radius:5px;font-size:11px;font-family:Inter,sans-serif;cursor:pointer;">Cancel</button>':'')+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -4445,6 +4508,7 @@ function rApprovals(){
   }
 
   html+=rConvertModal();
+  html+=rNewContactModal();
   html+='</div>';
   return html;
 }
@@ -4633,6 +4697,131 @@ function bind(){
   document.querySelectorAll('.kbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{kickoffMeeting:el.value});render();});});
   document.querySelectorAll('.mbtn-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{maSigned:el.value});render();});});
   document.querySelectorAll('.bstr-r').forEach(function(el){el.addEventListener('change',function(){S.lform=Object.assign({},gLF(),{bizStructure:el.value});render();});});
+  // ── Main Business Contact dropdown handler ────────────────────────────────
+  var mbcSel=document.getElementById('mbc-select');
+  if(mbcSel){
+    mbcSel.addEventListener('change',function(){
+      var val=mbcSel.value;
+      if(val==='__NEW__'){
+        // Reset selection so user can re-open after cancel
+        mbcSel.value='';
+        S.newContactModal=true;
+        S.newContactKind=(S.lform&&S.lform.clientId)?'company':'individual';
+        S.newContactClientId=(S.lform&&S.lform.clientId)||'';
+        render();
+        return;
+      }
+      var hidden=document.getElementById('mbc-name-hidden');
+      var emailEl=document.querySelector('[name="email"]');
+      var phoneEl=document.querySelector('[name="phone"]');
+      var clientEl=document.querySelector('[name="clientId"]');
+      var warn=document.getElementById('mbc-client-warn');
+      if(warn){warn.style.display='none';warn.textContent='';}
+      if(!val){if(hidden) hidden.value='';return;}
+      var opt=mbcSel.options[mbcSel.selectedIndex];
+      var name=opt.getAttribute('data-name')||'';
+      var email=opt.getAttribute('data-email')||'';
+      var mobile=opt.getAttribute('data-mobile')||'';
+      var clientId=opt.getAttribute('data-clientid')||'';
+      if(hidden) hidden.value=name;
+      if(emailEl&&email&&!emailEl.value) emailEl.value=email;
+      else if(emailEl&&email&&emailEl.value&&emailEl.value!==email){
+        if(confirm('Update email from "'+emailEl.value+'" to "'+email+'"?')) emailEl.value=email;
+      }
+      if(phoneEl&&mobile&&!phoneEl.value) phoneEl.value=mobile;
+      else if(phoneEl&&mobile&&phoneEl.value&&phoneEl.value!==mobile){
+        if(confirm('Update phone from "'+phoneEl.value+'" to "'+mobile+'"?')) phoneEl.value=mobile;
+      }
+      if(clientEl&&clientEl.value&&clientId&&clientEl.value!==clientId){
+        var pickedClient=S.clients.filter(function(c){return c._id===clientEl.value;})[0];
+        var pickedName=pickedClient?(pickedClient.companyName||pickedClient.clientId):'(selected client)';
+        if(warn){warn.innerHTML='<strong>Client mismatch:</strong> '+(name||'This contact')+' is linked to a different client than \u201C'+pickedName+'\u201D.';warn.style.display='block';}
+      } else if(clientEl&&!clientEl.value&&clientId){
+        var matchingClient=S.clients.filter(function(c){return c._id===clientId;})[0];
+        if(matchingClient&&warn){warn.innerHTML='<strong>Suggestion:</strong> '+(name||'This contact')+' is linked to <strong>'+matchingClient.companyName+'</strong>. Consider setting the Client field above.';warn.style.display='block';}
+      }
+    });
+  }
+
+  // ── New Contact modal bindings ────────────────────────────────────────────
+  function closeNewContactModal(){S.newContactModal=false;S.newContactKind=null;S.newContactClientId=null;render();}
+  var ncmCancel=document.getElementById('ncm-cancel');
+  if(ncmCancel) ncmCancel.addEventListener('click',closeNewContactModal);
+  var ncmCancelX=document.getElementById('ncm-cancel-x');
+  if(ncmCancelX) ncmCancelX.addEventListener('click',closeNewContactModal);
+  var ncmOverlay=document.getElementById('ncm-overlay');
+  if(ncmOverlay) ncmOverlay.addEventListener('click',function(ev){if(ev.target.id==='ncm-overlay') closeNewContactModal();});
+  document.querySelectorAll('.ncm-kind').forEach(function(el){
+    el.addEventListener('click',function(){S.newContactKind=el.dataset.kind;render();});
+  });
+
+  var ncmSave=document.getElementById('ncm-save');
+  if(ncmSave) ncmSave.addEventListener('click',function(){
+    var kind=S.newContactKind||'individual';
+    var fn=(document.getElementById('ncm-fname')||{}).value||'';
+    var ln=(document.getElementById('ncm-lname')||{}).value||'';
+    var title=(document.getElementById('ncm-title')||{}).value||'';
+    var email=(document.getElementById('ncm-email')||{}).value||'';
+    var mobile=(document.getElementById('ncm-mobile')||{}).value||'';
+    var clientId=(document.getElementById('ncm-client')||{}).value||'';
+    if(!fn.trim()){flash('First name is required.','err');return;}
+
+    var fullName=(fn+' '+ln).trim();
+    var newRefId='';
+
+    if(kind==='company'){
+      if(!clientId){flash('Please select a Client Account.','err');return;}
+      var client=S.clients.filter(function(c){return c._id===clientId;})[0];
+      if(!client){flash('Client not found.','err');return;}
+      var contactId='CNT'+Date.now();
+      var newContact={
+        id:contactId,
+        firstName:fn.trim(),lastName:ln.trim(),
+        name:fullName,
+        jobTitle:title.trim(),role:title.trim(),
+        email:email.trim(),mobile:mobile.trim(),phone:mobile.trim(),
+        notes:'Added via lead form',
+        isPrimary:(client.contacts||[]).length===0,
+        activities:[]
+      };
+      S.clients=S.clients.map(function(c){
+        if(c._id!==clientId) return c;
+        var updated=Object.assign({},c,{contacts:(c.contacts||[]).concat([newContact])});
+        syncClient(updated);return updated;
+      });
+      newRefId='company:'+clientId+':'+contactId;
+    } else {
+      var icId='IC'+Date.now();
+      var newIC={
+        _id:icId,id:'CNT'+Date.now(),
+        firstName:fn.trim(),lastName:ln.trim(),
+        jobTitle:title.trim(),
+        email:email.trim(),mobile:mobile.trim(),
+        notes:'Added via lead form',
+        relType:'Prospect',
+        createdAt:new Date().toISOString()
+      };
+      S.individualContacts=S.individualContacts.concat([newIC]);
+      syncIndContact(newIC);
+      newRefId='individual:'+icId;
+    }
+
+    // Snapshot the lead form values so they survive the re-render
+    var snapshot=(typeof gLF==='function')?gLF():(S.lform||{});
+    snapshot.ownerContact=fullName;
+    snapshot.ownerContactRef=newRefId;
+    if(email.trim()&&!snapshot.email) snapshot.email=email.trim();
+    if(mobile.trim()&&!snapshot.phone) snapshot.phone=mobile.trim();
+    if(kind==='company'&&clientId&&!snapshot.clientId) snapshot.clientId=clientId;
+    S.lform=snapshot;
+
+    S.newContactModal=false;
+    S.newContactKind=null;
+    S.newContactClientId=null;
+    flash('Contact "'+fullName+'" created and selected on lead.');
+    render();
+  });
+
   document.querySelectorAll('.bsbtn').forEach(function(el){el.addEventListener('click',function(){S.biz=el.dataset.v;render();});});
   var lfi=document.getElementById('lfi');
   if(lfi) lfi.addEventListener('change',function(){
