@@ -4004,34 +4004,40 @@ function rClients(){
 
 function rGantt(){
   var GD=visDeals();
-  var svcColors={'Business Consulting':'#2D6A4F','Business Brokerage':'#C8972A','Business Funding':'#7c3aed'};
-  var svcLight={'Business Consulting':'#E8F5EE','Business Brokerage':'#FDF8EE','Business Funding':'#faf5ff'};
 
-  // Week navigation
+  // Neutral enterprise palette — no more rainbow.
+  var C={
+    text:'#0F172A', sub:'#64748B', muted:'#94A3B8', bord:'#E2E8F0', bordLt:'#F1F5F9',
+    bg:'#FAFAFA', weekend:'#F8F8F7',
+    primary:'#275F45', primaryLt:'#EAF3EE',
+    amber:'#C8972A', amberLt:'#FDF8EE',
+    red:'#991B1B', redLt:'#FEF2F2',
+    blue:'#1E40AF', blueLt:'#EFF6FF',
+    progFill:'#275F45', progEmpty:'#F1F5F9'
+  };
+
+  // Week navigation (existing state, unchanged)
   var weekOffset=S.ganttWeek||0;
   var today=new Date();today.setHours(0,0,0,0);
   var dayOfWeek=today.getDay();
   var monday=new Date(today);
   monday.setDate(today.getDate()-((dayOfWeek+6)%7)+(weekOffset*7));
 
-  // Build 21 days (3 weeks) for wide view
   var days=[];
   for(var i=0;i<21;i++){var d=new Date(monday);d.setDate(monday.getDate()+i);days.push(d);}
 
   function fmt(d){return d instanceof Date?d.toISOString().slice(0,10):'';}
   function fmtShort(d){return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();}
   function dayLetter(d){return ['S','M','T','W','T','F','S'][d.getDay()];}
-  function diffDays(a,b){return Math.round((new Date(b)-new Date(a))/(1000*60*60*24));}
+  function fmtDate(d){if(!d) return '';var dt=new Date(d);if(isNaN(dt.getTime())) return '';return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+' '+dt.getDate();}
 
-  // Group months for header
   var monthGroups=[];
   days.forEach(function(d){
     var key=fmtShort(d);
-    if(!monthGroups.length||monthGroups[monthGroups.length-1].label!==key){monthGroups.push({label:key,count:1});}
+    if(!monthGroups.length||monthGroups[monthGroups.length-1].label!==key) monthGroups.push({label:key,count:1});
     else monthGroups[monthGroups.length-1].count++;
   });
 
-  // Collect all rows
   var allDeals=GD.filter(function(d){return (d.deliverables||[]).length>0;});
   if(S.ganttSearch&&S.ganttSearch.trim()){
     var gsq=S.ganttSearch.toLowerCase().trim();
@@ -4040,195 +4046,216 @@ function rGantt(){
     });
   }
 
-  // Priority color helper
-  function priColor(p){return p==='High Priority'?'#dc2626':p==='Medium'?'#C8972A':'#64748b';}
-  function priLight(p){return p==='High Priority'?'#fef2f2':p==='Medium'?'#FDF8EE':'#f8fafc';}
+  function priColor(p){return p==='High Priority'?C.red:p==='Medium'?C.amber:C.sub;}
+  function statusBar(dl){
+    var pct=dl.progress||0;
+    var status=(dl.status||'').toLowerCase();
+    if(status.indexOf('revision')>=0) return {fill:C.amber,outline:true};
+    if(status.indexOf('overdue')>=0||(dl.dueDate&&new Date(dl.dueDate)<today&&pct<100)) return {fill:C.red,outline:false};
+    if(pct>=100) return {fill:C.primary,outline:false};
+    return {fill:C.primary,outline:false};
+  }
+  function initials(name){if(!name) return '?';var p=name.split(' ');return ((p[0]||'').charAt(0)+(p[1]?p[1].charAt(0):'')).toUpperCase()||'?';}
 
   var html='<div>';
 
-  // Header
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">';
-  html+='<div><div style="font-size:22px;font-weight:900;color:#1A4731">Deliverables Gantt Chart</div>';
-  html+='<div style="font-size:12px;color:#5A7A65;margin-top:2px">Track all project deliverables across deals</div></div>';
-  html+='<div style="display:flex;align-items:center;gap:10px">';
-  html+='<button id="gw-prev" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">&#8592; Prev</button>';
-  html+='<div style="font-size:13px;font-weight:700;color:#1A4731;min-width:160px;text-align:center">'+fmtShort(monday)+' &mdash; '+fmtShort(days[20])+'</div>';
-  html+='<button id="gw-next" style="background:#E8F5EE;border:1px solid #C8E6D4;color:#2D6A4F;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Next &#8594;</button>';
-  html+='<button id="gw-today" style="background:#1A4731;border:none;color:#fff;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Today</button>';
-  html+='</div></div>';
-  // Search bar
-  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">';
-  html+='<div style="position:relative;flex:1;max-width:420px">';
-  html+='<span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#5A7A65;font-size:14px">&#128269;</span>';
-  html+='<input id="gantt-search" value="'+e(S.ganttSearch||'')+'" placeholder="Search project by business name or deal ID..." style="padding:10px 12px 10px 36px;font-size:13px;border:1px solid #C8E6D4;border-radius:10px;width:100%;font-family:inherit;outline:none"/>';
+  // ── Sticky toolbar ──────────────────────────────────────────────────────
+  html+='<div style="background:#fff;border-bottom:1px solid '+C.bord+';padding:10px 0;margin-bottom:12px;position:sticky;top:-24px;z-index:30;">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">';
+  // Title block
+  html+='<div><div style="font-size:15px;font-weight:700;color:'+C.text+';letter-spacing:-.1px;">Deliverables Gantt</div>';
+  html+='<div style="font-size:11px;color:'+C.sub+';margin-top:2px;">Project deliverables across active deals</div></div>';
+
+  // Right controls
+  html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+  // Search
+  html+='<div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:'+C.muted+';font-size:11px;">&#128269;</span>';
+  html+='<input id="gantt-search" value="'+e(S.ganttSearch||'')+'" placeholder="Search projects..." style="padding:5px 8px 5px 26px;font-size:12px;border:1px solid '+C.bord+';border-radius:4px;width:200px;font-family:Inter,sans-serif;outline:none;height:28px;"/></div>';
+  if(S.ganttSearch) html+='<button id="gantt-clear" style="background:#fff;border:1px solid '+C.bord+';color:'+C.sub+';border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;height:28px;">Clear</button>';
+  // Date nav
+  html+='<div style="display:flex;align-items:center;gap:4px;border-left:1px solid '+C.bord+';padding-left:8px;margin-left:4px;">';
+  html+='<button id="gw-prev" title="Previous" style="background:#fff;border:1px solid '+C.bord+';color:'+C.sub+';border-radius:4px;padding:3px 9px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;height:28px;line-height:1;">&#8592;</button>';
+  html+='<button id="gw-today" style="background:'+C.primary+';border:1px solid '+C.primary+';color:#fff;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;height:28px;">Today</button>';
+  html+='<button id="gw-next" title="Next" style="background:#fff;border:1px solid '+C.bord+';color:'+C.sub+';border-radius:4px;padding:3px 9px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;height:28px;line-height:1;">&#8594;</button>';
+  html+='<span style="font-size:11px;color:'+C.sub+';margin-left:8px;font-variant-numeric:tabular-nums;">'+fmtShort(monday)+' &mdash; '+fmtShort(days[20])+'</span>';
   html+='</div>';
-  if(S.ganttSearch) html+='<button id="gantt-clear" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Clear</button>';
-  if(S.ganttSearch) html+='<div style="font-size:12px;color:#5A7A65">Showing results for <strong style="color:#1A4731">"'+e(S.ganttSearch)+'"</strong></div>';
+  html+='</div></div>';
   html+='</div>';
 
-  if(allDeals.length===0){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;padding:60px;text-align:center"><div style="font-size:40px;margin-bottom:12px">&#128197;</div><div style="font-size:18px;font-weight:800;color:#1A4731;margin-bottom:6px">No deliverables yet</div><div style="font-size:13px;color:#5A7A65">Add deliverables to your deals to see them here.</div></div>';
-    html+='</div>';return html;
+  // ── Project filter strip (horizontally scrollable) ──────────────────────
+  if(GD.filter(function(d){return (d.deliverables||[]).length>0;}).length>0){
+    html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px;">';
+    html+='<span style="font-size:9.5px;font-weight:700;color:'+C.muted+';letter-spacing:.6px;text-transform:uppercase;flex-shrink:0;margin-right:4px;">Project:</span>';
+    var allOn=(S.ganttProject==='all'||!S.ganttProject);
+    html+='<button class="gantt-proj-sel" data-proj="all" style="padding:4px 10px;border-radius:4px;border:1px solid '+(allOn?C.primary:C.bord)+';background:'+(allOn?C.primaryLt:'#fff')+';color:'+(allOn?C.primary:C.sub)+';font-size:11px;font-weight:'+(allOn?700:500)+';cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;flex-shrink:0;height:26px;">All ('+allDeals.length+')</button>';
+    GD.filter(function(d){return (d.deliverables||[]).length>0;}).forEach(function(d){
+      var on=S.ganttProject===d._id;
+      html+='<button class="gantt-proj-sel" data-proj="'+e(d._id)+'" style="padding:4px 10px;border-radius:4px;border:1px solid '+(on?C.primary:C.bord)+';background:'+(on?C.primaryLt:'#fff')+';color:'+(on?C.primary:C.sub)+';font-size:11px;font-weight:'+(on?700:500)+';cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;flex-shrink:0;max-width:200px;overflow:hidden;text-overflow:ellipsis;height:26px;">'+e(d.bizName||d.dealId||'Deal')+'</button>';
+    });
+    html+='</div>';
   }
 
-  var COL_W=34; // px per day column
-  var LEFT_W=560; // px for left table
-
-  // Project selector
-  html+='<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center">';
-  html+='<span style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px">VIEW PROJECT:</span>';
-  html+='<button class="gantt-proj-sel" data-proj="all" style="padding:7px 16px;border-radius:20px;border:2px solid '+(S.ganttProject==='all'||!S.ganttProject?'#1A4731':'#C8E6D4')+';background:'+(S.ganttProject==='all'||!S.ganttProject?'#1A4731':'#fff')+';color:'+(S.ganttProject==='all'||!S.ganttProject?'#fff':'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s">All Projects ('+(allDeals.length)+')</button>';
-  GD.filter(function(d){return (d.deliverables||[]).length>0;}).forEach(function(d){
-    var c2=svcColors[d.serviceType]||'#2D6A4F';
-    var on=S.ganttProject===d._id;
-    html+='<button class="gantt-proj-sel" data-proj="'+e(d._id)+'" style="padding:7px 16px;border-radius:20px;border:2px solid '+(on?c2:'#C8E6D4')+';background:'+(on?c2:'#fff')+';color:'+(on?'#fff':'#5A7A65')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(d.bizName||d.dealId||'Deal')+'</button>';
-  });
-  html+='</div>';
-  // Filter allDeals by selected project
   if(S.ganttProject&&S.ganttProject!=='all') allDeals=allDeals.filter(function(d){return d._id===S.ganttProject;});
-  html+='<div style="overflow-x:auto;border-radius:14px;border:1px solid #C8E6D4;box-shadow:0 2px 12px #1A47310d">';
-  html+='<table style="border-collapse:collapse;font-size:12px;min-width:'+(LEFT_W+days.length*COL_W)+'px">';
 
-  // ── Header Row 1: Month groups ──────────────────────────────────────────
+  if(allDeals.length===0){
+    html+='<div style="background:#fff;border:1px solid '+C.bord+';border-radius:6px;padding:48px 20px;text-align:center;">';
+    html+='<div style="font-size:13px;font-weight:600;color:'+C.text+';margin-bottom:4px;">No deliverables to display</div>';
+    html+='<div style="font-size:11px;color:'+C.sub+';">Add deliverables to your deals or adjust your filters.</div>';
+    html+='</div></div>';return html;
+  }
+
+  var COL_W=32;
+  var LEFT_W=620;
+
+  // ── Gantt table ──────────────────────────────────────────────────────────
+  html+='<div style="overflow-x:auto;border:1px solid '+C.bord+';border-radius:6px;background:#fff;">';
+  html+='<table style="border-collapse:collapse;font-size:11.5px;min-width:'+(LEFT_W+days.length*COL_W)+'px;width:100%;">';
+
+  // ── Sticky table header ─────────────────────────────────────────────────
   html+='<thead>';
-  html+='<tr style="background:#0a1f13">';
-  html+='<th colspan="8" style="padding:12px 16px;text-align:left;color:#86efac;font-size:14px;font-weight:900;border-right:2px solid rgba(255,255,255,.2);width:'+LEFT_W+'px;letter-spacing:.5px">&#128197; Project &amp; Deliverable Schedule</th>';
+  // Row 1: Left columns header (spans) + month groups
+  html+='<tr style="background:#FAFAFA;border-bottom:1px solid '+C.bord+';height:30px;">';
+  html+='<th style="text-align:left;padding:6px 12px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;position:sticky;left:0;background:#FAFAFA;z-index:5;border-right:1px solid '+C.bord+';min-width:'+(LEFT_W-260)+'px;">Task</th>';
+  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:130px;">Owner</th>';
+  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:130px;border-right:1px solid '+C.bord+';">Progress</th>';
   monthGroups.forEach(function(mg){
-    html+='<th colspan="'+mg.count+'" style="padding:8px 4px;text-align:center;color:#fff;font-size:13px;font-weight:900;border-left:1px solid rgba(255,255,255,.2);letter-spacing:1px;text-shadow:0 1px 3px rgba(0,0,0,.4)">'+mg.label+'</th>';
+    html+='<th colspan="'+mg.count+'" style="text-align:center;padding:6px 4px;font-size:10px;font-weight:600;color:'+C.text+';border-right:1px solid '+C.bord+';background:#FAFAFA;">'+mg.label+'</th>';
   });
   html+='</tr>';
 
-  // ── Header Row 2: Column labels + Day numbers ────────────────────────────
-  html+='<tr style="background:#0f2d1f;border-top:1px solid rgba(255,255,255,.1)">';
-  var leftCols=[['ID','40px'],['TASK / DELIVERABLE','180px'],['OWNER','80px'],['PRIORITY','70px'],['START','72px'],['FINISH','72px'],['DAYS','46px'],['% DONE','64px']];
-  leftCols.forEach(function(c){
-    html+='<th style="padding:10px 8px;text-align:left;color:#fff;font-size:12px;font-weight:900;letter-spacing:.5px;white-space:nowrap;width:'+c[1]+';border-right:1px solid rgba(255,255,255,.2);background:#0f2d1f">'+c[0].charAt(0).toUpperCase()+c[0].slice(1).toLowerCase().replace('/ deliverable','/ Deliverable').replace('% done','% Done')+'</th>';
-  });
+  // Row 2: day columns
+  html+='<tr style="background:#FAFAFA;border-bottom:1px solid '+C.bord+';height:24px;">';
+  html+='<th colspan="3" style="position:sticky;left:0;background:#FAFAFA;z-index:5;border-right:1px solid '+C.bord+';"></th>';
   days.forEach(function(d){
-    var isToday=fmt(d)===fmt(today);
-    var isWknd=d.getDay()===0||d.getDay()===6;
-    html+='<th style="width:'+COL_W+'px;padding:6px 2px;text-align:center;color:'+(isToday?'#fff':isWknd?'#fde68a':'#fff')+';font-size:13px;font-weight:'+(isToday?'900':'800')+';border-left:1px solid rgba(255,255,255,.15);background:'+(isToday?'rgba(200,151,42,.7)':isWknd?'rgba(0,0,0,.35)':'rgba(0,0,0,.1)')+'">'+'<div style="line-height:1.3">'+d.getDate()+'</div><div style="font-size:11px;font-weight:700">'+dayLetter(d)+'</div></th>';
-      '<div>'+d.getDate()+'</div><div style="font-size:9px;opacity:.7">'+dayLetter(d)+'</div></th>';
+    var isWeekend=d.getDay()===0||d.getDay()===6;
+    var isToday=d.toDateString()===today.toDateString();
+    html+='<th style="text-align:center;width:'+COL_W+'px;font-size:9px;font-weight:600;color:'+(isToday?C.primary:C.sub)+';background:'+(isWeekend?C.weekend:'#FAFAFA')+';border-right:1px solid '+C.bordLt+';padding:2px 0;line-height:1.2;">';
+    html+='<div style="font-size:8.5px;">'+dayLetter(d)+'</div><div style="font-size:10px;font-weight:'+(isToday?700:600)+';">'+d.getDate()+'</div></th>';
   });
   html+='</tr></thead>';
 
-  // ── Body rows ────────────────────────────────────────────────────────────
+  // ── Body ────────────────────────────────────────────────────────────────
   html+='<tbody>';
+  allDeals.forEach(function(d){
+    var dlvs=d.deliverables||[];
+    var prog=dlvs.length?Math.round(dlvs.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs.length):0;
 
-  allDeals.forEach(function(deal,di){
-    var col=svcColors[deal.serviceType]||'#2D6A4F';
-    var colLight=svcLight[deal.serviceType]||'#E8F5EE';
-    var dlvs=deal.deliverables||[];
-    var dealAvg=dlvs.length?Math.round(dlvs.reduce(function(a,d){return a+(d.progress||0);},0)/dlvs.length):0;
-    var dealStart=dlvs.filter(function(d){return d.start;}).map(function(d){return d.start;}).sort()[0]||'';
-    var dealEnd=dlvs.filter(function(d){return d.end;}).map(function(d){return d.end;}).sort().reverse()[0]||'';
-    var dealDur=dealStart&&dealEnd?diffDays(dealStart,dealEnd)+' days':'';
+    // ── Project summary row ───────────────────────────────────────────────
+    html+='<tr style="background:#FAFCFA;border-bottom:1px solid '+C.bord+';border-top:1px solid '+C.bord+';height:48px;">';
+    html+='<td style="padding:8px 12px 8px 12px;position:sticky;left:0;background:#FAFCFA;z-index:4;border-right:1px solid '+C.bord+';border-left:3px solid '+C.primary+';">';
+    html+='<div style="font-size:12.5px;font-weight:700;color:'+C.text+';line-height:1.2;">'+e(d.bizName||d.dealId||'Untitled')+'</div>';
+    html+='<div style="font-size:9.5px;color:'+C.sub+';margin-top:2px;font-family:monospace;">'+e(d.dealId||'')+(d.serviceType?' &middot; '+e(d.serviceType.replace('Business ','')):'')+'</div>';
+    html+='</td>';
+    html+='<td style="padding:8px;background:#FAFCFA;font-size:11px;color:'+C.text+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">'+e(d.owner||'\u2014')+'</td>';
+    html+='<td style="padding:8px;background:#FAFCFA;border-right:1px solid '+C.bord+';">';
+    html+='<div style="display:flex;align-items:center;gap:8px;">';
+    html+='<div style="flex:1;height:6px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+prog+'%;height:100%;background:'+C.primary+';"></div></div>';
+    html+='<span style="font-size:10.5px;font-weight:700;color:'+C.text+';font-variant-numeric:tabular-nums;min-width:30px;text-align:right;">'+prog+'%</span>';
+    html+='</div>';
+    html+='<div style="font-size:9px;color:'+C.muted+';margin-top:2px;">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+'</div>';
+    html+='</td>';
 
-    // ── Deal group header row ────────────────────────────────────────────
-    html+='<tr style="background:'+col+';border-top:2px solid '+col+'">';
-    html+='<td style="padding:10px 8px;color:#fff;font-size:12px;font-weight:800;white-space:nowrap"><span style="background:rgba(255,255,255,.2);border-radius:4px;padding:2px 6px">'+e(deal.dealId||'?')+'</span></td>';
-    html+='<td style="padding:10px 8px;color:#fff;font-size:13px;font-weight:800">'+e(deal.bizName||'Unknown Deal')+'</td>';
-    html+='<td style="padding:10px 8px;color:rgba(255,255,255,.8);font-size:11px">'+e(deal.owner||'&mdash;')+'</td>';
-    html+='<td style="padding:10px 8px"><span style="background:rgba(255,255,255,.25);color:#fff;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+e(deal.serviceType||'Deal')+'</span></td>';
-    html+='<td style="padding:10px 8px;color:rgba(255,255,255,.8);font-size:11px">'+e(dealStart||'&mdash;')+'</td>';
-    html+='<td style="padding:10px 8px;color:rgba(255,255,255,.8);font-size:11px">'+e(dealEnd||'&mdash;')+'</td>';
-    html+='<td style="padding:10px 8px;color:rgba(255,255,255,.8);font-size:11px;text-align:center">'+e(dealDur||'&mdash;')+'</td>';
-    html+='<td style="padding:10px 8px"><div style="display:flex;align-items:center;gap:4px"><div style="flex:1;height:8px;background:rgba(255,255,255,.2);border-radius:4px;overflow:hidden"><div style="width:'+dealAvg+'%;height:100%;background:#fff;border-radius:4px"></div></div><span style="font-size:11px;font-weight:800;color:#fff;min-width:28px">'+dealAvg+'%</span></div></td>';
-    // Gantt cells for deal row - show thin overview bar
-    days.forEach(function(d){
-      var ds=fmt(d);
-      var inRange=dealStart&&dealEnd&&ds>=dealStart&&ds<=dealEnd;
-      var isWknd=d.getDay()===0||d.getDay()===6;
-      html+='<td style="border-left:1px solid rgba(255,255,255,.1);background:'+(inRange?'rgba(255,255,255,.15)':isWknd?'rgba(0,0,0,.15)':'')+';padding:2px">';
-      if(inRange) html+='<div style="height:20px;background:rgba(255,255,255,.3);border-radius:2px"></div>';
-      html+='</td>';
+    // Timeline cells for project row
+    days.forEach(function(day){
+      var isWeekend=day.getDay()===0||day.getDay()===6;
+      var isToday=day.toDateString()===today.toDateString();
+      html+='<td style="background:'+(isWeekend?C.weekend:'#FAFCFA')+';border-right:1px solid '+C.bordLt+';position:relative;'+(isToday?'box-shadow:inset 1px 0 0 '+C.primary+';':'')+'"></td>';
     });
     html+='</tr>';
 
-    // ── Deliverable rows ────────────────────────────────────────────────
-    dlvs.forEach(function(dlv,di2){
-      var pct=dlv.progress||0;
-      var TASK_COLORS=['#1e40af','#be123c','#b45309','#047857','#7e22ce','#0e7490','#c2410c','#4d7c0f','#be185d','#0369a1'];
-      var taskColor=TASK_COLORS[di2%TASK_COLORS.length];
-      var barCol=pct===100?'#16a34a':taskColor;
-      var dur=dlv.start&&dlv.end?diffDays(dlv.start,dlv.end)+' d':'&mdash;';
-      var rowBg=di2%2===0?'#fff':'#fafdfb';
-      var pri=dlv.priority||'';
+    // ── Deliverable rows ──────────────────────────────────────────────────
+    dlvs.forEach(function(dl,idx){
+      var dlStart=dl.startDate?new Date(dl.startDate):null;
+      var dlEnd=dl.dueDate?new Date(dl.dueDate):null;
+      var pct=dl.progress||0;
+      var sb=statusBar(dl);
+      var pri=dl.priority||'';
+      var pc=priColor(pri);
 
-      html+='<tr style="background:'+rowBg+';border-bottom:1px solid #E8F5EE">';
-      // ID
-      var isExpanded=S.
-      isExpanded=S.ganttExpDlv===dlv._id;
-      var rs2=dlv.reviewStatus||'Draft';
-      var rsBadgeCol={'Draft':'#94a3b8','Submitted for Review':'#C8972A','Under Review':'#2563eb','Revision Needed':'#dc2626','Approved':'#16a34a'}[rs2]||'#94a3b8';
-      html+='<tr style="background:'+rowBg+';border-bottom:1px solid #E8F5EE">';
-      html+='<td style="padding:9px 8px;border-left:3px solid '+col+';white-space:nowrap"><span style="color:'+col+';font-size:11px;font-weight:700;font-family:monospace">'+e(deal.dealId||'?')+'.'+(di2+1)+'</span></td>';
-      // Task name
-      html+='<td style="padding:9px 8px;font-weight:600;color:#1A4731;min-width:160px">'+
-        '<div style="display:flex;align-items:center;gap:6px">'+
-          '<button class="dlv-expand-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:none;border:none;cursor:pointer;color:'+col+';font-size:14px;padding:0;flex-shrink:0;font-family:inherit">'+(isExpanded?'&#9660;':'&#9654;')+'</button>'+
-          '<span>'+e(dlv.name)+'</span>'+
-          (rs2!=='Draft'?'<span style="background:'+rsBadgeCol+'20;color:'+rsBadgeCol+';border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;white-space:nowrap">'+rs2+'</span>':'')+
-          ((dlv.reviewFiles||[]).length>0?'<span style="background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700">&#128196; '+(dlv.reviewFiles.length)+'</span>':'')+
-        '</div>'+
-      '</td>';
-      // Owner
-      html+='<td style="padding:9px 8px;color:#5A7A65;font-size:11px;white-space:nowrap">'+e(dlv.owner||'&mdash;')+'</td>';
-      // Priority
-      html+='<td style="padding:6px 8px">'+
-        '<select class="dlv-pri-sel" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="font-size:10px;font-weight:700;border-radius:4px;padding:3px 5px;border:1px solid '+(pri==='High'?'#fecaca':pri==='Medium'?'#F5E6C3':pri==='Low'?'#C8E6D4':'#e2e8f0')+';background:'+(pri==='High'?'#fef2f2':pri==='Medium'?'#FDF8EE':pri==='Low'?'#E8F5EE':'#f8fafc')+';color:'+(pri==='High'?'#dc2626':pri==='Medium'?'#C8972A':pri==='Low'?'#2D6A4F':'#94a3b8')+';cursor:pointer;font-family:inherit;width:100%">'+
-          '<option value=""'+(pri===''?' selected':'')+'>Set Priority</option>'+
-          '<option value="Low"'+(pri==='Low'?' selected':'')+'>Low</option>'+
-          '<option value="Medium"'+(pri==='Medium'?' selected':'')+'>Medium</option>'+
-          '<option value="High"'+(pri==='High'?' selected':'')+'>High</option>'+
-        '</select>'+
-      '</td>';
-      // Start
-      html+='<td style="padding:9px 8px;color:#5A7A65;font-size:11px;white-space:nowrap">'+e(dlv.start||'&mdash;')+'</td>';
-      // Finish
-      html+='<td style="padding:9px 8px;color:#5A7A65;font-size:11px;white-space:nowrap">'+e(dlv.end||'&mdash;')+'</td>';
-      // Duration
-      html+='<td style="padding:9px 8px;color:#5A7A65;font-size:11px;text-align:center">'+dur+'</td>';
-      // % Complete with bar
-      html+='<td style="padding:9px 8px"><div style="display:flex;align-items:center;gap:4px"><div style="width:40px;height:8px;background:#E8F5EE;border-radius:4px;overflow:hidden;flex-shrink:0"><div style="width:'+pct+'%;height:100%;background:'+barCol+';border-radius:4px"></div></div><span style="font-size:11px;font-weight:700;color:'+barCol+'">'+pct+'%</span></div></td>';
-
-      // Gantt bar cells
-      var inRangeStart=dlv.start&&dlv.end;
-      days.forEach(function(d){
-        var ds=fmt(d);
-        var isToday2=ds===fmt(today);
-        var isWknd2=d.getDay()===0||d.getDay()===6;
-        var inBar=inRangeStart&&ds>=dlv.start&&ds<=dlv.end;
-        var fillPct=pct;
-        // Progress fill: what fraction of the bar is "done"
-        var fillW=0;
-        if(inBar&&dlv.start&&dlv.end){
-          var totalSpan=diffDays(dlv.start,dlv.end)||1;
-          var dayPos=diffDays(dlv.start,ds);
-          var progressDays=totalSpan*(pct/100);
-          fillW=dayPos<progressDays?100:0;
+      // Compute bar position relative to the 21-day window
+      var barLeftCol=-1, barWidthCols=0;
+      if(dlStart&&dlEnd){
+        dlStart.setHours(0,0,0,0);dlEnd.setHours(0,0,0,0);
+        for(var di=0;di<days.length;di++){
+          var dayCmp=days[di].getTime();
+          if(barLeftCol<0&&dayCmp>=dlStart.getTime()&&dayCmp<=dlEnd.getTime()) barLeftCol=di;
+          if(dayCmp>=dlStart.getTime()&&dayCmp<=dlEnd.getTime()) barWidthCols++;
         }
-        html+='<td style="padding:2px 1px;border-left:1px solid '+(isToday2?'#C8972A':'#E8F5EE')+';background:'+(isToday2?'#FDF8EE50':isWknd2?'#f5f5f5':'')+'">';
-        if(inBar){
-          var isFirst=ds===dlv.start,isLast=ds===dlv.end;
-          var radius=isFirst&&isLast?'4px':isFirst?'4px 0 0 4px':isLast?'0 4px 4px 0':'0';
-          html+='<div style="height:24px;background:'+taskColor+'40;border-radius:'+radius+';overflow:hidden;position:relative;margin:1px 0">';
-          if(fillW) html+='<div style="position:absolute;left:0;top:0;width:100%;height:100%;background:'+taskColor+';border-radius:inherit"></div>';
-          else html+='<div style="position:absolute;left:0;top:0;width:100%;height:100%;background:'+taskColor+';opacity:.55;border-radius:inherit"></div>';
-          html+='</div>';
+      }
+      var isMilestone=dlStart&&dlEnd&&dlStart.toDateString()===dlEnd.toDateString();
+
+      html+='<tr class="gantt-row" style="background:#fff;border-bottom:1px solid '+C.bordLt+';height:40px;" onmouseover="this.style.background=\''+C.bg+'\'" onmouseout="this.style.background=\'#fff\'">';
+
+      // Task column (sticky)
+      html+='<td style="padding:6px 12px 6px 24px;position:sticky;left:0;background:inherit;z-index:3;border-right:1px solid '+C.bord+';">';
+      html+='<div style="display:flex;align-items:center;gap:8px;">';
+      html+='<span style="width:5px;height:5px;border-radius:50%;background:'+pc+';flex-shrink:0;"></span>';
+      html+='<div style="min-width:0;flex:1;">';
+      html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dl.name||'Untitled')+'</div>';
+      html+='<div style="font-size:9px;color:'+C.muted+';margin-top:1px;">'+(pri?e(pri.replace(' Priority',''))+' priority':'')+(dlStart?' &middot; '+fmtDate(dlStart):'')+(dlEnd?' \u2192 '+fmtDate(dlEnd):'')+'</div>';
+      html+='</div></div></td>';
+
+      // Owner
+      html+='<td style="padding:6px 8px;background:inherit;">';
+      if(dl.owner){
+        html+='<div style="display:flex;align-items:center;gap:6px;">';
+        html+='<span style="width:20px;height:20px;border-radius:50%;background:'+C.primaryLt+';color:'+C.primary+';font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials(dl.owner)+'</span>';
+        html+='<span style="font-size:11px;color:'+C.text+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dl.owner)+'</span>';
+        html+='</div>';
+      } else {
+        html+='<span style="font-size:11px;color:'+C.muted+';">Unassigned</span>';
+      }
+      html+='</td>';
+
+      // Progress
+      html+='<td style="padding:6px 8px;background:inherit;border-right:1px solid '+C.bord+';">';
+      html+='<div style="display:flex;align-items:center;gap:8px;">';
+      var pColor=pct>=100?C.primary:pct>=60?C.primary:pct>=30?C.amber:C.muted;
+      html+='<div style="flex:1;height:5px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+pColor+';"></div></div>';
+      html+='<span style="font-size:10.5px;font-weight:700;color:'+pColor+';font-variant-numeric:tabular-nums;min-width:30px;text-align:right;">'+pct+'%</span>';
+      html+='</div></td>';
+
+      // Timeline cells
+      days.forEach(function(day,di){
+        var isWeekend=day.getDay()===0||day.getDay()===6;
+        var isToday=day.toDateString()===today.toDateString();
+        var inBar=barLeftCol>=0&&di>=barLeftCol&&di<barLeftCol+barWidthCols;
+        var bg=isWeekend?C.weekend:'#fff';
+        var cellStyle='background:'+bg+';border-right:1px solid '+C.bordLt+';position:relative;padding:0;height:40px;';
+        if(isToday) cellStyle+='box-shadow:inset 1px 0 0 '+C.primary+';';
+        html+='<td style="'+cellStyle+'">';
+        if(inBar&&di===barLeftCol){
+          var w=barWidthCols*COL_W-4;
+          if(isMilestone){
+            html+='<div title="'+e(dl.name)+'" style="position:absolute;top:50%;left:'+(COL_W/2-7)+'px;transform:translateY(-50%) rotate(45deg);width:14px;height:14px;background:'+sb.fill+';border:1px solid #fff;"></div>';
+          } else {
+            html+='<div title="'+e(dl.name)+' \u2014 '+pct+'%" style="position:absolute;top:50%;transform:translateY(-50%);left:2px;width:'+w+'px;height:18px;background:'+(sb.outline?'#fff':C.progEmpty)+';border:'+(sb.outline?'1.5px solid '+sb.fill:'1px solid '+sb.fill)+';border-radius:3px;overflow:hidden;">';
+            if(!sb.outline) html+='<div style="height:100%;width:'+pct+'%;background:'+sb.fill+';"></div>';
+            html+='</div>';
+          }
         }
         html+='</td>';
       });
       html+='</tr>';
-      if(isExpanded){ html+=rDlvReviewPanel(deal,dlv); }
     });
   });
+  html+='</tbody></table>';
+  html+='</div>';
 
-  html+='</tbody></table></div>';
+  // ── Legend ───────────────────────────────────────────────────────────────
+  html+='<div style="display:flex;align-items:center;gap:14px;margin-top:10px;padding:8px 12px;background:#fff;border:1px solid '+C.bord+';border-radius:4px;font-size:10.5px;color:'+C.sub+';flex-wrap:wrap;">';
+  html+='<span style="font-weight:700;color:'+C.text+';">Legend:</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.primary+';border-radius:2px;"></span>Completed</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.progEmpty+';border:1px solid '+C.primary+';border-radius:2px;position:relative;overflow:hidden;"><span style="position:absolute;left:0;top:0;bottom:0;width:50%;background:'+C.primary+';"></span></span>In progress</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:#fff;border:1.5px solid '+C.amber+';border-radius:2px;"></span>Revision</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.red+';border-radius:2px;"></span>Overdue</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:'+C.primary+';transform:rotate(45deg);"></span>Milestone</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:2px;height:14px;background:'+C.primary+';"></span>Today</span>';
+  html+='</div>';
+
   html+='</div>';
   return html;
 }
-
 
 function rConvertModal(){
   var out='';
