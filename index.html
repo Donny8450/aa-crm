@@ -549,6 +549,11 @@ var S={
   leadMenu:null,
   convertModal:null,
   newContactModal:false,
+  linkContactModal:null,
+  linkContactSearch:'',
+  linkContactSelClient:null,
+  linkContactStatus:'All',
+  linkContactIndustry:'All',
   pipeSavedView:'active',
   pipeStage:'All',
   pipeSvc:'All',
@@ -837,6 +842,147 @@ function renderMainContactSelect(lf){
   html+='<div style="font-size:10px;color:#9BA8A2;margin-top:3px;">Pick an existing contact &mdash; phone &amp; email auto-fill. Choose &ldquo;+ Add New&rdquo; to enter manually.</div>';
   // Client-mismatch warning placeholder
   html+='<div id="mbc-client-warn" style="display:none;margin-top:6px;padding:6px 10px;background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;font-size:11px;color:#92400E;"></div>';
+  return html;
+}
+
+
+function rLinkContactModal(){
+  if(!S.linkContactModal) return '';
+  // linkContactModal = {kind:'individual'|'company', contactId, clientId(if company)}
+  var ctx=S.linkContactModal;
+  var ct=null, currentClientId='';
+  if(ctx.kind==='individual'){
+    ct=(S.individualContacts||[]).filter(function(x){return x._id===ctx.contactId;})[0];
+  } else {
+    var srcClient=S.clients.filter(function(c){return c._id===ctx.clientId;})[0];
+    if(srcClient) ct=(srcClient.contacts||[]).filter(function(x){return x.id===ctx.contactId;})[0];
+    currentClientId=ctx.clientId;
+  }
+  if(!ct) return '';
+
+  var contactName=((ct.firstName||ct.name||'')+' '+(ct.lastName||'')).trim()||'Unnamed contact';
+  var contactInit=((ct.firstName||ct.name||'').charAt(0)+(ct.lastName||'').charAt(0)).toUpperCase()||'?';
+
+  // Filter pool
+  var clients=[].concat(S.clients).filter(function(c){return c._id!==currentClientId;});
+  var q=(S.linkContactSearch||'').toLowerCase().trim();
+  if(q) clients=clients.filter(function(c){
+    return (c.companyName||'').toLowerCase().indexOf(q)>=0||(c.clientId||'').toLowerCase().indexOf(q)>=0||(c.industry||'').toLowerCase().indexOf(q)>=0||(c.location||'').toLowerCase().indexOf(q)>=0||(c.accountOwner||'').toLowerCase().indexOf(q)>=0;
+  });
+  if(S.linkContactStatus!=='All') clients=clients.filter(function(c){return (c.status||'Prospect')===S.linkContactStatus;});
+  if(S.linkContactIndustry!=='All') clients=clients.filter(function(c){return c.industry===S.linkContactIndustry;});
+
+  var industries=[];S.clients.forEach(function(c){if(c.industry&&industries.indexOf(c.industry)<0) industries.push(c.industry);});
+
+  var selected=S.linkContactSelClient?S.clients.filter(function(c){return c._id===S.linkContactSelClient;})[0]:null;
+  var currentClient=currentClientId?S.clients.filter(function(c){return c._id===currentClientId;})[0]:null;
+
+  var html='<div id="lcm-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;">';
+  html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:740px;max-height:88vh;display:flex;flex-direction:column;">';
+
+  // Header
+  html+='<div style="padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">';
+  html+='<div><div style="font-size:14px;font-weight:700;color:#0F172A;">Link Contact to Client Account</div>';
+  html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">Select the client account you want to link this contact to.</div></div>';
+  html+='<button id="lcm-close" style="background:none;border:none;font-size:18px;color:#94A3B8;cursor:pointer;line-height:1;">&#10005;</button></div>';
+
+  // Contact summary
+  html+='<div style="padding:12px 20px;background:#F8FAF9;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:12px;">';
+  html+='<div style="width:36px;height:36px;border-radius:50%;background:#EAF3EE;border:1px solid #C8E6D4;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#275F45;flex-shrink:0;">'+contactInit+'</div>';
+  html+='<div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:700;color:#0F172A;">'+e(contactName)+'</div>';
+  var meta=[];
+  if(ct.jobTitle||ct.role) meta.push(e(ct.jobTitle||ct.role));
+  if(ct.email) meta.push(e(ct.email));
+  if(ct.mobile||ct.phone) meta.push(e(ct.mobile||ct.phone));
+  html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">'+(meta.length?meta.join(' &middot; '):'No additional details')+'</div></div>';
+  html+='</div>';
+
+  // Currently-linked indicator (Q2: change company flow)
+  if(currentClient){
+    html+='<div style="padding:10px 20px;background:#EFF6FF;border-bottom:1px solid #BFDBFE;display:flex;align-items:center;gap:10px;">';
+    html+='<div style="font-size:10px;font-weight:700;color:#1E40AF;text-transform:uppercase;letter-spacing:.5px;">Currently Linked:</div>';
+    html+='<div style="font-size:12px;color:#0F172A;font-weight:600;flex:1;">'+e(currentClient.companyName)+'</div>';
+    html+='<button id="lcm-unlink" style="background:#fff;border:1px solid #FECACA;color:#991B1B;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Unlink</button>';
+    html+='</div>';
+  }
+
+  // No-accounts empty state
+  if(!S.clients.length){
+    html+='<div style="padding:48px 20px;text-align:center;flex:1;">';
+    html+='<div style="font-size:28px;opacity:.3;margin-bottom:12px;">&#127970;</div>';
+    html+='<div style="font-size:14px;font-weight:600;color:#0F172A;margin-bottom:6px;">No client accounts found</div>';
+    html+='<div style="font-size:12px;color:#64748B;margin-bottom:14px;">Create a client account first, then link this contact.</div>';
+    html+='<button id="lcm-new-client" class="btn btn-sm">+ Create New Client Account</button>';
+    html+='</div>';
+  } else {
+    // Sticky search & filters
+    html+='<div style="padding:12px 20px;border-bottom:1px solid #E2E8F0;background:#fff;position:sticky;top:0;z-index:2;">';
+    html+='<div style="position:relative;margin-bottom:8px;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:12px;">&#128269;</span>';
+    html+='<input id="lcm-search" value="'+e(S.linkContactSearch||'')+'" placeholder="Search by company name, client ID, industry, location, or account owner" style="padding:7px 10px 7px 30px;font-size:12px;border:1px solid #E2E8F0;border-radius:4px;width:100%;font-family:Inter,sans-serif;outline:none;"/></div>';
+    html+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">';
+    html+='<select id="lcm-status" style="font-size:11px;padding:4px 8px;border:1px solid #E2E8F0;border-radius:3px;font-family:Inter,sans-serif;height:26px;background:#fff;">';
+    ['All','Active','Prospect','Inactive'].forEach(function(s){html+='<option'+(S.linkContactStatus===s?' selected':'')+'>'+s+'</option>';});
+    html+='</select>';
+    html+='<select id="lcm-industry" style="font-size:11px;padding:4px 8px;border:1px solid #E2E8F0;border-radius:3px;font-family:Inter,sans-serif;height:26px;background:#fff;">';
+    html+='<option value="All"'+(S.linkContactIndustry==='All'?' selected':'')+'>All Industries</option>';
+    industries.forEach(function(ind){html+='<option'+(S.linkContactIndustry===ind?' selected':'')+'>'+e(ind)+'</option>';});
+    html+='</select>';
+    html+='<span style="font-size:11px;color:#64748B;margin-left:auto;">'+clients.length+' result'+(clients.length!==1?'s':'')+'</span>';
+    html+='</div></div>';
+
+    // Scrollable list
+    html+='<div style="flex:1;overflow-y:auto;padding:8px 12px;">';
+    if(!clients.length){
+      html+='<div style="text-align:center;padding:36px 0;color:#94A3B8;font-size:12px;">No client accounts match the current filters.</div>';
+    } else {
+      clients.forEach(function(c){
+        var isSel=S.linkContactSelClient===c._id;
+        var statusCol={'Active':'#16a34a','Prospect':'#D97706','Inactive':'#9BA8A2'}[c.status||'Prospect']||'#9BA8A2';
+        var initials=(c.companyName||'?').split(' ').map(function(w){return w.charAt(0);}).join('').slice(0,2).toUpperCase();
+        var ctCount=(c.contacts||[]).length;
+        html+='<div class="lcm-row" data-id="'+e(c._id)+'" style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:'+(isSel?'#EAF3EE':'#fff')+';border:1px solid '+(isSel?'#275F45':'#E2E8F0')+';border-radius:5px;margin-bottom:5px;cursor:pointer;transition:background .12s,border-color .12s;">';
+        // Radio dot
+        html+='<div style="width:16px;height:16px;border-radius:50%;border:2px solid '+(isSel?'#275F45':'#CBD5E1')+';background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">';
+        if(isSel) html+='<div style="width:6px;height:6px;border-radius:50%;background:#275F45;"></div>';
+        html+='</div>';
+        // Initials avatar
+        html+='<div style="width:28px;height:28px;border-radius:4px;background:#EAF3EE;border:1px solid #C8E6D4;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#275F45;flex-shrink:0;">'+initials+'</div>';
+        // Info
+        html+='<div style="flex:1;min-width:0;">';
+        html+='<div style="display:flex;align-items:center;gap:8px;">';
+        html+='<span style="font-size:12.5px;font-weight:600;color:#0F172A;">'+e(c.companyName)+'</span>';
+        if(c.clientId) html+='<span style="font-size:9.5px;color:#94A3B8;font-family:monospace;">'+e(c.clientId)+'</span>';
+        if(isSel) html+='<span style="font-size:11px;color:#275F45;">&#10003;</span>';
+        html+='</div>';
+        var line2=[];
+        if(c.industry) line2.push(e(c.industry));
+        if(c.location) line2.push(e(c.location));
+        if(c.accountOwner) line2.push('Owner: '+e(c.accountOwner));
+        line2.push(ctCount+' contact'+(ctCount!==1?'s':''));
+        html+='<div style="font-size:10.5px;color:#64748B;margin-top:2px;">'+line2.join(' &middot; ')+'</div>';
+        html+='</div>';
+        // Status badge
+        html+='<span style="background:'+statusCol+'15;color:'+statusCol+';border:1px solid '+statusCol+'30;border-radius:3px;padding:2px 7px;font-size:9.5px;font-weight:700;flex-shrink:0;">'+e(c.status||'Prospect')+'</span>';
+        html+='</div>';
+      });
+    }
+    html+='</div>';
+
+    // Confirmation strip when selected
+    if(selected){
+      html+='<div style="padding:8px 20px;background:#F8FAF9;border-top:1px solid #E2E8F0;font-size:11.5px;color:#0F172A;">';
+      html+='<strong>'+e(contactName)+'</strong> will be '+(currentClient?'moved from '+e(currentClient.companyName)+' to':'linked to')+' <strong>'+e(selected.companyName)+'</strong>.';
+      html+='</div>';
+    }
+  }
+
+  // Footer
+  html+='<div style="padding:12px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px;">';
+  html+='<button id="lcm-cancel" class="btn btn-ghost btn-sm">Cancel</button>';
+  html+='<button id="lcm-confirm" class="btn btn-sm"'+(selected?'':' disabled style="opacity:.5;cursor:not-allowed;"')+'>Link Contact</button>';
+  html+='</div>';
+
+  html+='</div></div>';
   return html;
 }
 
@@ -3445,6 +3591,7 @@ function rIndividualContacts(){
     });
     html+='</tbody></table></div></div>';
   }
+  html+=rLinkContactModal();
   return html;
 }
 
@@ -3767,7 +3914,7 @@ function rContacts(){
       if(ct.isBudgetAuthority) html+='<span style="background:#FFFBEB;color:#D97706;border-radius:2px;padding:1px 5px;font-size:10px;font-weight:600;">BA</span>';
       if(ct.isInfluencer) html+='<span style="background:#EFF6FF;color:#1D4ED8;border-radius:2px;padding:1px 5px;font-size:10px;font-weight:600;">Inf</span>';
       html+='</div></td>';
-      html+='<td style="white-space:nowrap;"><button class="btn btn-ghost btn-sm ct-view-btn" data-cid="'+e(ct.id)+'" style="font-size:11px;">View</button></td>';
+      html+='<td style="white-space:nowrap;"><div style="display:flex;gap:4px;"><button class="btn btn-ghost btn-sm ct-view-btn" data-cid="'+e(ct.id)+'" style="font-size:11px;">View</button><button class="btn btn-ghost btn-sm cc-change-company-btn" data-cid="'+e(ct.id)+'" data-clientid="'+e(ct._clientId)+'" style="font-size:11px;" title="Change linked company">&#128279;</button></div></td>';
       html+='</tr>';
     });
     html+='</tbody></table></div></div>';
@@ -4056,6 +4203,7 @@ function rClients(){
   }
 
   html+='</div>';
+  html+=rLinkContactModal();
   return html;
 }
 
@@ -5593,17 +5741,110 @@ function bRF(){
   });
 
   // Link individual contact to a company
+  // Open Link Contact modal (Individual contact path)
   document.querySelectorAll('.ic-link-btn').forEach(function(el){
-    el.addEventListener('click',function(){
-      var ct=S.individualContacts.filter(function(x){return x._id===el.dataset.id;})[0];
-      if(!ct) return;
-      var options=S.clients.map(function(c,i){return (i+1)+'. '+c.companyName+' ('+(c.clientId||'')+')';}).join('\n');
-      var pick=prompt('Link '+(ct.firstName||'contact')+' to which company?\n\n'+options+'\n\nEnter the number:');
-      if(!pick) return;
-      var idx=parseInt(pick.trim(),10)-1;
-      if(isNaN(idx)||idx<0||idx>=S.clients.length){flash('Invalid selection.','err');return;}
-      var client=S.clients[idx];
-      // Move contact into the client's contacts array
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      S.linkContactModal={kind:'individual',contactId:el.dataset.id};
+      S.linkContactSearch='';
+      S.linkContactSelClient=null;
+      S.linkContactStatus='All';
+      S.linkContactIndustry='All';
+      render();
+    });
+  });
+
+  // Open Link Contact modal (Company Contact "Change Company" path)
+  document.querySelectorAll('.cc-change-company-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      S.linkContactModal={kind:'company',contactId:el.dataset.cid,clientId:el.dataset.clientid};
+      S.linkContactSearch='';
+      S.linkContactSelClient=null;
+      S.linkContactStatus='All';
+      S.linkContactIndustry='All';
+      render();
+    });
+  });
+
+  // ── Modal interactions ────────────────────────────────────────────────────
+  function closeLinkModal(){S.linkContactModal=null;S.linkContactSelClient=null;render();}
+  var lcmClose=document.getElementById('lcm-close');
+  if(lcmClose) lcmClose.addEventListener('click',closeLinkModal);
+  var lcmCancel=document.getElementById('lcm-cancel');
+  if(lcmCancel) lcmCancel.addEventListener('click',closeLinkModal);
+  var lcmOverlay=document.getElementById('lcm-overlay');
+  if(lcmOverlay) lcmOverlay.addEventListener('click',function(ev){if(ev.target.id==='lcm-overlay') closeLinkModal();});
+
+  var lcmSearch=document.getElementById('lcm-search');
+  if(lcmSearch) lcmSearch.addEventListener('input',function(){S.linkContactSearch=lcmSearch.value;render();setTimeout(function(){var e2=document.getElementById('lcm-search');if(e2){e2.focus();e2.setSelectionRange((S.linkContactSearch||'').length,(S.linkContactSearch||'').length);}},0);});
+  var lcmStatus=document.getElementById('lcm-status');
+  if(lcmStatus) lcmStatus.addEventListener('change',function(){S.linkContactStatus=lcmStatus.value;render();});
+  var lcmIndustry=document.getElementById('lcm-industry');
+  if(lcmIndustry) lcmIndustry.addEventListener('change',function(){S.linkContactIndustry=lcmIndustry.value;render();});
+
+  document.querySelectorAll('.lcm-row').forEach(function(el){
+    el.addEventListener('click',function(){S.linkContactSelClient=el.dataset.id;render();});
+  });
+
+  var lcmNewClient=document.getElementById('lcm-new-client');
+  if(lcmNewClient) lcmNewClient.addEventListener('click',function(){
+    S.linkContactModal=null;
+    S.tab='clients';
+    S.showClientForm=true;
+    S.clientForm=bClient();
+    S.editClientId=null;
+    render();
+  });
+
+  // Unlink (only when contact is already linked to a client, i.e. kind='company')
+  var lcmUnlink=document.getElementById('lcm-unlink');
+  if(lcmUnlink) lcmUnlink.addEventListener('click',function(){
+    var ctx=S.linkContactModal;
+    if(!ctx||ctx.kind!=='company') return;
+    if(!confirm('Unlink this contact from the client account? It will be moved to Individual Contacts.')) return;
+    var srcClient=S.clients.filter(function(c){return c._id===ctx.clientId;})[0];
+    if(!srcClient) return;
+    var ct=(srcClient.contacts||[]).filter(function(x){return x.id===ctx.contactId;})[0];
+    if(!ct) return;
+    // Build individual contact record
+    var newIC={
+      _id:'IC'+Date.now(),id:ct.id||'CNT'+Date.now(),
+      firstName:ct.firstName||(ct.name||'').split(' ')[0]||'',
+      lastName:ct.lastName||(ct.name||'').split(' ').slice(1).join(' ')||'',
+      jobTitle:ct.jobTitle||ct.role||'',
+      email:ct.email||'',
+      mobile:ct.mobile||ct.phone||'',
+      whatsapp:ct.whatsapp||'',
+      linkedin:ct.linkedin||'',
+      notes:(ct.notes||'')+' | Unlinked from '+srcClient.companyName,
+      relType:'Industry Connection',
+      activities:ct.activities||[],
+      createdAt:new Date().toISOString()
+    };
+    S.individualContacts=(S.individualContacts||[]).concat([newIC]);
+    syncIndContact(newIC);
+    // Remove from client
+    S.clients=S.clients.map(function(c){
+      if(c._id!==srcClient._id) return c;
+      var u=Object.assign({},c,{contacts:(c.contacts||[]).filter(function(x){return x.id!==ctx.contactId;})});
+      syncClient(u);return u;
+    });
+    S.linkContactModal=null;
+    flash('Contact unlinked and moved to Individual Contacts.');
+    render();
+  });
+
+  // Confirm link / re-link
+  var lcmConfirm=document.getElementById('lcm-confirm');
+  if(lcmConfirm) lcmConfirm.addEventListener('click',function(){
+    var ctx=S.linkContactModal;
+    var target=S.clients.filter(function(c){return c._id===S.linkContactSelClient;})[0];
+    if(!ctx||!target){flash('Please select a client account.','err');return;}
+
+    if(ctx.kind==='individual'){
+      var ct=S.individualContacts.filter(function(x){return x._id===ctx.contactId;})[0];
+      if(!ct){flash('Contact not found.','err');return;}
       var moved={
         id:ct.id||'CNT'+Date.now(),
         firstName:ct.firstName||'',lastName:ct.lastName||'',
@@ -5612,21 +5853,37 @@ function bRF(){
         email:ct.email||'',mobile:ct.mobile||'',phone:ct.mobile||'',
         whatsapp:ct.whatsapp||'',linkedin:ct.linkedin||'',
         notes:(ct.notes||'')+(ct.referredBy?' | Source: '+ct.referredBy:''),
-        isPrimary:(client.contacts||[]).length===0,
+        isPrimary:(target.contacts||[]).length===0,
         activities:ct.activities||[]
       };
       S.clients=S.clients.map(function(c){
-        if(c._id!==client._id) return c;
-        var updated=Object.assign({},c,{contacts:(c.contacts||[]).concat([moved])});
-        syncClient(updated);return updated;
+        if(c._id!==target._id) return c;
+        var u=Object.assign({},c,{contacts:(c.contacts||[]).concat([moved])});
+        syncClient(u);return u;
       });
-      // Remove from individual contacts
       S.individualContacts=S.individualContacts.filter(function(x){return x._id!==ct._id;});
       deleteIndContact(ct._id);
-      flash((ct.firstName||'Contact')+' linked to '+client.companyName+'!');
-      render();
-    });
+      flash((ct.firstName||'Contact')+' linked to '+target.companyName+'.');
+    } else {
+      // Move from one company to another
+      var srcClient=S.clients.filter(function(c){return c._id===ctx.clientId;})[0];
+      if(!srcClient){flash('Source client not found.','err');return;}
+      var existingCt=(srcClient.contacts||[]).filter(function(x){return x.id===ctx.contactId;})[0];
+      if(!existingCt){flash('Contact not found in current client.','err');return;}
+      // Add to target
+      var movedCt=Object.assign({},existingCt,{isPrimary:(target.contacts||[]).length===0});
+      S.clients=S.clients.map(function(c){
+        if(c._id===target._id){var u1=Object.assign({},c,{contacts:(c.contacts||[]).concat([movedCt])});syncClient(u1);return u1;}
+        if(c._id===srcClient._id){var u2=Object.assign({},c,{contacts:(c.contacts||[]).filter(function(x){return x.id!==ctx.contactId;})});syncClient(u2);return u2;}
+        return c;
+      });
+      flash((existingCt.name||existingCt.firstName||'Contact')+' moved from '+srcClient.companyName+' to '+target.companyName+'.');
+    }
+    S.linkContactModal=null;
+    S.linkContactSelClient=null;
+    render();
   });
+
 
   var ctSearch=document.getElementById('ct-search');
   if(ctSearch){
