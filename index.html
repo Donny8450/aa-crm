@@ -733,6 +733,19 @@ window._dealQuick=function(id,field,value){
 };
 
 function canSeeAll(){return !!(S.currentUser&&S.currentUser.role!=='staff');}
+
+// ── Permissions: centralized role checks (additive — existing callers untouched) ──
+var Permissions={
+  isAdmin:function(u){u=u||S.currentUser;return !!(u&&u.role==='admin');},
+  isManager:function(u){u=u||S.currentUser;return !!(u&&(u.role==='manager'||u.role==='admin'));},
+  isStaff:function(u){u=u||S.currentUser;return !!(u&&u.role==='staff');},
+  canSeeAll:function(u){u=u||S.currentUser;return !!(u&&u.role!=='staff');},
+  canApprove:function(u){return Permissions.isManager(u);},
+  canManageUsers:function(u){return Permissions.isAdmin(u);},
+  canRevertDeal:function(u){return Permissions.isManager(u);},
+  canEditAfterApproval:function(u){return Permissions.isManager(u);}
+};
+
 function visLeads(){
   if(canSeeAll()) return S.leads;
   var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
@@ -4362,7 +4375,7 @@ function rContacts(){
            (ct.lastName||'').toLowerCase().indexOf(q)>=0||
            (ct.jobTitle||'').toLowerCase().indexOf(q)>=0||
            (ct.email||'').toLowerCase().indexOf(q)>=0||
-           (ct._clientName||'').toLowerCase().indexOf(q)>=0;
+           ((S.clients.filter(function(c){return c._id===ct._clientId;})[0]||{}).companyName||ct._clientName||'').toLowerCase().indexOf(q)>=0;
   }):allContacts;
 
   var html='';
@@ -4400,7 +4413,11 @@ function rContacts(){
       if(ct.isPrimary) html+='<span style="font-size:10px;background:#EAF3EE;color:#275F45;border-radius:2px;padding:1px 5px;font-weight:600;">Primary</span>';
       html+='</div></div></td>';
       html+='<td style="font-size:12px;color:#5F6B65;">'+e(ct.jobTitle||'—')+'</td>';
-      html+='<td><div style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(ct._clientName)+'</div><div style="font-size:10px;color:#9BA8A2;">'+e(ct._clientCode)+'</div></td>';
+      // #3: Look up live client name to avoid stale data
+var _liveClient=S.clients.filter(function(c){return c._id===ct._clientId;})[0];
+var _liveName=_liveClient?(_liveClient.companyName||ct._clientName):ct._clientName;
+var _liveCode=_liveClient?(_liveClient.clientId||ct._clientCode):ct._clientCode;
+html+='<td><div style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(_liveName)+'</div><div style="font-size:10px;color:#9BA8A2;">'+e(_liveCode)+'</div></td>';
       html+='<td style="font-size:12px;color:#1D4ED8;">'+e(ct.email||'—')+'</td>';
       html+='<td style="font-size:12px;color:#5F6B65;">'+e(ct.mobile||ct.phone||'—')+'</td>';
       html+='<td>'+(ct.relationshipStrength?'<span style="background:'+sc+'18;color:'+sc+';border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;">'+e(ct.relationshipStrength)+'</span>':'<span style="color:#9BA8A2;font-size:12px;">—</span>')+'</td>';
