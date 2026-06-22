@@ -4557,7 +4557,7 @@ function rApprovals(){
   var approved=S.leads.filter(function(l){return leadStage(l)==='Approved';});
   var ready=approved.filter(function(l){return leadReadiness(l)==='Ready to Convert';});
   var rejected=S.leads.filter(function(l){return leadStage(l)==='Rejected';});
-  var convertedDeals=S.deals.filter(function(d){return d.convertedFromLeadId||d.convertedFromLead;});
+  var convertedDeals=S.deals.filter(function(d){return (d.convertedFromLeadId||d.convertedFromLead)&&!d.archived;});
 
   // Average review time (created → approved)
   var revTimes=[];
@@ -4584,7 +4584,7 @@ function rApprovals(){
   html+='<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;">';
   [['pending','Pending Review',pending.length+moreinfo.length,'#D97706'],['approved','Approved',approved.length,'#16a34a'],['ready','Ready to Convert',ready.length,'#275F45'],['converted','Converted to Deal',convertedDeals.length,'#2563eb'],['rejected','Rejected',rejected.length,'#dc2626'],[null,'Avg Review Time',avgLabel,'#7C3AED']].forEach(function(k){
     var clickable=k[0]!==null;
-    html+='<div '+(clickable?'class="apq-kpi" data-tab="'+k[0]+'" ':'')+'style="background:#fff;border:1px solid '+(tab===k[0]?k[3]:'#D8E3DC')+';border-radius:6px;padding:10px 12px;'+(clickable?'cursor:pointer;':'')+(tab===k[0]?'box-shadow:0 0 0 1px '+k[3]+'30;':'')+'">';
+    html+='<div '+(clickable?'class="apq-kpi" data-apqtab="'+(k[0]||'')+'" ':'')+'style="background:#fff;border:1px solid '+(tab===k[0]?k[3]:'#D8E3DC')+';border-radius:6px;padding:10px 12px;'+(clickable?'cursor:pointer;':'')+(tab===k[0]?'box-shadow:0 0 0 1px '+k[3]+'30;':'')+'">';
     html+='<div style="font-size:18px;font-weight:700;color:'+k[3]+';line-height:1;">'+k[2]+'</div>';
     html+='<div style="font-size:9px;font-weight:600;color:#9BA8A2;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;white-space:nowrap;">'+k[1]+'</div>';
     html+='</div>';
@@ -4595,7 +4595,7 @@ function rApprovals(){
   html+='<div style="display:flex;border-bottom:2px solid #D8E3DC;margin-bottom:14px;position:sticky;top:-24px;background:#F8FAF9;z-index:20;">';
   [['pending','Pending Review ('+(pending.length+moreinfo.length)+')'],['approved','Approved ('+approved.length+')'],['ready','Ready to Convert ('+ready.length+')'],['converted','Converted ('+convertedDeals.length+')'],['rejected','Rejected ('+rejected.length+')']].forEach(function(t){
     var on=tab===t[0];
-    html+='<button class="apq-tab" data-tab="'+t[0]+'" style="padding:8px 16px;font-size:13px;font-weight:'+(on?700:500)+';color:'+(on?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(on?'#275F45':'transparent')+';margin-bottom:-2px;font-family:Inter,sans-serif;white-space:nowrap;">'+t[1]+'</button>';
+    html+='<button class="apq-tab" data-apqtab="'+t[0]+'" style="padding:8px 16px;font-size:13px;font-weight:'+(on?700:500)+';color:'+(on?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(on?'#275F45':'transparent')+';margin-bottom:-2px;font-family:Inter,sans-serif;white-space:nowrap;">'+t[1]+'</button>';
   });
   html+='</div>';
 
@@ -5272,7 +5272,7 @@ function bind(){
   if(ovExp) ovExp.addEventListener('click',function(){flash('Use Export CSV inside Leads / Pipeline tabs for raw data.');});
 
   document.querySelectorAll('.apq-kpi,.apq-tab').forEach(function(el){
-    el.addEventListener('click',function(){S.apqTab=el.dataset.tab;render();});
+    el.addEventListener('click',function(ev){ev.stopPropagation();var v=el.dataset.apqtab;if(v) S.apqTab=v;render();});
   });
   document.querySelectorAll('.apq-row').forEach(function(el){
     el.addEventListener('click',function(ev){
