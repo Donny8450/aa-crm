@@ -1662,7 +1662,7 @@ function rPipe(){
       } else {
         (dd.deliverables||[]).forEach(function(dl){
           var dp=dl.progress||0;var dpc=dp===100?'#16a34a':dp>=60?'#275F45':'#D97706';
-          html+='<div style="padding:7px 0;border-bottom:1px solid #F8FAF9;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(dl.name)+'</span><span style="font-size:11px;font-weight:600;color:'+dpc+';">'+dp+'%</span></div>';
+          html+='<div style="padding:7px 0;border-bottom:1px solid #F8FAF9;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;"><span style="font-size:12px;font-weight:500;color:#1A1A1A;flex:1;">'+e(dl.name)+dlvDeadlineBadge(dl,true)+'</span><span style="font-size:11px;font-weight:600;color:'+dpc+';">'+dp+'%</span></div>';
           html+='<div style="height:4px;background:#F0F0F0;border-radius:2px;overflow:hidden;"><div style="width:'+dp+'%;height:100%;background:'+dpc+';"></div></div></div>';
         });
       }
@@ -3078,6 +3078,21 @@ function rOverview(){
   html+=card('Deliverable Progress by Deal',dprog);
 
   var alerts=[];
+  // Deadline alerts (NEW)
+  var overdueDlvs=0, dueSoonDlvs=0, atRiskDlvs=0;
+  S.deals.forEach(function(d){
+    if(d.archived||d.status==='Completed'||d.status==='Cancelled') return;
+    (d.deliverables||[]).forEach(function(dl){
+      var ds=dlvDeadlineState(dl);
+      if(!ds) return;
+      if(ds.kind==='overdue') overdueDlvs++;
+      else if(ds.kind==='today'||ds.kind==='soon') dueSoonDlvs++;
+      else if(ds.kind==='risk') atRiskDlvs++;
+    });
+  });
+  if(overdueDlvs>0) alerts.push([overdueDlvs+' deliverable'+(overdueDlvs!==1?'s':'')+' overdue',C.danger]);
+  if(dueSoonDlvs>0) alerts.push([dueSoonDlvs+' deliverable'+(dueSoonDlvs!==1?'s':'')+' due in 3 days',C.accent]);
+  if(atRiskDlvs>0) alerts.push([atRiskDlvs+' deliverable'+(atRiskDlvs!==1?'s':'')+' at risk',C.accent]);
   if(k.pending>0) alerts.push([k.pending+' lead'+(k.pending!==1?'s':'')+' pending approval',C.accent]);
   if(k.hold>0) alerts.push([k.hold+' deal'+(k.hold!==1?'s':'')+' on hold',C.accent]);
   var overdue=S.deals.filter(isOverdue).length;
@@ -3241,72 +3256,115 @@ function rDlvReviewPanel(deal, dlv){
   var col = statusColors[rs]||'#94a3b8';
   var bg = statusBg[rs]||'#f8fafc';
   var isManager = S.currentUser&&(S.currentUser.role==='manager'||S.currentUser.role==='admin');
+  var ddState = dlvDeadlineState(dlv);
 
-  var html='<tr><td colspan="100%" style="padding:0;background:#fafdfb">';
-  html+='<div style="padding:16px 20px;border-top:2px solid #C8E6D4;border-bottom:2px solid #E8F5EE">';
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">';
-  html+='<div style="font-size:13px;font-weight:800;color:#1A4731">&#128203; '+e(dlv.name)+' &mdash; Review Panel</div>';
-  html+='<div style="display:flex;align-items:center;gap:10px">';
-  html+='<span style="background:'+bg+';color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700">'+rs+'</span>';
-  html+='<button class="dlv-review-close" data-dlvid="'+e(dlv._id)+'" style="background:#E8F5EE;border:none;color:#2D6A4F;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">&#10005; Close</button>';
-  html+='</div></div>';
+  var html='<div style="padding:14px 18px;background:#fafdfb;">';
 
-  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">';
+  // Deadline banner (if any)
+  if(ddState){
+    html+='<div style="display:flex;align-items:center;gap:8px;background:'+ddState.bg+';border:1px solid '+ddState.border+';border-left:3px solid '+ddState.color+';border-radius:4px;padding:8px 12px;margin-bottom:12px;">';
+    html+='<span style="font-size:14px;color:'+ddState.color+';">&#9888;</span>';
+    html+='<div style="font-size:11.5px;color:'+ddState.color+';font-weight:700;">'+ddState.label;
+    if(ddState.kind==='overdue') html+=' <span style="font-weight:500;color:#5F6B65;">by '+Math.abs(ddState.days)+' day'+(Math.abs(ddState.days)!==1?'s':'')+' (due '+e(dlv.end)+')</span>';
+    else if(ddState.kind==='today') html+=' <span style="font-weight:500;color:#5F6B65;">(due '+e(dlv.end)+')</span>';
+    else if(ddState.kind==='soon') html+=' <span style="font-weight:500;color:#5F6B65;">(due '+e(dlv.end)+')</span>';
+    else if(ddState.kind==='risk') html+=' <span style="font-weight:500;color:#5F6B65;">'+ddState.days+' days remaining, progress at '+(dlv.progress||0)+'%</span>';
+    html+='</div></div>';
+  }
 
-  // ── Panel 1: Upload ──────────────────────────────────────────────────────
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px">';
-  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128196; Documents</div>';
-  if(files.length>0){
+  // Status header
+  html+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">';
+  html+='<span style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;">Review Status:</span>';
+  html+='<span style="background:'+col+'15;color:'+col+';border:1px solid '+col+'40;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">'+rs+'</span>';
+  if(dlv.submittedAt) html+='<span style="font-size:10.5px;color:#94A3B8;">Submitted '+e(dlv.submittedAt)+(dlv.submittedBy?' by '+e(dlv.submittedBy):'')+'</span>';
+  html+='</div>';
+
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">';
+
+  // ── LEFT: Submission / Review controls ─────────────────────────────────
+  html+='<div>';
+  html+='<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Submission Files ('+files.length+')</div>';
+  if(!files.length){
+    html+='<div style="font-size:11px;color:#94A3B8;padding:6px 0;">No files submitted for review yet.</div>';
+  } else {
     files.forEach(function(f,fi){
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px;background:#fafdfb;border:1px solid #E8F5EE;border-radius:8px;margin-bottom:6px">';
-      html+='<div style="font-size:18px">&#128196;</div>';
-      html+='<div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:#1A4731;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e(f.name)+'</div>';
-      html+='<div style="font-size:10px;color:#5A7A65">'+e(f.uploadedBy||'')+'  '+e(f.uploadedAt||'')+'</div></div>';
-      if(f.data) html+='<button class="dlv-file-dl" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" data-fi="'+fi+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit">&#128229;</button>';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;border:1px solid #E2E8F0;border-radius:4px;margin-bottom:4px;">';
+      html+='<span style="font-size:12px;">&#128196;</span><div style="flex:1;font-size:11px;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</div>';
+      if(f.data) html+='<button class="dlv-dl-file" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" data-fi="'+fi+'" style="font-size:10px;padding:2px 7px;background:none;border:1px solid #E2E8F0;border-radius:3px;cursor:pointer;color:#64748B;">&#8659;</button>';
       html+='</div>';
     });
-  } else {
-    html+='<div style="text-align:center;padding:16px;color:#5A7A65;font-size:11px">No documents yet</div>';
   }
-  html+='<div style="margin-top:10px"><label style="display:block;background:#1A4731;color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;text-align:center">&#128196; Upload Document<input type="file" class="dlv-file-upload" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.png"/></label></div>';
+
+  if(rs==='Draft'||rs==='Revision Needed'){
+    html+='<div style="margin-top:10px;display:flex;gap:6px;align-items:center;">';
+    html+='<label style="display:inline-block;background:#fff;border:1px solid #275F45;color:#275F45;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">';
+    html+='&#43; Add File<input type="file" class="dlv-file-input" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" multiple style="display:none;"/>';
+    html+='</label>';
+    html+='<button class="dlv-submit-review" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#275F45;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Submit for Review</button>';
+    html+='</div>';
+  }
+
+  if(isManager&&rs==='Submitted for Review'){
+    html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;gap:6px;flex-wrap:wrap;">';
+    html+='<button class="dlv-manager-action" data-action="Under Review" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#fff;border:1px solid #2563EB;color:#2563EB;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Mark Under Review</button>';
+    html+='<button class="dlv-manager-action" data-action="Approved" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#16a34a;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">&#10003; Approve</button>';
+    html+='<button class="dlv-manager-action" data-action="Revision Needed" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#fff;border:1px solid #dc2626;color:#dc2626;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Request Revision</button>';
+    html+='</div>';
+  } else if(isManager&&rs==='Under Review'){
+    html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid #E2E8F0;display:flex;gap:6px;flex-wrap:wrap;">';
+    html+='<button class="dlv-manager-action" data-action="Approved" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#16a34a;color:#fff;border:none;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">&#10003; Approve</button>';
+    html+='<button class="dlv-manager-action" data-action="Revision Needed" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#fff;border:1px solid #dc2626;color:#dc2626;padding:5px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Request Revision</button>';
+    html+='</div>';
+  }
   html+='</div>';
 
-  // ── Panel 2: Review Status ───────────────────────────────────────────────
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px">';
-  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128260; Review Status</div>';
-  ['Draft','Submitted for Review','Under Review','Revision Needed','Approved'].forEach(function(status){
-    var sc=statusColors[status]||'#94a3b8';
-    var isActive=rs===status;
-    var canSet=status==='Submitted for Review'||status==='Draft'?true:(isManager);
-    html+='<button class="dlv-status-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" data-status="'+status+'" '+(!canSet?'disabled':'')+' style="display:block;width:100%;text-align:left;margin-bottom:6px;padding:8px 12px;border-radius:8px;border:1.5px solid '+(isActive?sc:'#E8F5EE')+';background:'+(isActive?statusBg[status]:'#fff')+';color:'+(isActive?sc:'#5A7A65')+';font-size:11px;font-weight:'+(isActive?'800':'500')+';cursor:'+(canSet?'pointer':'not-allowed')+';font-family:inherit;opacity:'+(canSet?1:0.5)+'">'+(isActive?'&#9679; ':'')+status+'</button>';
-  });
-  if(rs==='Approved'){
-    html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:8px;margin-top:8px;font-size:11px;color:#16a34a;font-weight:600;text-align:center">&#10003; Progress auto-set to 100%</div>';
-  }
-  html+='</div>';
-
-  // ── Panel 3: Comments ────────────────────────────────────────────────────
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:12px;padding:16px;display:flex;flex-direction:column">';
-  html+='<div style="font-size:12px;font-weight:800;color:#1A4731;margin-bottom:12px">&#128172; Comments ('+comments.length+')</div>';
-  html+='<div style="flex:1;max-height:180px;overflow-y:auto;margin-bottom:10px">';
-  if(comments.length===0){
-    html+='<div style="text-align:center;padding:16px;color:#5A7A65;font-size:11px">No comments yet</div>';
+  // ── RIGHT: Chat (open to anyone — Q1=C) ────────────────────────────────
+  html+='<div>';
+  html+='<div style="font-size:10px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Chat &amp; Comments ('+comments.length+')</div>';
+  html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:4px;max-height:240px;overflow-y:auto;padding:8px;margin-bottom:8px;">';
+  if(!comments.length){
+    html+='<div style="text-align:center;padding:20px 0;color:#94A3B8;font-size:11px;">No messages yet. Start the conversation.</div>';
   } else {
     comments.forEach(function(c){
-      var isMe=S.currentUser&&c.userId===S.currentUser.id;
-      html+='<div style="margin-bottom:8px;padding:8px 10px;background:'+(isMe?'#E8F5EE':'#fafdfb')+';border-radius:8px;border:1px solid #E8F5EE">';
-      html+='<div style="display:flex;justify-content:space-between;margin-bottom:3px">';
-      html+='<span style="font-size:10px;font-weight:700;color:#1A4731">'+e(c.user||'?')+'</span>';
-      html+='<span style="font-size:10px;color:#5A7A65">'+e(c.ts||'')+'</span>';
-      html+='</div><div style="font-size:11px;color:#333">'+e(c.text)+'</div></div>';
+      var rolePill=c.userRole&&c.userRole!=='staff'?'<span style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:2px;padding:0 4px;font-size:8.5px;font-weight:700;margin-left:4px;text-transform:uppercase;letter-spacing:.3px;">'+e(c.userRole)+'</span>':'';
+      html+='<div style="padding:6px 8px;margin-bottom:6px;background:#F8FAF9;border-radius:3px;">';
+      html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">';
+      html+='<span style="font-size:10.5px;font-weight:700;color:#0F172A;">'+e(c.user||'?')+'</span>'+rolePill;
+      html+='<span style="font-size:9.5px;color:#94A3B8;margin-left:auto;">'+e(c.ts||'')+'</span>';
+      html+='</div>';
+      if(c.text) html+='<div style="font-size:11px;color:#1A1A1A;line-height:1.45;white-space:pre-wrap;word-break:break-word;">'+e(c.text)+'</div>';
+      // Q3=C: chat-attached files
+      if(c.files&&c.files.length){
+        html+='<div style="margin-top:4px;display:flex;flex-direction:column;gap:3px;">';
+        c.files.forEach(function(f,fi){
+          html+='<div style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #E2E8F0;border-radius:3px;padding:3px 6px;font-size:10px;">';
+          html+='<span>&#128206;</span><span style="flex:1;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(f.name)+'</span>';
+          if(f.data) html+='<a href="'+e(f.data)+'" download="'+e(f.name)+'" style="color:#275F45;text-decoration:none;font-weight:600;">&#8659;</a>';
+          html+='</div>';
+        });
+        html+='</div>';
+      }
+      html+='</div>';
     });
   }
   html+='</div>';
-  html+='<div style="display:flex;gap:6px">';
-  html+='<input id="dlv-comment-'+e(dlv._id)+'" type="text" placeholder="Add a comment..." style="flex:1;font-size:12px;padding:7px 10px"/>';
-  html+='<button class="dlv-add-comment" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">Send</button>';
+  // Compose area — open to all logged-in users (Q1=C)
+  if(S.currentUser){
+    html+='<div style="display:flex;flex-direction:column;gap:5px;">';
+    html+='<textarea id="dlv-comment-'+e(dlv._id)+'" placeholder="Write a message... (Shift+Enter for new line)" style="width:100%;font-size:11.5px;padding:6px 9px;border:1px solid #E2E8F0;border-radius:4px;resize:vertical;min-height:46px;font-family:Inter,sans-serif;outline:none;"></textarea>';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">';
+    html+='<label style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;color:#64748B;cursor:pointer;">';
+    html+='&#128206; <span class="dlv-chat-files-label" id="dlv-chat-files-label-'+e(dlv._id)+'">Attach files</span>';
+    html+='<input type="file" class="dlv-chat-files" id="dlv-chat-files-'+e(dlv._id)+'" data-dlvid="'+e(dlv._id)+'" multiple style="display:none;"/>';
+    html+='</label>';
+    html+='<button class="dlv-add-comment" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:#275F45;color:#fff;border:none;border-radius:4px;padding:5px 14px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Send</button>';
+    html+='</div></div>';
+  } else {
+    html+='<div style="font-size:10.5px;color:#94A3B8;text-align:center;padding:8px 0;">Sign in to send messages.</div>';
+  }
+  html+='</div>';
+
   html+='</div></div>';
-  html+='</div></div></td></tr>';
   return html;
 }
 
@@ -4002,6 +4060,31 @@ function rClients(){
 }
 
 
+function dlvDeadlineState(dlv){
+  if(!dlv||!dlv.end) return null;
+  var pct=dlv.progress||0;
+  if(pct>=100) return null;
+  var today=new Date();today.setHours(0,0,0,0);
+  var end=new Date(dlv.end);end.setHours(0,0,0,0);
+  if(isNaN(end.getTime())) return null;
+  var diffDays=Math.round((end-today)/86400000);
+  if(diffDays<0) return {kind:'overdue',label:'Overdue',color:'#991B1B',bg:'#FEF2F2',border:'#FECACA',days:diffDays,priority:4};
+  if(diffDays===0) return {kind:'today',label:'Due Today',color:'#991B1B',bg:'#FEF2F2',border:'#FECACA',days:0,priority:3};
+  if(diffDays<=3) return {kind:'soon',label:'Due in '+diffDays+'d',color:'#C8972A',bg:'#FDF8EE',border:'#F5E6C3',days:diffDays,priority:2};
+  if(diffDays<=7&&pct<50) return {kind:'risk',label:'At Risk',color:'#C8972A',bg:'#FDF8EE',border:'#F5E6C3',days:diffDays,priority:1};
+  return null;
+}
+
+function dlvDeadlineBadge(dlv,compact){
+  var ds=dlvDeadlineState(dlv);
+  if(!ds) return '';
+  if(compact){
+    return '<span title="'+ds.label+(ds.days<0?' by '+Math.abs(ds.days)+' day'+(Math.abs(ds.days)!==1?'s':''):'')+'" style="display:inline-flex;align-items:center;gap:3px;background:'+ds.bg+';color:'+ds.color+';border:1px solid '+ds.border+';border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;vertical-align:middle;white-space:nowrap;">&#9888; '+ds.label+'</span>';
+  }
+  return '<span style="display:inline-flex;align-items:center;gap:4px;background:'+ds.bg+';color:'+ds.color+';border:1px solid '+ds.border+';border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;">&#9888; '+ds.label+'</span>';
+}
+
+
 function rGantt(){
   var GD=visDeals();
 
@@ -4164,7 +4247,7 @@ function rGantt(){
       html+='<button class="dlv-expand-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:none;border:none;cursor:pointer;color:'+C.sub+';font-size:10px;padding:0;flex-shrink:0;font-family:inherit;width:14px;">'+(isExpanded?'&#9660;':'&#9654;')+'</button>';
       html+='<span style="width:5px;height:5px;border-radius:50%;background:'+priCol+';flex-shrink:0;"></span>';
       html+='<div style="min-width:0;flex:1;">';
-      html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dlv.name||'Untitled')+(rs2!=='Draft'?' <span style="background:'+rsBadgeCol+'15;color:'+rsBadgeCol+';border:1px solid '+rsBadgeCol+'30;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;vertical-align:middle;">'+rs2+'</span>':'')+'</div>';
+      html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dlv.name||'Untitled')+(rs2!=='Draft'?' <span style="background:'+rsBadgeCol+'15;color:'+rsBadgeCol+';border:1px solid '+rsBadgeCol+'30;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;vertical-align:middle;">'+rs2+'</span>':'')+dlvDeadlineBadge(dlv,true)+'</div>';
       html+='<div style="font-size:9px;color:'+C.muted+';margin-top:1px;">'+(dur?dur+' &middot; ':'')+(dlv.start||'')+(dlv.end?' \u2192 '+dlv.end:'')+'</div>';
       html+='</div></div></td>';
 
@@ -5169,32 +5252,60 @@ function bind(){
   });
 
   // ── Add comment ───────────────────────────────────────────────────────────
+  // Pending chat attachments cache: keyed by deliverable id
+  if(!window._pendingChatFiles) window._pendingChatFiles={};
+  // Capture files attached to chat compose
+  document.querySelectorAll('.dlv-chat-files').forEach(function(el){
+    el.addEventListener('change',function(){
+      var dlvId=el.dataset.dlvid;
+      if(!dlvId) return;
+      if(!window._pendingChatFiles[dlvId]) window._pendingChatFiles[dlvId]=[];
+      Array.from(el.files).forEach(function(f){
+        if(f.size>5*1024*1024){flash('"'+f.name+'" exceeds 5MB and was skipped.','err');return;}
+        if(f.size>2*1024*1024) flash('"'+f.name+'" is large ('+(f.size/1048576).toFixed(1)+'MB).','warn');
+        var reader=new FileReader();
+        reader.onload=function(ev){
+          window._pendingChatFiles[dlvId].push({name:f.name,size:f.size,data:ev.target.result,type:f.type});
+          var lbl=document.getElementById('dlv-chat-files-label-'+dlvId);
+          if(lbl) lbl.textContent=window._pendingChatFiles[dlvId].length+' file'+(window._pendingChatFiles[dlvId].length!==1?'s':'')+' attached';
+        };
+        reader.readAsDataURL(f);
+      });
+    });
+  });
+
   document.querySelectorAll('.dlv-add-comment').forEach(function(el){
     el.addEventListener('click',function(){
       var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
       var inp=document.getElementById('dlv-comment-'+dlvId);
       var text=inp?inp.value.trim():'';
-      if(!text) return;
+      var attached=(window._pendingChatFiles&&window._pendingChatFiles[dlvId])||[];
+      if(!text&&!attached.length){flash('Type a message or attach a file.','err');return;}
+      // Q1=C: anyone logged in can post; role tag preserved for display
       var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var role=S.currentUser?(S.currentUser.role||'staff'):'';
       var ts=new Date().toLocaleString();
       S.deals=S.deals.map(function(d){
         if(d._id!==dealId) return d;
         var dlvs=(d.deliverables||[]).map(function(dlv){
           if(dlv._id!==dlvId) return dlv;
-          var newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',text:text,ts:ts};
+          var newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',userRole:role,text:text,ts:ts,files:attached};
           return Object.assign({},dlv,{comments:(dlv.comments||[]).concat([newComment])});
         });
         var updated=Object.assign({},d,{deliverables:dlvs});
         syncDeal(updated);return updated;
       });
-      flash('Comment added');render();
+      // Clear pending attachments
+      if(window._pendingChatFiles) delete window._pendingChatFiles[dlvId];
+      flash('Message sent');render();
     });
   });
 
-  // Enter key on comment input
+  // Enter to send, Shift+Enter for newline
   document.querySelectorAll('[id^="dlv-comment-"]').forEach(function(el){
     el.addEventListener('keydown',function(ev){
-      if(ev.key==='Enter'){
+      if(ev.key==='Enter'&&!ev.shiftKey){
+        ev.preventDefault();
         var btn=document.querySelector('.dlv-add-comment[data-dlvid="'+el.id.replace('dlv-comment-','')+'"]');
         if(btn) btn.click();
       }
