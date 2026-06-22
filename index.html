@@ -4005,7 +4005,7 @@ function rClients(){
 function rGantt(){
   var GD=visDeals();
 
-  // Neutral enterprise palette — no more rainbow.
+  // Neutral enterprise palette
   var C={
     text:'#0F172A', sub:'#64748B', muted:'#94A3B8', bord:'#E2E8F0', bordLt:'#F1F5F9',
     bg:'#FAFAFA', weekend:'#F8F8F7',
@@ -4013,10 +4013,9 @@ function rGantt(){
     amber:'#C8972A', amberLt:'#FDF8EE',
     red:'#991B1B', redLt:'#FEF2F2',
     blue:'#1E40AF', blueLt:'#EFF6FF',
-    progFill:'#275F45', progEmpty:'#F1F5F9'
+    progEmpty:'#F1F5F9'
   };
 
-  // Week navigation (existing state, unchanged)
   var weekOffset=S.ganttWeek||0;
   var today=new Date();today.setHours(0,0,0,0);
   var dayOfWeek=today.getDay();
@@ -4029,7 +4028,7 @@ function rGantt(){
   function fmt(d){return d instanceof Date?d.toISOString().slice(0,10):'';}
   function fmtShort(d){return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear();}
   function dayLetter(d){return ['S','M','T','W','T','F','S'][d.getDay()];}
-  function fmtDate(d){if(!d) return '';var dt=new Date(d);if(isNaN(dt.getTime())) return '';return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+' '+dt.getDate();}
+  function diffDays(a,b){return Math.round((new Date(b)-new Date(a))/(1000*60*60*24));}
 
   var monthGroups=[];
   days.forEach(function(d){
@@ -4046,15 +4045,6 @@ function rGantt(){
     });
   }
 
-  function priColor(p){return p==='High Priority'?C.red:p==='Medium'?C.amber:C.sub;}
-  function statusBar(dl){
-    var pct=dl.progress||0;
-    var status=(dl.status||'').toLowerCase();
-    if(status.indexOf('revision')>=0) return {fill:C.amber,outline:true};
-    if(status.indexOf('overdue')>=0||(dl.dueDate&&new Date(dl.dueDate)<today&&pct<100)) return {fill:C.red,outline:false};
-    if(pct>=100) return {fill:C.primary,outline:false};
-    return {fill:C.primary,outline:false};
-  }
   function initials(name){if(!name) return '?';var p=name.split(' ');return ((p[0]||'').charAt(0)+(p[1]?p[1].charAt(0):'')).toUpperCase()||'?';}
 
   var html='<div>';
@@ -4062,17 +4052,12 @@ function rGantt(){
   // ── Sticky toolbar ──────────────────────────────────────────────────────
   html+='<div style="background:#fff;border-bottom:1px solid '+C.bord+';padding:10px 0;margin-bottom:12px;position:sticky;top:-24px;z-index:30;">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">';
-  // Title block
   html+='<div><div style="font-size:15px;font-weight:700;color:'+C.text+';letter-spacing:-.1px;">Deliverables Gantt</div>';
   html+='<div style="font-size:11px;color:'+C.sub+';margin-top:2px;">Project deliverables across active deals</div></div>';
-
-  // Right controls
   html+='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
-  // Search
   html+='<div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:'+C.muted+';font-size:11px;">&#128269;</span>';
   html+='<input id="gantt-search" value="'+e(S.ganttSearch||'')+'" placeholder="Search projects..." style="padding:5px 8px 5px 26px;font-size:12px;border:1px solid '+C.bord+';border-radius:4px;width:200px;font-family:Inter,sans-serif;outline:none;height:28px;"/></div>';
   if(S.ganttSearch) html+='<button id="gantt-clear" style="background:#fff;border:1px solid '+C.bord+';color:'+C.sub+';border-radius:4px;padding:3px 9px;font-size:11px;cursor:pointer;font-family:Inter,sans-serif;height:28px;">Clear</button>';
-  // Date nav
   html+='<div style="display:flex;align-items:center;gap:4px;border-left:1px solid '+C.bord+';padding-left:8px;margin-left:4px;">';
   html+='<button id="gw-prev" title="Previous" style="background:#fff;border:1px solid '+C.bord+';color:'+C.sub+';border-radius:4px;padding:3px 9px;font-size:13px;cursor:pointer;font-family:Inter,sans-serif;height:28px;line-height:1;">&#8592;</button>';
   html+='<button id="gw-today" style="background:'+C.primary+';border:1px solid '+C.primary+';color:#fff;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;height:28px;">Today</button>';
@@ -4082,7 +4067,7 @@ function rGantt(){
   html+='</div></div>';
   html+='</div>';
 
-  // ── Project filter strip (horizontally scrollable) ──────────────────────
+  // ── Project filter strip ────────────────────────────────────────────────
   if(GD.filter(function(d){return (d.deliverables||[]).length>0;}).length>0){
     html+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:4px;">';
     html+='<span style="font-size:9.5px;font-weight:700;color:'+C.muted+';letter-spacing:.6px;text-transform:uppercase;flex-shrink:0;margin-right:4px;">Project:</span>';
@@ -4107,23 +4092,19 @@ function rGantt(){
   var COL_W=32;
   var LEFT_W=620;
 
-  // ── Gantt table ──────────────────────────────────────────────────────────
   html+='<div style="overflow-x:auto;border:1px solid '+C.bord+';border-radius:6px;background:#fff;">';
   html+='<table style="border-collapse:collapse;font-size:11.5px;min-width:'+(LEFT_W+days.length*COL_W)+'px;width:100%;">';
 
-  // ── Sticky table header ─────────────────────────────────────────────────
+  // Sticky header
   html+='<thead>';
-  // Row 1: Left columns header (spans) + month groups
   html+='<tr style="background:#FAFAFA;border-bottom:1px solid '+C.bord+';height:30px;">';
   html+='<th style="text-align:left;padding:6px 12px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;position:sticky;left:0;background:#FAFAFA;z-index:5;border-right:1px solid '+C.bord+';min-width:'+(LEFT_W-260)+'px;">Task</th>';
-  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:130px;">Owner</th>';
-  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:130px;border-right:1px solid '+C.bord+';">Progress</th>';
+  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:110px;">Owner</th>';
+  html+='<th style="text-align:left;padding:6px 8px;font-size:9.5px;font-weight:700;color:'+C.sub+';text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;min-width:150px;border-right:1px solid '+C.bord+';">Progress</th>';
   monthGroups.forEach(function(mg){
     html+='<th colspan="'+mg.count+'" style="text-align:center;padding:6px 4px;font-size:10px;font-weight:600;color:'+C.text+';border-right:1px solid '+C.bord+';background:#FAFAFA;">'+mg.label+'</th>';
   });
   html+='</tr>';
-
-  // Row 2: day columns
   html+='<tr style="background:#FAFAFA;border-bottom:1px solid '+C.bord+';height:24px;">';
   html+='<th colspan="3" style="position:sticky;left:0;background:#FAFAFA;z-index:5;border-right:1px solid '+C.bord+';"></th>';
   days.forEach(function(d){
@@ -4134,19 +4115,18 @@ function rGantt(){
   });
   html+='</tr></thead>';
 
-  // ── Body ────────────────────────────────────────────────────────────────
   html+='<tbody>';
-  allDeals.forEach(function(d){
-    var dlvs=d.deliverables||[];
+  allDeals.forEach(function(deal){
+    var dlvs=deal.deliverables||[];
     var prog=dlvs.length?Math.round(dlvs.reduce(function(a,x){return a+(x.progress||0);},0)/dlvs.length):0;
 
-    // ── Project summary row ───────────────────────────────────────────────
+    // Project summary row
     html+='<tr style="background:#FAFCFA;border-bottom:1px solid '+C.bord+';border-top:1px solid '+C.bord+';height:48px;">';
-    html+='<td style="padding:8px 12px 8px 12px;position:sticky;left:0;background:#FAFCFA;z-index:4;border-right:1px solid '+C.bord+';border-left:3px solid '+C.primary+';">';
-    html+='<div style="font-size:12.5px;font-weight:700;color:'+C.text+';line-height:1.2;">'+e(d.bizName||d.dealId||'Untitled')+'</div>';
-    html+='<div style="font-size:9.5px;color:'+C.sub+';margin-top:2px;font-family:monospace;">'+e(d.dealId||'')+(d.serviceType?' &middot; '+e(d.serviceType.replace('Business ','')):'')+'</div>';
+    html+='<td style="padding:8px 12px;position:sticky;left:0;background:#FAFCFA;z-index:4;border-right:1px solid '+C.bord+';border-left:3px solid '+C.primary+';">';
+    html+='<div style="font-size:12.5px;font-weight:700;color:'+C.text+';line-height:1.2;">'+e(deal.bizName||deal.dealId||'Untitled')+'</div>';
+    html+='<div style="font-size:9.5px;color:'+C.sub+';margin-top:2px;font-family:monospace;">'+e(deal.dealId||'')+(deal.serviceType?' &middot; '+e(deal.serviceType.replace('Business ','')):'')+'</div>';
     html+='</td>';
-    html+='<td style="padding:8px;background:#FAFCFA;font-size:11px;color:'+C.text+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">'+e(d.owner||'\u2014')+'</td>';
+    html+='<td style="padding:8px;background:#FAFCFA;font-size:11px;color:'+C.text+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;">'+e(deal.owner||'\u2014')+'</td>';
     html+='<td style="padding:8px;background:#FAFCFA;border-right:1px solid '+C.bord+';">';
     html+='<div style="display:flex;align-items:center;gap:8px;">';
     html+='<div style="flex:1;height:6px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+prog+'%;height:100%;background:'+C.primary+';"></div></div>';
@@ -4154,8 +4134,6 @@ function rGantt(){
     html+='</div>';
     html+='<div style="font-size:9px;color:'+C.muted+';margin-top:2px;">'+dlvs.length+' deliverable'+(dlvs.length!==1?'s':'')+'</div>';
     html+='</td>';
-
-    // Timeline cells for project row
     days.forEach(function(day){
       var isWeekend=day.getDay()===0||day.getDay()===6;
       var isToday=day.toDateString()===today.toDateString();
@@ -4163,94 +4141,97 @@ function rGantt(){
     });
     html+='</tr>';
 
-    // ── Deliverable rows ──────────────────────────────────────────────────
-    dlvs.forEach(function(dl,idx){
-      var dlStart=dl.startDate?new Date(dl.startDate):null;
-      var dlEnd=dl.dueDate?new Date(dl.dueDate):null;
-      var pct=dl.progress||0;
-      var sb=statusBar(dl);
-      var pri=dl.priority||'';
-      var pc=priColor(pri);
+    // Deliverable rows
+    dlvs.forEach(function(dlv){
+      var isExpanded=S.ganttExpDlv===dlv._id;
+      var rs2=dlv.reviewStatus||'Draft';
+      var rsBadgeCol={'Draft':C.muted,'Submitted for Review':C.amber,'Under Review':C.blue,'Revision Needed':C.red,'Approved':C.primary}[rs2]||C.muted;
+      var pct=dlv.progress||0;
+      var pri=dlv.priority||'';
+      var priCol=pri==='High'?C.red:pri==='Medium'?C.amber:pri==='Low'?C.primary:C.muted;
+      var priBg=pri==='High'?C.redLt:pri==='Medium'?C.amberLt:pri==='Low'?C.primaryLt:'#F8FAFC';
+      var priBord=pri==='High'?'#fecaca':pri==='Medium'?'#F5E6C3':pri==='Low'?'#C8E6D4':C.bord;
+      var dlStart=dlv.start?new Date(dlv.start):null;
+      var dlEnd=dlv.end?new Date(dlv.end):null;
+      var dur=(dlStart&&dlEnd)?diffDays(dlv.start,dlv.end)+1+'d':'';
+      var barCol=pct===100?C.primary:pct>=60?C.primary:pct>=30?C.amber:C.muted;
 
-      // Compute bar position relative to the 21-day window
-      var barLeftCol=-1, barWidthCols=0;
-      if(dlStart&&dlEnd){
-        dlStart.setHours(0,0,0,0);dlEnd.setHours(0,0,0,0);
-        for(var di=0;di<days.length;di++){
-          var dayCmp=days[di].getTime();
-          if(barLeftCol<0&&dayCmp>=dlStart.getTime()&&dayCmp<=dlEnd.getTime()) barLeftCol=di;
-          if(dayCmp>=dlStart.getTime()&&dayCmp<=dlEnd.getTime()) barWidthCols++;
-        }
-      }
-      var isMilestone=dlStart&&dlEnd&&dlStart.toDateString()===dlEnd.toDateString();
+      html+='<tr class="gantt-row" style="background:#fff;border-bottom:1px solid '+C.bordLt+';height:44px;" onmouseover="this.style.background=\''+C.bg+'\'" onmouseout="this.style.background=\'#fff\'">';
 
-      html+='<tr class="gantt-row" style="background:#fff;border-bottom:1px solid '+C.bordLt+';height:40px;" onmouseover="this.style.background=\''+C.bg+'\'" onmouseout="this.style.background=\'#fff\'">';
-
-      // Task column (sticky)
-      html+='<td style="padding:6px 12px 6px 24px;position:sticky;left:0;background:inherit;z-index:3;border-right:1px solid '+C.bord+';">';
+      // Task (with expand button)
+      html+='<td style="padding:6px 12px;position:sticky;left:0;background:inherit;z-index:3;border-right:1px solid '+C.bord+';">';
       html+='<div style="display:flex;align-items:center;gap:8px;">';
-      html+='<span style="width:5px;height:5px;border-radius:50%;background:'+pc+';flex-shrink:0;"></span>';
+      html+='<button class="dlv-expand-btn" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="background:none;border:none;cursor:pointer;color:'+C.sub+';font-size:10px;padding:0;flex-shrink:0;font-family:inherit;width:14px;">'+(isExpanded?'&#9660;':'&#9654;')+'</button>';
+      html+='<span style="width:5px;height:5px;border-radius:50%;background:'+priCol+';flex-shrink:0;"></span>';
       html+='<div style="min-width:0;flex:1;">';
-      html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dl.name||'Untitled')+'</div>';
-      html+='<div style="font-size:9px;color:'+C.muted+';margin-top:1px;">'+(pri?e(pri.replace(' Priority',''))+' priority':'')+(dlStart?' &middot; '+fmtDate(dlStart):'')+(dlEnd?' \u2192 '+fmtDate(dlEnd):'')+'</div>';
+      html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dlv.name||'Untitled')+(rs2!=='Draft'?' <span style="background:'+rsBadgeCol+'15;color:'+rsBadgeCol+';border:1px solid '+rsBadgeCol+'30;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;vertical-align:middle;">'+rs2+'</span>':'')+'</div>';
+      html+='<div style="font-size:9px;color:'+C.muted+';margin-top:1px;">'+(dur?dur+' &middot; ':'')+(dlv.start||'')+(dlv.end?' \u2192 '+dlv.end:'')+'</div>';
       html+='</div></div></td>';
 
       // Owner
       html+='<td style="padding:6px 8px;background:inherit;">';
-      if(dl.owner){
+      if(dlv.owner){
         html+='<div style="display:flex;align-items:center;gap:6px;">';
-        html+='<span style="width:20px;height:20px;border-radius:50%;background:'+C.primaryLt+';color:'+C.primary+';font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials(dl.owner)+'</span>';
-        html+='<span style="font-size:11px;color:'+C.text+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dl.owner)+'</span>';
+        html+='<span style="width:20px;height:20px;border-radius:50%;background:'+C.primaryLt+';color:'+C.primary+';font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">'+initials(dlv.owner)+'</span>';
+        html+='<span style="font-size:11px;color:'+C.text+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dlv.owner)+'</span>';
         html+='</div>';
       } else {
         html+='<span style="font-size:11px;color:'+C.muted+';">Unassigned</span>';
       }
       html+='</td>';
 
-      // Progress
+      // Progress (with priority select inline)
       html+='<td style="padding:6px 8px;background:inherit;border-right:1px solid '+C.bord+';">';
-      html+='<div style="display:flex;align-items:center;gap:8px;">';
-      var pColor=pct>=100?C.primary:pct>=60?C.primary:pct>=30?C.amber:C.muted;
-      html+='<div style="flex:1;height:5px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+pColor+';"></div></div>';
-      html+='<span style="font-size:10.5px;font-weight:700;color:'+pColor+';font-variant-numeric:tabular-nums;min-width:30px;text-align:right;">'+pct+'%</span>';
+      html+='<div style="display:flex;align-items:center;gap:6px;">';
+      html+='<select class="dlv-pri-sel" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="font-size:9.5px;font-weight:600;border-radius:3px;padding:2px 4px;border:1px solid '+priBord+';background:'+priBg+';color:'+priCol+';font-family:Inter,sans-serif;flex-shrink:0;">';
+      ['','High','Medium','Low'].forEach(function(p){html+='<option'+(pri===p?' selected':'')+'>'+(p||'Pri')+'</option>';});
+      html+='</select>';
+      html+='<div style="flex:1;height:5px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+barCol+';"></div></div>';
+      html+='<span style="font-size:10.5px;font-weight:700;color:'+barCol+';font-variant-numeric:tabular-nums;min-width:30px;text-align:right;">'+pct+'%</span>';
       html+='</div></td>';
 
       // Timeline cells
       days.forEach(function(day,di){
+        var ds=fmt(day);
         var isWeekend=day.getDay()===0||day.getDay()===6;
         var isToday=day.toDateString()===today.toDateString();
-        var inBar=barLeftCol>=0&&di>=barLeftCol&&di<barLeftCol+barWidthCols;
+        var inBar=dlv.start&&dlv.end&&ds>=dlv.start&&ds<=dlv.end;
         var bg=isWeekend?C.weekend:'#fff';
-        var cellStyle='background:'+bg+';border-right:1px solid '+C.bordLt+';position:relative;padding:0;height:40px;';
+        var cellStyle='background:'+bg+';border-right:1px solid '+C.bordLt+';position:relative;padding:0;height:44px;';
         if(isToday) cellStyle+='box-shadow:inset 1px 0 0 '+C.primary+';';
         html+='<td style="'+cellStyle+'">';
-        if(inBar&&di===barLeftCol){
-          var w=barWidthCols*COL_W-4;
-          if(isMilestone){
-            html+='<div title="'+e(dl.name)+'" style="position:absolute;top:50%;left:'+(COL_W/2-7)+'px;transform:translateY(-50%) rotate(45deg);width:14px;height:14px;background:'+sb.fill+';border:1px solid #fff;"></div>';
-          } else {
-            html+='<div title="'+e(dl.name)+' \u2014 '+pct+'%" style="position:absolute;top:50%;transform:translateY(-50%);left:2px;width:'+w+'px;height:18px;background:'+(sb.outline?'#fff':C.progEmpty)+';border:'+(sb.outline?'1.5px solid '+sb.fill:'1px solid '+sb.fill)+';border-radius:3px;overflow:hidden;">';
-            if(!sb.outline) html+='<div style="height:100%;width:'+pct+'%;background:'+sb.fill+';"></div>';
-            html+='</div>';
-          }
+        if(inBar){
+          var isFirst=ds===dlv.start, isLast=ds===dlv.end;
+          var totalSpan=diffDays(dlv.start,dlv.end)||1;
+          var dayPos=diffDays(dlv.start,ds);
+          var progressDays=totalSpan*(pct/100);
+          var isFilled=dayPos<progressDays;
+          var radius=isFirst&&isLast?'3px':isFirst?'3px 0 0 3px':isLast?'0 3px 3px 0':'0';
+          html+='<div title="'+e(dlv.name)+' \u2014 '+pct+'%" style="position:absolute;top:50%;transform:translateY(-50%);left:1px;right:1px;height:16px;background:'+barCol+(isFilled?'':'33')+';border-radius:'+radius+';"></div>';
         }
         html+='</td>';
       });
       html+='</tr>';
+
+      // Expansion panel (preserves original deliverable submission workflow)
+      if(isExpanded){
+        html+='<tr><td colspan="'+(3+days.length)+'" style="padding:0;background:#FAFCFA;border-bottom:1px solid '+C.bord+';">';
+        html+='<div style="padding:12px 18px;border-left:3px solid '+C.primary+';">';
+        html+=rDlvReviewPanel(deal,dlv);
+        html+='</div></td></tr>';
+      }
     });
   });
-  html+='</tbody></table>';
-  html+='</div>';
+  html+='</tbody></table></div>';
 
-  // ── Legend ───────────────────────────────────────────────────────────────
+  // Legend
   html+='<div style="display:flex;align-items:center;gap:14px;margin-top:10px;padding:8px 12px;background:#fff;border:1px solid '+C.bord+';border-radius:4px;font-size:10.5px;color:'+C.sub+';flex-wrap:wrap;">';
   html+='<span style="font-weight:700;color:'+C.text+';">Legend:</span>';
   html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.primary+';border-radius:2px;"></span>Completed</span>';
-  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.progEmpty+';border:1px solid '+C.primary+';border-radius:2px;position:relative;overflow:hidden;"><span style="position:absolute;left:0;top:0;bottom:0;width:50%;background:'+C.primary+';"></span></span>In progress</span>';
-  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:#fff;border:1.5px solid '+C.amber+';border-radius:2px;"></span>Revision</span>';
-  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.red+';border-radius:2px;"></span>Overdue</span>';
-  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;background:'+C.primary+';transform:rotate(45deg);"></span>Milestone</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.amber+';border-radius:2px;"></span>In progress</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:18px;height:8px;background:'+C.muted+';border-radius:2px;"></span>Not started</span>';
   html+='<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:2px;height:14px;background:'+C.primary+';"></span>Today</span>';
+  html+='<span style="display:inline-flex;align-items:center;gap:5px;color:'+C.muted+';">Click &#9654; to expand a row for review &amp; submission</span>';
   html+='</div>';
 
   html+='</div>';
