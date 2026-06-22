@@ -485,20 +485,45 @@ function nextClientId(){
   return 'CLI'+ ('0000'+(max+1)).slice(-5);
 }
 
+// B3: Monotonic audit ID counter — guarantees uniqueness even within same millisecond
+var _auditSeq=0;
+function nextAuditId(){
+  _auditSeq++;
+  return Date.now()+'-'+_auditSeq;
+}
+
 function syncDeal(deal){
-  sbUpsert('deals', deal._id, deal).catch(function(){flash('Sync error - check connection.','err');});
+  sbUpsert('deals', deal._id, deal).catch(function(err){
+    console.error('Deal sync failed:',err);
+    flash('Deal NOT saved to database: '+(err&&err.message?err.message:'unknown error'),'err');
+  });
 }
 function syncLead(lead){
-  sbUpsert('leads', lead._id, lead).catch(function(){flash('Sync error - check connection.','err');});
+  sbUpsert('leads', lead._id, lead).catch(function(err){
+    console.error('Lead sync failed:',err);
+    flash('Lead NOT saved to database: '+(err&&err.message?err.message:'unknown error'),'err');
+  });
 }
 function syncNote(note){
-  sbUpsert('notes', note._id, note).catch(function(){flash('Sync error.','err');});
+  sbUpsert('notes', note._id, note).catch(function(err){
+    console.error('Note sync failed:',err);
+    flash('Note NOT saved: '+(err&&err.message?err.message:'unknown error'),'err');
+  });
 }
 function syncAct(act){
-  sbUpsert('activities', act._id, act).catch(function(){flash('Sync error.','err');});
+  sbUpsert('activities', act._id, act).catch(function(err){
+    console.error('Activity sync failed:',err);
+    flash('Activity NOT saved: '+(err&&err.message?err.message:'unknown error'),'err');
+  });
 }
+var _auditSeq=0;
+function nextAuditId(){_auditSeq++;return Date.now()+'-'+_auditSeq;}
 function syncAudit(entry){
-  sbUpsert('audit_log', String(entry._id), entry).catch(function(){});
+  // B2: surface audit failures — critical for compliance/history
+  sbUpsert('audit_log', String(entry._id), entry).catch(function(err){
+    console.error('Audit log sync failed:',err);
+    flash('Audit entry NOT saved: '+(err&&err.message?err.message:'unknown error'),'err');
+  });
 }
 function deleteDeal(id){sbDelete('deals', id);}
 function deleteLead(id){sbDelete('leads', id);}
@@ -673,9 +698,12 @@ function bContact(){
 }
 
 window._dealQuick=function(id,field,value){
+  var actor=S.currentUser?S.currentUser.name:'Unknown';
+  var ts=new Date().toLocaleString();
   S.deals=S.deals.map(function(d){
     if(d._id!==id) return d;
-    var upd={updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'};upd[field]=value;
+    var prevVal=d[field]||'(empty)';
+    var upd={updatedAt:new Date().toISOString(),updatedBy:actor};upd[field]=value;
     if(field==='pipelineStage'){
       if(value==='Completed') upd.status='Completed';
       else if(value==='On Hold') upd.status='On Hold';
@@ -684,6 +712,11 @@ window._dealQuick=function(id,field,value){
     }
     var updated=Object.assign({},d,upd);
     syncDeal(updated);
+    // H11: audit log entry for every drawer-driven update
+    var fieldLabel={'pipelineStage':'Stage','priority':'Priority','blocker':'Blocker','nextAction':'Next Action','dueDate':'Due Date'}[field]||field;
+    var en={_id:nextAuditId(),dealRef:d._id,dealId:d.dealId,user:actor,field:fieldLabel,prev:String(prevVal),next:String(value||'(empty)'),ts:ts};
+    S.dealAuditLog=S.dealAuditLog.concat([en]);
+    syncAudit(en);
     return updated;
   });
   flash('Deal updated');render();
@@ -729,7 +762,7 @@ function relTime(v){
   if(mo<12) return mo+' month'+(mo>1?'s':'')+' ago';
   return Math.floor(mo/12)+' yr'+(Math.floor(mo/12)>1?'s':'')+' ago';
 }
-function rAuditMeta(rows){
+function rAuditMeta(rows){if(!rows||!rows.length) return '';
   var items=rows.filter(function(r){return r[1];});
   if(!items.length) return '';
   var html='<div style="border-top:1px solid #EAEFEC;margin-top:16px;padding-top:12px;">';
@@ -739,7 +772,7 @@ function rAuditMeta(rows){
     var rel=relTime(r[1]);
     html+='<div style="font-size:10.5px;color:#9BA8A2;line-height:1.5;" title="'+e(fmtAudit(r[1]))+(r[2]?' by '+e(r[2]):'')+'">';
     html+='<span style="color:#B7C2BC;">'+r[0]+'</span> '+e(fmtAudit(r[1]));
-    if(r[2]) html+=' <span style="color:#B7C2BC;">by '+e(r[2])+'</span>';
+    if(r[2]) html+=' <span style="color:#B7C2BC;">by '+e(r[2])+'</span>'; else html+=' <span style="color:#D8E3DC;font-style:italic;">(unknown)</span>';
     if(rel) html+=' <span style="color:#C9D3CE;">&middot; '+rel+'</span>';
     html+='</div>';
   });
@@ -1119,6 +1152,29 @@ function render(){
     document.getElementById('app').innerHTML='<div style="padding:40px;color:red;font-family:monospace;"><h2>Render Error</h2><pre>'+err.message+'\n'+err.stack+'</pre></div>';
     console.error('Render error:',err);
   }
+}
+
+// L32: ESC closes any open modal/drawer
+if(!window._escBound){
+  window._escBound=true;
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Escape') return;
+    var dirty=false;
+    if(S.convertModal){S.convertModal=null;dirty=true;}
+    else if(S.approvalModal){S.approvalModal=null;dirty=true;}
+    else if(S.confirmModal){S.confirmModal=null;dirty=true;}
+    else if(S.newContactModal){S.newContactModal=false;S.newContactKind=null;S.newContactClientId=null;dirty=true;}
+    else if(S.linkContactModal){S.linkContactModal=null;S.linkContactSelClient=null;dirty=true;}
+    else if(S.qaActionModal){S.qaActionModal=null;S.qaActionContact=null;S.qaActionClient=null;dirty=true;}
+    else if(S.leadDrawer){S.leadDrawer=null;dirty=true;}
+    else if(S.pipeDrawer){S.pipeDrawer=null;dirty=true;}
+    else if(S.apqDrawer){S.apqDrawer=null;dirty=true;}
+    else if(S.showICForm){S.showICForm=false;S.editICId=null;S.icForm=null;dirty=true;}
+    else if(S.showClientForm){S.showClientForm=false;S.editClientId=null;S.clientForm=null;dirty=true;}
+    else if(S.pipeMenu){S.pipeMenu=null;dirty=true;}
+    else if(S.leadMenu){S.leadMenu=null;dirty=true;}
+    if(dirty) render();
+  });
 }
 
 function sel(n,opts,v){return '<select name="'+n+'">'+opts.map(function(o){return '<option'+(o===v?' selected':'')+'>'+e(o)+'</option>';}).join('')+'</select>';}
@@ -1626,7 +1682,7 @@ function rPipe(){
   // ── Saved view base filter ───────────────────────────────────────────────
   var VISD=visDeals();
   // Hide archived/reverted deals from active pipeline
-  var ds=[].concat(VISD).filter(function(d){return !d.archived;});
+  var ds=(S.pipeSavedView==='archived')?[]:[].concat(VISD).filter(function(d){return !d.archived;});
   var sv=S.pipeSavedView||'active';
   if(sv==='active') ds=ds.filter(function(d){var st=dealStage(d);return st!=='Completed'&&st!=='Cancelled';});
   else if(sv==='mine') ds=ds.filter(function(d){return (d.owner||'').toLowerCase().indexOf(me.toLowerCase())>=0&&me;});
@@ -1636,6 +1692,16 @@ function rPipe(){
   else if(sv==='waiting') ds=ds.filter(function(d){return d.blocker==='Waiting on Client';});
   else if(sv==='mgreview') ds=ds.filter(function(d){return dealStage(d)==='Manager Review';});
   else if(sv==='completed') ds=ds.filter(function(d){return dealStage(d)==='Completed';});
+  else if(sv==='archived'){
+    // M21: explicit archived view shows reverted/archived deals
+    ds=S.deals.filter(function(d){return d.archived;});
+    if(!canSeeAll()){
+      var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
+      ds=ds.filter(function(d){
+        return (d.createdBy||'').toLowerCase().trim()===n||(d.owner||'').toLowerCase().trim()===n||(d.convertedBy||'').toLowerCase().trim()===n;
+      });
+    }
+  }
 
   // ── Dropdown filters ─────────────────────────────────────────────────────
   if(S.pipeStage!=='All') ds=ds.filter(function(d){return dealStage(d)===S.pipeStage;});
@@ -1674,7 +1740,7 @@ function rPipe(){
 
   // Saved views
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
-  [['active','All Active'],['mine','My Deals'],['dueweek','Due This Week'],['overdue','Overdue'],['blocked','Blocked'],['waiting','Waiting on Client'],['mgreview','Manager Review'],['completed','Completed']].forEach(function(v){
+  [['active','All Active'],['mine','My Deals'],['dueweek','Due This Week'],['overdue','Overdue'],['blocked','Blocked'],['waiting','Waiting on Client'],['mgreview','Manager Review'],['completed','Completed'],['archived','Archived']].forEach(function(v){
     var on=sv===v[0];
     html+='<button class="pipe-sv fbtn'+(on?' on':'')+'" data-sv="'+v[0]+'">'+v[1]+'</button>';
   });
@@ -1809,7 +1875,7 @@ function rPipe(){
 
       // Summary rows
       html+='<div style="border-top:1px solid #D8E3DC;padding-top:12px;margin-bottom:12px;">';
-      [['Client',dclient?dclient.companyName:'\u2014'],['Service Type',dd.serviceType||'\u2014'],['Owner',dd.owner||'\u2014'],['Start Date',dd.startDate||'\u2014'],['Progress',dprog+'%']].forEach(function(r){
+      [['Client',dclient?dclient.companyName:'\u2014'],['Service Type',dd.serviceType||'\u2014'],['Lead Owner (internal)',dd.owner||'\u2014'],['Client Contact',dd.clientContact||'\u2014'],['Start Date',dd.startDate||'\u2014'],['Progress',dprog+'%']].forEach(function(r){
         html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;">'+e(String(r[1]))+'</span></div>';
       });
       html+='</div>';
@@ -2060,7 +2126,7 @@ function rLeadsPipeline(){
       // Stage
       html+='<td><span style="background:'+stc+'14;color:'+stc+';border:1px solid '+stc+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;white-space:nowrap;">'+stg+'</span></td>';
       // Approval
-      html+='<td><span style="font-size:11px;font-weight:600;color:'+aprCol+';white-space:nowrap;">'+apr+'</span></td>';
+      html+='<td>'+(stg==='Draft'?'<span style="color:#D8E3DC;">&mdash;</span>':'<span style="font-size:11px;font-weight:600;color:'+aprCol+';white-space:nowrap;">'+apr+'</span>')+'</td>';
       // Docs
       html+='<td>'+(fcount>0?'<button class="lead-files-btn" data-id="'+e(l._id)+'" style="background:#EAF3EE;color:#275F45;border:1px solid #C8E6D4;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;">&#128206; '+fcount+' File'+(fcount!==1?'s':'')+'</button>':'<span style="background:#FEF2F2;color:#dc2626;border:1px solid #FECACA;border-radius:3px;padding:2px 7px;font-size:10px;font-weight:700;white-space:nowrap;">Missing Docs</span>')+'</td>';
       // Readiness
@@ -2138,8 +2204,22 @@ function rLeadsPipeline(){
         html+='<div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Action Required: More Info Requested</div>';
         html+='<div style="font-size:12px;color:#1A1A1A;line-height:1.5;margin-bottom:6px;">'+e(dl.infoRequest)+'</div>';
         html+='<div style="font-size:10px;color:#9BA8A2;margin-bottom:6px;">Requested by '+e(dl.infoRequestedBy||'')+' &middot; '+(dl.infoRequestedAt?relTime(dl.infoRequestedAt):'')+'</div>';
-        html+='<button class="ell btn btn-sm" data-id="'+e(dl._id)+'" style="font-size:11px;">Edit & Resubmit</button>';
+        html+='<button class="lead-edit-from-drawer btn btn-sm" data-id="'+e(dl._id)+'" style="font-size:11px;">Edit & Resubmit</button>';
         html+='</div>';
+      }
+      // M17: Full audit history for this lead
+      var leadAudit=(S.auditLog||[]).filter(function(a){return a.leadId===dl.leadId;}).slice().reverse();
+      if(leadAudit.length){
+        html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">History ('+leadAudit.length+')</div>';
+        html+='<div style="max-height:200px;overflow-y:auto;border:1px solid #E2E8F0;border-radius:4px;background:#FAFAFA;">';
+        leadAudit.forEach(function(a){
+          html+='<div style="padding:6px 10px;border-bottom:1px solid #F1F5F9;font-size:11px;">';
+          html+='<div style="display:flex;justify-content:space-between;gap:6px;"><span style="color:#0F172A;font-weight:600;">'+e(a.field||'Change')+'</span><span style="color:#94A3B8;font-size:10px;">'+e(a.ts||'')+'</span></div>';
+          if(a.prev||a.next) html+='<div style="color:#64748B;margin-top:2px;">'+e(a.prev||'')+' &rarr; '+e(a.next||'')+'</div>';
+          if(a.user) html+='<div style="color:#94A3B8;font-size:9.5px;margin-top:2px;">by '+e(a.user)+'</div>';
+          html+='</div>';
+        });
+        html+='</div></div>';
       }
       // Conversion checklist
       html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Conversion Checklist</div>';
@@ -2168,6 +2248,20 @@ function rLeadsPipeline(){
         ['Approved',dl.approvedAt,dl.approvedBy],
         ['Converted',dl.convertedAt,dl.convertedBy]
       ]);
+      // M17: full audit history for this lead
+      var leadHistory=S.auditLog.filter(function(en){return en.leadId===dl.leadId;}).reverse();
+      if(leadHistory.length>0){
+        html+='<div style="border-top:1px solid #EAEFEC;margin-top:12px;padding-top:10px;">';
+        html+='<div style="font-size:9px;font-weight:700;color:#B7C2BC;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;">Change History ('+leadHistory.length+')</div>';
+        html+='<div style="max-height:180px;overflow-y:auto;">';
+        leadHistory.forEach(function(en){
+          html+='<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #F8FAF9;">';
+          html+='<div style="width:22px;height:22px;border-radius:50%;background:#EAF3EE;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#275F45;flex-shrink:0;">'+e((en.user||'?').charAt(0).toUpperCase())+'</div>';
+          html+='<div style="min-width:0;flex:1;"><div style="font-size:11px;color:#1A1A1A;line-height:1.4;">'+(en.field==='n/a'?e(en.next):'<strong>'+e(en.field)+'</strong>: '+e(en.next||''))+'</div>';
+          html+='<div style="font-size:10px;color:#9BA8A2;">'+e(en.user||'')+' &middot; '+e(en.ts||'')+'</div></div></div>';
+        });
+        html+='</div></div>';
+      }
       html+='</div>';
       // Drawer footer
       html+='<div style="padding:12px 18px;border-top:1px solid #D8E3DC;display:flex;gap:8px;">';
@@ -2638,7 +2732,8 @@ function mvStage(){
 
 function persistLead(lf, status, msg){
   // #14: track lastSubmittedAt on submission
-  var _isSubmission=(status==='submitted');
+  // B4: treat both 'submitted' and 'pending' as a submission event
+  var _isSubmission=(status==='submitted'||status==='pending');
   var ts=new Date().toLocaleString();
   lf.leadStatus=status;
   if(S.leid!==null){
@@ -2649,7 +2744,13 @@ function persistLead(lf, status, msg){
     if(entries.length>0){S.auditLog=S.auditLog.concat(entries);entries.forEach(function(en){syncAudit(en);});}
     var critical=['bizName','serviceType','ownerContact','salesLead'];
     var wasApproved=!!(old.approved||old.leadStatus==='approved');
-    var criticalChanged=wasApproved&&critical.some(function(k){return (old[k]||'')!==(lf[k]||'');});
+    // H14: don't punish users for filling in empty fields on legacy approved leads
+    var criticalChanged=wasApproved&&critical.some(function(k){
+      var oldV=(old[k]||'').toString().trim();
+      var newV=(lf[k]||'').toString().trim();
+      // Only revert if BOTH old and new exist and differ (a real change)
+      return oldV&&newV&&oldV!==newV;
+    });
     var actor=S.currentUser?S.currentUser.name:S.auditUser;
     var nowIso=new Date().toISOString();
     var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz,createdAt:old.createdAt,createdBy:old.createdBy,updatedAt:nowIso,updatedBy:actor});
@@ -2663,7 +2764,7 @@ function persistLead(lf, status, msg){
       updated.revertedToReviewAt=nowIso;
       updated.revertedToReviewBy=actor;
       var changedFields=critical.filter(function(k){return (old[k]||'')!==(lf[k]||'');}).map(function(k){return k+': '+(old[k]||'(empty)')+' → '+(lf[k]||'(empty)');}).join('; ');
-      var entry={_id:Date.now(),leadId:lf.leadId||'',user:actor,field:'Approval Reverted',prev:'Approved',next:'Under Review (critical fields changed: '+changedFields+')',ts:new Date().toLocaleString()};
+      var entry={_id:nextAuditId(),leadId:lf.leadId||'',user:actor,field:'Approval Reverted',prev:'Approved',next:'Under Review (critical fields changed: '+changedFields+')',ts:new Date().toLocaleString()};
       S.auditLog=S.auditLog.concat([entry]);
       if(typeof syncAudit==='function') syncAudit(entry);
       setTimeout(function(){flash('Lead reverted to Under Review — critical fields changed.','err');},0);
@@ -2675,7 +2776,7 @@ function persistLead(lf, status, msg){
     var nid=nextLeadId(lf.serviceType);
     var _now=new Date().toISOString();var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:_now,createdBy:S.currentUser?S.currentUser.name:S.auditUser});if(_isSubmission){newLead.lastSubmittedAt=_now;newLead.firstSubmittedAt=_now;}
     S.leads=S.leads.concat([newLead]);
-    var auditEntry={_id:Date.now(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
+    var auditEntry={_id:nextAuditId(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
     S.auditLog=S.auditLog.concat([auditEntry]);
     syncLead(newLead);
     syncAudit(auditEntry);
@@ -2773,10 +2874,10 @@ function revertDealToLead(dealId){
   });
 
   // Audit log on both sides
-  var en1={_id:Date.now(),leadId:lead.leadId||'',user:actor,field:'Reverted from Deal',prev:'Converted',next:'Under Review — '+reason.trim(),ts:new Date().toLocaleString()};
+  var en1={_id:nextAuditId(),leadId:lead.leadId||'',user:actor,field:'Reverted from Deal',prev:'Converted',next:'Under Review — '+reason.trim(),ts:new Date().toLocaleString()};
   S.auditLog=S.auditLog.concat([en1]);
   if(typeof syncAudit==='function') syncAudit(en1);
-  var en2={_id:Date.now()+1,dealRef:d._id,dealId:d.dealId,user:actor,field:'Deal Reverted',prev:'Active',next:'Archived — reverted to lead: '+reason.trim(),ts:new Date().toLocaleString()};
+  var en2={_id:nextAuditId(),dealRef:d._id,dealId:d.dealId,user:actor,field:'Deal Reverted',prev:'Active',next:'Archived — reverted to lead: '+reason.trim(),ts:new Date().toLocaleString()};
   S.dealAuditLog=S.dealAuditLog.concat([en2]);
 
   S.pipeDrawer=null;
@@ -2807,17 +2908,21 @@ function cvt(id){
   var convertor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
   var convTs=new Date().toISOString();
 
+  // M16: normalize priority vocabulary (lead uses 'High Priority', deals use 'High')
+  var normPriority=(l.priority||'').replace(' Priority','');
   var newDeal2=Object.assign({},bDeal(),{
     _id:'D'+Date.now(),
     dealId:nid,
     bizName:l.bizName||l.ownerContact||'',
+    priority:(l.priority||'').replace(' Priority','')||'',  // M16: normalize for deal model
     serviceType:l.serviceType||'',
-    owner:l.salesLead||l.ownerContact||'',  // Lead Owner becomes the Deal Owner (internal)
-    clientContact:l.ownerContact||'',  // Main Business Contact preserved on the deal
+    owner:l.salesLead||l.ownerContact||'',
+    clientContact:l.ownerContact||'',
     email:l.email||'',phone:l.phone||'',source:l.source||'',
     projectBrief:l.projectBrief||'',
     startDate:l.startDate||'',endDate:l.endDate||'',
     status:'Active',
+    priority:normPriority,
     files:l.files||[],
     deliverables:[],
     // Audit lineage
@@ -2832,34 +2937,45 @@ function cvt(id){
     convertedBy:convertor
   });
 
+  // H6: atomic-ish — write deal first, on success stamp lead.
+  // If deal write fails, sync error surfaces immediately and we don't strand the lead.
+  // If lead stamp fails, surfaced separately; user can refresh and re-run (dedupe guard catches it).
   S.deals=S.deals.concat([newDeal2]);
-  syncDeal(newDeal2);
-
-  // ── BLOCKER #1 FIX: stamp lead as converted ──────────────────────────────
-  S.leads=S.leads.map(function(x){
-    if(x._id!==l._id) return x;
-    var u=Object.assign({},x,{
-      converted:true,
-      convertedAt:convTs,
-      convertedBy:convertor,
-      convertedToDealId:newDeal2.dealId,
-      convertedToDealRef:newDeal2._id,
-      leadStatus:'converted',
-      updatedAt:convTs,
-      updatedBy:convertor,
-      // #6: files transferred to deal; clear from lead to avoid double-storage
-      filesTransferredAt:convTs,
-      filesTransferredCount:(x.files||[]).length,
-      files:[]
+  sbUpsert('deals', newDeal2._id, newDeal2).then(function(){
+    S.leads=S.leads.map(function(x){
+      if(x._id!==l._id) return x;
+      var u=Object.assign({},x,{
+        converted:true,
+        convertedAt:convTs,
+        convertedBy:convertor,
+        convertedToDealId:newDeal2.dealId,
+        convertedToDealRef:newDeal2._id,
+        leadStatus:'converted',
+        updatedAt:convTs,
+        updatedBy:convertor,
+        filesTransferredAt:convTs,
+        filesTransferredCount:(x.files||[]).length,
+        files:[]
+      });
+      sbUpsert('leads', u._id, u).then(function(){
+        // Both writes confirmed
+      }).catch(function(err){
+        flash('WARNING: Deal '+newDeal2.dealId+' saved but lead status not updated. Refresh and contact admin. '+(err.message||''),'err');
+      });
+      return u;
     });
-    syncLead(u);
-    return u;
+    render();
+  }).catch(function(err){
+    // Roll back local deal addition
+    S.deals=S.deals.filter(function(d){return d._id!==newDeal2._id;});
+    flash('Conversion FAILED: deal could not be saved. '+(err.message||'Try again.'),'err');
+    render();
   });
 
   // Audit entries on both sides
-  var en1={_id:Date.now(),leadId:l.leadId||'',user:convertor,field:'Conversion',prev:'Approved',next:'Converted to '+nid,ts:new Date().toLocaleString()};
+  var en1={_id:nextAuditId(),leadId:l.leadId||'',user:convertor,field:'Conversion',prev:'Approved',next:'Converted to '+nid,ts:new Date().toLocaleString()};
   S.auditLog=S.auditLog.concat([en1]);syncAudit(en1);
-  var en2={_id:Date.now()+1,dealRef:newDeal2._id,dealId:nid,user:convertor,field:'Created',prev:'',next:'Converted from lead '+(l.leadId||''),ts:new Date().toLocaleString()};
+  var en2={_id:nextAuditId(),dealRef:newDeal2._id,dealId:nid,user:convertor,field:'Created',prev:'',next:'Converted from lead '+(l.leadId||''),ts:new Date().toLocaleString()};
   S.dealAuditLog=S.dealAuditLog.concat([en2]);
 
   S.convertModal=null;
@@ -2926,7 +3042,7 @@ function confirmApproval(){
     syncLead(updated);
     return updated;
   });
-  S.auditLog=S.auditLog.concat([{_id:Date.now(),leadId:(S.leads.filter(function(l){return l._id===leadId;})[0]||{}).leadId||'n/a',user:match.name,field:'Approval',prev:'Pending',next:(S.approvalAction==='reject'?'Rejected by ':'Approved by ')+match.name,ts:ts}]);
+  S.auditLog=S.auditLog.concat([{_id:nextAuditId(),leadId:(S.leads.filter(function(l){return l._id===leadId;})[0]||{}).leadId||'n/a',user:match.name,field:'Approval',prev:'Pending',next:(S.approvalAction==='reject'?'Rejected by ':'Approved by ')+match.name,ts:ts}]);
   S.currentApprover=match.name;
   flash(S.approvalAction==='reject'?('Lead rejected by '+match.name+'.'):('Lead approved by '+match.name+'!'));
   S.approvalModal=false;S.approvalTargetId=null;S.approvalAction=null;
@@ -4536,7 +4652,7 @@ function rConvertModal(){
       out+='<div style="padding:18px 22px;border-bottom:1px solid #D8E3DC;"><div style="font-size:16px;font-weight:700;color:#1A1A1A;">Convert Lead to Deal Pipeline?</div>';
       out+='<div style="font-size:12px;color:#5F6B65;margin-top:4px;line-height:1.5;">This will create a new deal record and move this approved lead into the Deal Pipeline for execution.</div></div>';
       out+='<div style="padding:16px 22px;">';
-      [['Business Name',cl.bizName],['Service Type',cl.serviceType],['Owner / Contact',cl.ownerContact],['Documents',(cl.files||[]).length+' file'+((cl.files||[]).length!==1?'s':'')]].forEach(function(r){
+      [['Business Name',cl.bizName],['Service Type',cl.serviceType],['Lead Owner (internal)',cl.salesLead],['Main Business Contact',cl.ownerContact],['Documents',(cl.files||[]).length+' file'+((cl.files||[]).length!==1?'s':'')]].forEach(function(r){
         out+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:12px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:13px;font-weight:600;color:#1A1A1A;">'+e(String(r[1]||'\u2014'))+'</span></div>';
       });
       out+='</div>';
@@ -4559,10 +4675,11 @@ function rApprovals(){
   var rejected=S.leads.filter(function(l){return leadStage(l)==='Rejected';});
   var convertedDeals=S.deals.filter(function(d){return (d.convertedFromLeadId||d.convertedFromLead)&&!d.archived;});
 
-  // Average review time (created → approved)
+  // M22: Average review time — current month only, not all-time
+  var thisMonth=new Date().toISOString().slice(0,7);
   var revTimes=[];
-  S.leads.concat([]).forEach(function(l){
-    if(l.approvedAt&&l.createdAt){
+  S.leads.forEach(function(l){
+    if(l.approvedAt&&l.createdAt&&l.approvedAt.slice(0,7)===thisMonth){
       var a=new Date(l.approvedAt).getTime(),c=new Date(l.createdAt).getTime();
       if(!isNaN(a)&&!isNaN(c)&&a>c) revTimes.push(a-c);
     }
@@ -4639,7 +4756,7 @@ function rApprovals(){
         html+='<tr class="apq-row" data-id="'+e(l._id)+'" style="cursor:pointer;'+(stg==='More Info Required'?'background:#FFFBF5;':'')+'">';
         html+='<td style="min-width:160px;"><div style="font-weight:600;font-size:13px;color:#1A1A1A;">'+e(l.bizName||'Untitled')+'</div><div style="font-size:10px;color:#9BA8A2;font-family:monospace;">'+e(l.leadId||'')+(stg==='More Info Required'?' &middot; <span style="color:#D97706;font-weight:700;">Info Requested</span>':'')+'</div></td>';
         html+='<td><span style="background:#F8FAF9;color:#5F6B65;border:1px solid #D8E3DC;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:600;white-space:nowrap;">'+e(svcShort2[l.serviceType]||l.serviceType||'\u2014')+'</span></td>';
-        html+='<td style="font-size:12px;color:#1A1A1A;white-space:nowrap;">'+e(l.createdBy||l.salesLead||'\u2014')+'</td>';
+        html+='<td style="font-size:12px;color:#1A1A1A;white-space:nowrap;">'+e(l.salesLead||l.createdBy||'\u2014')+'</td>';
         html+='<td style="font-size:10px;color:#9BA8A2;white-space:nowrap;" title="'+e(fmtAudit(l.updatedAt||l.createdAt))+'">'+(l.updatedAt||l.createdAt?relTime(l.updatedAt||l.createdAt):'\u2014')+'</td>';
         html+='<td style="font-size:11px;font-weight:600;color:'+((Date.now()-new Date(l.lastSubmittedAt||l.updatedAt||l.createdAt||Date.now()).getTime())>172800000?'#dc2626':'#5F6B65')+';white-space:nowrap;">'+timeWaiting(l)+'</td>';
         html+='<td>'+docsCell(l)+'</td>';
@@ -4806,6 +4923,21 @@ function rApprovals(){
   html+=rNewContactModal();
   html+='</div>';
   return html;
+}
+
+
+// L32: global ESC handler closes any open modal/drawer
+if(!window._escBound){
+  window._escBound=true;
+  document.addEventListener('keydown',function(ev){
+    if(ev.key!=='Escape') return;
+    if(S.convertModal||S.approvalModal||S.confirmModal||S.newContactModal||S.linkContactModal||S.qaActionModal||S.leadDrawer||S.pipeDrawer||S.apqDrawer){
+      S.convertModal=null;S.approvalModal=null;S.confirmModal=null;
+      S.newContactModal=false;S.linkContactModal=null;S.qaActionModal=null;
+      S.leadDrawer=null;S.pipeDrawer=null;S.apqDrawer=null;
+      render();
+    }
+  });
 }
 
 function bind(){
@@ -5160,7 +5292,7 @@ function bind(){
     el.addEventListener('click',function(){
       var l=S.leads.filter(function(x){return x._id===el.dataset.id;})[0];
       if(l){
-        S.auditLog=S.auditLog.concat([{_id:Date.now(),leadId:l.leadId||'n/a',user:S.auditUser,field:'n/a',prev:'n/a',next:'Opened for editing',ts:new Date().toLocaleString()}]);
+        S.auditLog=S.auditLog.concat([{_id:nextAuditId(),leadId:l.leadId||'n/a',user:S.auditUser,field:'n/a',prev:'n/a',next:'Opened for editing',ts:new Date().toLocaleString()}]);
         S.lform=Object.assign({},l);S.leid=l._id;S.lfiles=l.files||[];S.biz=l.bizStructure||'';
         S.leadsView='form';  // switch to form view for editing
         render();
@@ -5182,6 +5314,23 @@ function bind(){
   [['lf-stage','leadFStage'],['lf-approval','leadFApproval'],['lf-svc','leadFSvc'],['lf-priority','leadFPriority'],['lf-temp','leadFTemp'],['lf-docs','leadFDocs']].forEach(function(p){
     var el=document.getElementById(p[0]);
     if(el) el.addEventListener('change',function(){S[p[1]]=el.value;render();});
+  });
+
+  // H8: Edit & Resubmit from drawer banner — load lead into form properly
+  document.querySelectorAll('.lead-edit-from-drawer').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var l=S.leads.filter(function(x){return x._id===el.dataset.id;})[0];
+      if(!l){flash('Lead not found.','err');return;}
+      S.lform=Object.assign({},l);
+      S.leid=l._id;
+      S.lfiles=l.files||[];
+      S.biz=l.bizStructure||'';
+      S.leadDrawer=null;
+      S.tab='leads';
+      S.leadsView='form';
+      render();
+    });
   });
 
   document.querySelectorAll('.lead-row').forEach(function(el){
@@ -5250,6 +5399,25 @@ function bind(){
   });
 
   // Convert buttons in table open the confirmation modal (preserving cvt workflow behind confirm)
+  // H8: Edit & Resubmit — load lead into form
+  document.querySelectorAll('.lead-edit-from-drawer').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var lid=el.dataset.id;
+      var l=S.leads.filter(function(x){return x._id===lid;})[0];
+      if(!l){flash('Lead not found.','err');return;}
+      S.leid=l._id;
+      S.lform=Object.assign({},l);
+      S.lfiles=[];  // existing files preserved on l.files; staging only for new uploads
+      S.biz=l.bizStructure||'';
+      S.tab='leads';
+      S.leadsView='form';
+      S.leadDrawer=null;
+      S.apqDrawer=null;
+      render();
+    });
+  });
+
   document.querySelectorAll('.cnv').forEach(function(el){el.addEventListener('click',function(ev){ev.stopPropagation();S.convertModal=el.dataset.id;render();});});
   document.querySelectorAll('.aprbtn').forEach(function(el){el.addEventListener('click',function(){openApprovalModal(el.dataset.id,'approve');});});
   var aprCancel=document.getElementById('apr-cancel');if(aprCancel) aprCancel.addEventListener('click',closeApprovalModal);
@@ -5303,7 +5471,7 @@ function bind(){
         syncLead(u);return u;
       });
       var tgt=S.leads.filter(function(l){return l._id===el.dataset.id;})[0]||{};
-      var en={_id:Date.now(),leadId:tgt.leadId||'n/a',user:actor,field:'Review',prev:'Submitted',next:'More info requested'+(note?': '+note:''),ts:ts3};
+      var en={_id:nextAuditId(),leadId:tgt.leadId||'n/a',user:actor,field:'Review',prev:'Submitted',next:'More info requested'+(note?': '+note:''),ts:ts3};
       S.auditLog=S.auditLog.concat([en]);syncAudit(en);
       S.apqDrawer=null;
       flash('Information request sent.');render();
