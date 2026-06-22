@@ -577,6 +577,8 @@ var S={
   linkContactModal:null,
   qaActionModal:null,
   usersTab:'profile',
+  lastBackupAt:null,
+  lastBackupBy:null,
   usersSearch:'',
   usersFilterRole:'All',
   usersFilterStatus:'All',
@@ -3496,7 +3498,8 @@ function rUsers(){
     ['security','Security'],
     ['team','Team Members'],
     ['roles','Roles & Permissions'],
-    ['activity','Activity Log']
+    ['activity','Activity Log'],
+    ['backup','Backup']
   ];
   html+='<div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:16px;gap:0;">';
   tabs.forEach(function(t){
@@ -3760,6 +3763,78 @@ function rUsers(){
       });
     }
     html+='</tbody></table></div></div>';
+  }
+
+  // ════════ BACKUP ════════
+  else if(tab==='backup'){
+    if(!isAdmin){
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:36px;text-align:center;">';
+      html+='<div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:4px;">Admin access required</div>';
+      html+='<div style="font-size:11px;color:#64748B;">Only administrators can manage backups.</div>';
+      html+='</div>';
+    } else {
+      // Load last backup timestamp from localStorage if not in state
+      if(S.lastBackupAt===null){
+        try{
+          var stored=localStorage.getItem('aa_crm_last_backup');
+          if(stored){var p=JSON.parse(stored);S.lastBackupAt=p.at;S.lastBackupBy=p.by;}
+        }catch(_){}
+      }
+      var stale=false, staleDays=0;
+      if(S.lastBackupAt){
+        staleDays=Math.floor((Date.now()-new Date(S.lastBackupAt).getTime())/86400000);
+        stale=staleDays>=7;
+      } else {
+        stale=true;
+      }
+
+      // Stale banner
+      if(stale){
+        html+='<div style="background:#FFFBEB;border:1px solid #FDE68A;border-left:3px solid #D97706;border-radius:4px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">';
+        html+='<span style="font-size:16px;">&#9888;</span>';
+        html+='<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:#92400E;">'+(S.lastBackupAt?'Backup is '+staleDays+' day'+(staleDays!==1?'s':'')+' old':'No backup taken yet')+'</div>';
+        html+='<div style="font-size:11px;color:#5F6B65;margin-top:2px;">Download a fresh backup to keep your data recoverable.</div></div>';
+        html+='</div>';
+      }
+
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;max-width:680px;">';
+      html+='<div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:4px;">Full Database Backup</div>';
+      html+='<div style="font-size:11.5px;color:#64748B;line-height:1.5;margin-bottom:16px;">Downloads a single JSON file containing every record in your CRM &mdash; leads, deals, clients, contacts, team members (passwords excluded), and audit history. Save the file somewhere safe (Google Drive, local backup, etc.).</div>';
+
+      // Stats row — count what will be in the backup
+      var stats=[
+        ['Leads',(S.leads||[]).length],
+        ['Deals',(S.deals||[]).length],
+        ['Clients',(S.clients||[]).length],
+        ['Individual Contacts',(S.individualContacts||[]).length],
+        ['Team Members',(S.users||[]).length],
+        ['Audit Entries',(S.auditLog||[]).length+(S.dealAuditLog||[]).length]
+      ];
+      html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px;padding:12px;background:#FAFAFA;border:1px solid #E2E8F0;border-radius:4px;">';
+      stats.forEach(function(s){
+        html+='<div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:#0F172A;font-variant-numeric:tabular-nums;">'+s[1]+'</div>';
+        html+='<div style="font-size:9.5px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">'+s[0]+'</div></div>';
+      });
+      html+='</div>';
+
+      // Last backup metadata
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F8FAF9;border:1px solid #E2E8F0;border-radius:4px;margin-bottom:14px;">';
+      html+='<div style="font-size:11.5px;color:#0F172A;"><strong>Last backup:</strong> ';
+      if(S.lastBackupAt){
+        html+=relTime(S.lastBackupAt)+(S.lastBackupBy?' by '+e(S.lastBackupBy):'');
+      } else {
+        html+='<span style="color:#94A3B8;">Never</span>';
+      }
+      html+='</div></div>';
+
+      // Action button
+      html+='<button id="backup-download-btn" class="btn" style="font-size:13px;padding:9px 18px;">&#8659; Download Full Backup</button>';
+      html+='<div style="font-size:10.5px;color:#94A3B8;margin-top:10px;line-height:1.5;">';
+      html+='<strong>Note:</strong> If you ever need to restore from a backup, contact your developer. They can do it via the Supabase dashboard in 5 minutes. This avoids accidentally wiping live data via an in-app restore button.';
+      html+='</div>';
+
+      html+='</div>';
+    }
   }
 
   // ════════ Add User modal ════════
@@ -6634,6 +6709,70 @@ function bRF(){
     var a=document.createElement('a');a.href=url;a.download='users-export-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
     URL.revokeObjectURL(url);
     flash('Users exported.');
+  });
+
+
+  // ── Backup: download full JSON ────────────────────────────────────────────
+  var backupBtn=document.getElementById('backup-download-btn');
+  var goToBackup=document.getElementById('dash-goto-backup');
+  if(goToBackup) goToBackup.addEventListener('click',function(ev){ev.preventDefault();S.tab='users';S.usersTab='backup';render();});
+
+  if(backupBtn) backupBtn.addEventListener('click',function(){
+    if(!S.currentUser||S.currentUser.role!=='admin'){flash('Admin only.','err');return;}
+    var now=new Date();
+    var iso=now.toISOString();
+    var ymd=iso.slice(0,10);
+    // Strip passwords from users
+    var safeUsers=(S.users||[]).map(function(u){var c=Object.assign({},u);delete c.password;return c;});
+    var payload={
+      _meta:{
+        appName:'African Aspirations Sales CRM',
+        appVersion:'pilot-2026-06',
+        backupVersion:1,
+        createdAt:iso,
+        createdBy:S.currentUser.name||S.currentUser.email||'unknown',
+        passwordsIncluded:false,
+        counts:{
+          leads:(S.leads||[]).length,
+          deals:(S.deals||[]).length,
+          clients:(S.clients||[]).length,
+          individualContacts:(S.individualContacts||[]).length,
+          users:safeUsers.length,
+          auditLog:(S.auditLog||[]).length,
+          dealAuditLog:(S.dealAuditLog||[]).length,
+          notes:(S.notes||[]).length,
+          acts:(S.acts||[]).length
+        }
+      },
+      leads:S.leads||[],
+      deals:S.deals||[],
+      clients:S.clients||[],
+      individualContacts:S.individualContacts||[],
+      users:safeUsers,
+      auditLog:S.auditLog||[],
+      dealAuditLog:S.dealAuditLog||[],
+      notes:S.notes||[],
+      activities:S.acts||[]
+    };
+    try {
+      var json=JSON.stringify(payload,null,2);
+      var blob=new Blob([json],{type:'application/json'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='aa-crm-backup-'+ymd+'.json';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},100);
+      // Persist last-backup metadata
+      S.lastBackupAt=iso;
+      S.lastBackupBy=payload._meta.createdBy;
+      try{localStorage.setItem('aa_crm_last_backup',JSON.stringify({at:iso,by:S.lastBackupBy}));}catch(_){}
+      var sizeMb=(blob.size/1048576).toFixed(2);
+      flash('Backup downloaded ('+sizeMb+' MB). Store it somewhere safe.');
+      render();
+    } catch(err){
+      flash('Backup failed: '+err.message,'err');
+    }
   });
 
   var cpBtn=document.getElementById('cp-save');
