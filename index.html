@@ -550,6 +550,9 @@ var S={
   convertModal:null,
   newContactModal:false,
   linkContactModal:null,
+  qaActionModal:null,
+  qaActionContact:null,
+  qaActionClient:null,
   linkContactSearch:'',
   linkContactSelClient:null,
   linkContactStatus:'All',
@@ -845,6 +848,53 @@ function renderMainContactSelect(lf){
   return html;
 }
 
+
+function rQuickActionModal(){
+  if(!S.qaActionModal||!S.qaActionContact) return '';
+  var kind=S.qaActionModal; // 'note' | 'meeting' | 'opportunity'
+  var client=S.clients.filter(function(c){return c._id===S.qaActionClient;})[0];
+  if(!client) return '';
+  var ct=(client.contacts||[]).filter(function(x){return x.id===S.qaActionContact;})[0];
+  if(!ct) return '';
+  var contactName=((ct.firstName||ct.name||'')+' '+(ct.lastName||'')).trim()||'contact';
+
+  var titles={'note':'Add Note','meeting':'Log Meeting','opportunity':'Log Opportunity'};
+  var icons={'note':'&#128221;','meeting':'&#128197;','opportunity':'&#9889;'};
+
+  var html='<div id="qam-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;">';
+  html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:520px;">';
+  html+='<div style="padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;justify-content:space-between;">';
+  html+='<div><div style="font-size:14px;font-weight:700;color:#0F172A;">'+icons[kind]+' '+titles[kind]+'</div>';
+  html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">For '+e(contactName)+' at '+e(client.companyName)+'</div></div>';
+  html+='<button id="qam-close" style="background:none;border:none;font-size:18px;color:#94A3B8;cursor:pointer;">&#10005;</button></div>';
+  html+='<div style="padding:18px 20px;">';
+
+  if(kind==='meeting'){
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">';
+    html+='<div><div class="field-lbl">Meeting Date</div><input type="date" id="qam-date" value="'+new Date().toISOString().slice(0,10)+'"/></div>';
+    html+='<div><div class="field-lbl">Time</div><input type="time" id="qam-time"/></div>';
+    html+='</div>';
+    html+='<div class="field-lbl">Title / Purpose</div><input id="qam-title" placeholder="e.g. Discovery call, contract review..."/>';
+    html+='<div class="field-lbl" style="margin-top:10px;">Notes</div><textarea id="qam-text" placeholder="Discussion points, next steps..." style="min-height:80px;"></textarea>';
+  } else if(kind==='opportunity'){
+    html+='<div class="field-lbl">Opportunity Title</div><input id="qam-title" placeholder="e.g. Business valuation engagement"/>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">';
+    html+='<div><div class="field-lbl">Service Type</div><select id="qam-svc"><option value="">Select...</option><option>Business Consulting</option><option>Business Brokerage</option><option>Business Funding</option><option>Business Valuation</option></select></div>';
+    html+='<div><div class="field-lbl">Stage</div><select id="qam-stage"><option>Identified</option><option>Discussing</option><option>Qualified</option><option>Proposing</option></select></div>';
+    html+='</div>';
+    html+='<div class="field-lbl" style="margin-top:10px;">Notes</div><textarea id="qam-text" placeholder="Context, fit, next steps..." style="min-height:70px;"></textarea>';
+  } else {
+    html+='<div class="field-lbl">Note</div><textarea id="qam-text" placeholder="What happened? What was discussed?" style="min-height:100px;" autofocus></textarea>';
+  }
+
+  html+='</div>';
+  html+='<div style="padding:12px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px;">';
+  html+='<button id="qam-cancel" class="btn btn-ghost btn-sm">Cancel</button>';
+  html+='<button id="qam-save" class="btn btn-sm">Save</button>';
+  html+='</div>';
+  html+='</div></div>';
+  return html;
+}
 
 function rLinkContactModal(){
   if(!S.linkContactModal) return '';
@@ -3592,6 +3642,7 @@ function rIndividualContacts(){
     html+='</tbody></table></div></div>';
   }
   html+=rLinkContactModal();
+  html+=rQuickActionModal();
   return html;
 }
 
@@ -3671,16 +3722,20 @@ function rContacts(){
     html+='<div class="card card-body-sm">';
     html+='<div style="font-size:11px;font-weight:700;color:#9BA8A2;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">Quick Actions</div>';
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+    var phoneVal=ct.mobile||ct.phone||ct.office||'';
+    var whatsappVal=(ct.whatsapp||phoneVal||'').replace(/[^0-9+]/g,'');
+    var emailVal=ct.email||'';
     var qas=[
-      ['&#128222;','Call',ct.mobile||ct.office||''],
-      ['&#9993;','Email',ct.email||''],
-      ['&#128241;','WhatsApp',ct.whatsapp||''],
-      ['&#128197;','Meeting',''],
-      ['&#128221;','Note',''],
-      ['&#9889;','Opportunity','']
+      ['&#128222;','Call','call',phoneVal,!phoneVal],
+      ['&#9993;','Email','email',emailVal,!emailVal],
+      ['&#128241;','WhatsApp','whatsapp',whatsappVal,!whatsappVal],
+      ['&#128197;','Meeting','meeting','',false],
+      ['&#128221;','Note','note','',false],
+      ['&#9889;','Opportunity','opportunity','',false]
     ];
     qas.forEach(function(qa){
-      html+='<button class="btn btn-ghost btn-sm" style="font-size:11px;justify-content:flex-start;gap:6px;">'+qa[0]+' '+qa[1]+'</button>';
+      var disabled=qa[4];
+      html+='<button class="qa-act-btn btn btn-ghost btn-sm" data-act="'+qa[2]+'" data-val="'+e(qa[3])+'" data-clientid="'+e(client._id)+'" data-cid="'+e(ct.id)+'"'+(disabled?' disabled title="No '+qa[1].toLowerCase()+' on file"':'')+' style="font-size:11px;justify-content:flex-start;gap:6px;'+(disabled?'opacity:.4;cursor:not-allowed;':'')+'">'+qa[0]+' '+qa[1]+'</button>';
     });
     html+='</div></div>';
 
@@ -4204,6 +4259,7 @@ function rClients(){
 
   html+='</div>';
   html+=rLinkContactModal();
+  html+=rQuickActionModal();
   return html;
 }
 
@@ -5897,6 +5953,71 @@ function bRF(){
   });
 
   // View contact
+  // ── Quick Action button bindings ──────────────────────────────────────────
+  document.querySelectorAll('.qa-act-btn').forEach(function(el){
+    if(el.disabled) return;
+    el.addEventListener('click',function(ev){
+      ev.preventDefault();
+      var act=el.dataset.act, val=el.dataset.val, clientId=el.dataset.clientid, cid=el.dataset.cid;
+      if(act==='call'&&val){window.location.href='tel:'+val.replace(/[^0-9+]/g,'');return;}
+      if(act==='email'&&val){window.location.href='mailto:'+val;return;}
+      if(act==='whatsapp'&&val){
+        var num=val.replace(/^\+/,'');
+        window.open('https://wa.me/'+num,'_blank');return;
+      }
+      if(act==='note'||act==='meeting'||act==='opportunity'){
+        S.qaActionModal=act;
+        S.qaActionClient=clientId;
+        S.qaActionContact=cid;
+        render();
+        return;
+      }
+    });
+  });
+
+  function closeQaModal(){S.qaActionModal=null;S.qaActionContact=null;S.qaActionClient=null;render();}
+  var qamClose=document.getElementById('qam-close');
+  if(qamClose) qamClose.addEventListener('click',closeQaModal);
+  var qamCancel=document.getElementById('qam-cancel');
+  if(qamCancel) qamCancel.addEventListener('click',closeQaModal);
+  var qamOverlay=document.getElementById('qam-overlay');
+  if(qamOverlay) qamOverlay.addEventListener('click',function(ev){if(ev.target.id==='qam-overlay') closeQaModal();});
+
+  var qamSave=document.getElementById('qam-save');
+  if(qamSave) qamSave.addEventListener('click',function(){
+    var kind=S.qaActionModal;
+    var text=((document.getElementById('qam-text')||{}).value||'').trim();
+    var title=((document.getElementById('qam-title')||{}).value||'').trim();
+    if(kind==='note'&&!text){flash('Note cannot be empty.','err');return;}
+    if(kind==='meeting'&&!title&&!text){flash('Please enter a meeting title or notes.','err');return;}
+    if(kind==='opportunity'&&!title){flash('Please enter an opportunity title.','err');return;}
+    var date=(document.getElementById('qam-date')||{}).value||'';
+    var time=(document.getElementById('qam-time')||{}).value||'';
+    var svc=(document.getElementById('qam-svc')||{}).value||'';
+    var stage=(document.getElementById('qam-stage')||{}).value||'';
+    var actor=S.currentUser?S.currentUser.name:'Unknown';
+    var ts=new Date().toLocaleString();
+    var entry={
+      id:'ACT'+Date.now(),
+      type:kind==='note'?'Note':kind==='meeting'?'Meeting':'Opportunity',
+      user:actor, ts:ts,
+      title:title, text:text,
+      date:date, time:time, svc:svc, stage:stage
+    };
+    S.clients=S.clients.map(function(c){
+      if(c._id!==S.qaActionClient) return c;
+      var u=Object.assign({},c,{contacts:(c.contacts||[]).map(function(x){
+        if(x.id!==S.qaActionContact) return x;
+        var acts=(x.activities||[]).concat([entry]);
+        var update={activities:acts,lastContactDate:date||new Date().toISOString().slice(0,10)};
+        return Object.assign({},x,update);
+      })});
+      syncClient(u);return u;
+    });
+    closeQaModal();
+    flash(entry.type+' saved.');
+  });
+
   document.querySelectorAll('.ct-view-btn').forEach(function(el){
     el.addEventListener('click',function(){S.contactView=el.dataset.cid;S.contactTab='overview';render();});
   });
