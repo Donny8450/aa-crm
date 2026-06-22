@@ -4893,7 +4893,8 @@ function rGantt(){
       html+='<span style="width:5px;height:5px;border-radius:50%;background:'+priCol+';flex-shrink:0;"></span>';
       html+='<div style="min-width:0;flex:1;">';
       html+='<div style="font-size:11.5px;font-weight:600;color:'+C.text+';line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e(dlv.name||'Untitled')+(rs2!=='Draft'?' <span style="background:'+rsBadgeCol+'15;color:'+rsBadgeCol+';border:1px solid '+rsBadgeCol+'30;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;vertical-align:middle;">'+rs2+'</span>':'')+dlvDeadlineBadge(dlv,true)+'</div>';
-      html+='<div style="font-size:9px;color:'+C.muted+';margin-top:1px;">'+(dur?dur+' &middot; ':'')+(dlv.start||'')+(dlv.end?' \u2192 '+dlv.end:'')+'</div>';
+      var dateWarn=dlv.start&&dlv.end&&dlv.end<dlv.start;
+      html+='<div style="font-size:9px;color:'+(dateWarn?C.red:C.muted)+';margin-top:1px;">'+(dur?dur+' &middot; ':'')+(dlv.start||'')+(dlv.end?' \u2192 '+dlv.end:'')+(dateWarn?' &#9888; date order':'')+'</div>';
       html+='</div></div></td>';
 
       // Owner
@@ -4912,7 +4913,7 @@ function rGantt(){
       html+='<td style="padding:6px 8px;background:inherit;border-right:1px solid '+C.bord+';">';
       html+='<div style="display:flex;align-items:center;gap:6px;">';
       html+='<select class="dlv-pri-sel" data-dealid="'+e(deal._id)+'" data-dlvid="'+e(dlv._id)+'" style="font-size:9.5px;font-weight:600;border-radius:3px;padding:2px 4px;border:1px solid '+priBord+';background:'+priBg+';color:'+priCol+';font-family:Inter,sans-serif;flex-shrink:0;">';
-      ['','High','Medium','Low'].forEach(function(p){html+='<option'+(pri===p?' selected':'')+'>'+(p||'Pri')+'</option>';});
+      ['','High','Medium','Low'].forEach(function(p){var match=pri===p||(p==='High'&&pri==='High Priority');html+='<option'+(match?' selected':'')+'>'+(p||'Pri')+'</option>';});
       html+='</select>';
       html+='<div style="flex:1;height:5px;background:'+C.progEmpty+';border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+barCol+';"></div></div>';
       html+='<span style="font-size:10.5px;font-weight:700;color:'+barCol+';font-variant-numeric:tabular-nums;min-width:30px;text-align:right;">'+pct+'%</span>';
@@ -4923,15 +4924,18 @@ function rGantt(){
         var ds=fmt(day);
         var isWeekend=day.getDay()===0||day.getDay()===6;
         var isToday=day.toDateString()===today.toDateString();
-        var inBar=dlv.start&&dlv.end&&ds>=dlv.start&&ds<=dlv.end;
+        // H8: reversed-date guard — treat end<start as single-day at start
+        var dStart=dlv.start, dEnd=dlv.end;
+        if(dStart&&dEnd&&dEnd<dStart){dEnd=dStart;}
+        var inBar=dStart&&dEnd&&ds>=dStart&&ds<=dEnd;
         var bg=isWeekend?C.weekend:'#fff';
         var cellStyle='background:'+bg+';border-right:1px solid '+C.bordLt+';position:relative;padding:0;height:44px;';
         if(isToday) cellStyle+='box-shadow:inset 1px 0 0 '+C.primary+';';
         html+='<td style="'+cellStyle+'">';
         if(inBar){
-          var isFirst=ds===dlv.start, isLast=ds===dlv.end;
-          var totalSpan=diffDays(dlv.start,dlv.end)||1;
-          var dayPos=diffDays(dlv.start,ds);
+          var isFirst=ds===dStart, isLast=ds===dEnd;
+          var totalSpan=diffDays(dStart,dEnd)||1;
+          var dayPos=diffDays(dStart,ds);
           var progressDays=totalSpan*(pct/100);
           var isFilled=dayPos<progressDays;
           var radius=isFirst&&isLast?'3px':isFirst?'3px 0 0 3px':isLast?'0 3px 3px 0':'0';
@@ -5974,7 +5978,11 @@ function bind(){
       var dlvId=el.dataset.dlvid;
       if(!dlvId) return;
       if(!window._pendingChatFiles[dlvId]) window._pendingChatFiles[dlvId]=[];
+      // H11: total payload cap per message — 4MB across all chat attachments
+      var existingSize=window._pendingChatFiles[dlvId].reduce(function(a,x){return a+(x.size||0);},0);
       Array.from(el.files).forEach(function(f){
+        if(existingSize+f.size>4*1024*1024){flash('Total chat attachments would exceed 4MB. "'+f.name+'" skipped — send what you have first, then attach more.','err');return;}
+        existingSize+=f.size;
         if(f.size>5*1024*1024){flash('"'+f.name+'" exceeds 5MB and was skipped.','err');return;}
         if(f.size>2*1024*1024) flash('"'+f.name+'" is large ('+(f.size/1048576).toFixed(1)+'MB).','warn');
         var reader=new FileReader();
@@ -6061,6 +6069,151 @@ function bind(){
     });
   });
   // Priority dropdown on Gantt
+  // ── B3: Submission file picker (review submission, not chat) ─────────────
+  document.querySelectorAll('.dlv-file-input').forEach(function(el){
+    el.addEventListener('change',function(){
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
+      Array.from(el.files).forEach(function(f){
+        if(f.size>5*1024*1024){flash('"'+f.name+'" is over 5MB. Skipped.','err');return;}
+        if(f.size>2*1024*1024) flash('"'+f.name+'" is large ('+(f.size/1048576).toFixed(1)+'MB).','warn');
+        var reader=new FileReader();
+        reader.onload=function(ev){
+          S.deals=S.deals.map(function(d){
+            if(d._id!==dealId) return d;
+            var dlvs=(d.deliverables||[]).map(function(dlv){
+              if(dlv._id!==dlvId) return dlv;
+              var newFile={name:f.name,size:f.size,type:f.type,data:ev.target.result,uploadedAt:new Date().toISOString(),uploadedBy:S.currentUser?S.currentUser.name:''};
+              return Object.assign({},dlv,{reviewFiles:(dlv.reviewFiles||[]).concat([newFile])});
+            });
+            var u=Object.assign({},d,{deliverables:dlvs});
+            syncDeal(u);return u;
+          });
+          flash('"'+f.name+'" added to submission.');
+          render();
+        };
+        reader.readAsDataURL(f);
+      });
+    });
+  });
+
+  // ── B4: Download a submission file ────────────────────────────────────────
+  document.querySelectorAll('.dlv-dl-file').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, fi=parseInt(el.dataset.fi,10);
+      var deal=S.deals.filter(function(d){return d._id===dealId;})[0];
+      if(!deal) return;
+      var dlv=(deal.deliverables||[]).filter(function(x){return x._id===dlvId;})[0];
+      if(!dlv) return;
+      var f=(dlv.reviewFiles||[])[fi];
+      if(!f||!f.data){flash('File not available.','err');return;}
+      var a=document.createElement('a');
+      a.href=f.data;a.download=f.name||'download';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    });
+  });
+
+  // ── B2: Submit for Review (staff/owner) ───────────────────────────────────
+  document.querySelectorAll('.dlv-submit-review').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
+      var deal=S.deals.filter(function(d){return d._id===dealId;})[0];
+      if(!deal){flash('Deal not found.','err');return;}
+      var dlv=(deal.deliverables||[]).filter(function(x){return x._id===dlvId;})[0];
+      if(!dlv){flash('Deliverable not found.','err');return;}
+      // Validate: require at least one file in the submission
+      if(!(dlv.reviewFiles||[]).length){
+        flash('Add at least one submission file before sending for review.','err');return;
+      }
+      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var ts=new Date().toISOString();
+      S.deals=S.deals.map(function(d){
+        if(d._id!==dealId) return d;
+        var dlvs=(d.deliverables||[]).map(function(x){
+          if(x._id!==dlvId) return x;
+          return Object.assign({},x,{
+            reviewStatus:'Submitted for Review',
+            submittedAt:ts,
+            submittedBy:actor,
+            // Clear any prior reviewer stamps on resubmission
+            reviewedAt:'', reviewedBy:'', revisionReason:''
+          });
+        });
+        var u=Object.assign({},d,{deliverables:dlvs,updatedAt:ts,updatedBy:actor});
+        syncDeal(u);return u;
+      });
+      // Audit
+      var entry={_id:nextAuditId(),dealRef:dealId,dlvId:dlvId,user:actor,field:'Deliverable Submitted',prev:'Draft',next:'Submitted for Review — '+(dlv.name||''),ts:new Date().toLocaleString()};
+      S.dealAuditLog=S.dealAuditLog.concat([entry]);
+      if(typeof syncAudit==='function') syncAudit(entry);
+      flash('Submitted "'+(dlv.name||'deliverable')+'" for review.');
+      render();
+    });
+  });
+
+  // ── B1 + H10: Manager actions (Approve / Request Revision / Under Review) ──
+  document.querySelectorAll('.dlv-manager-action').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      // H10 defense-in-depth: re-check role in handler
+      if(!S.currentUser||(S.currentUser.role!=='manager'&&S.currentUser.role!=='admin')){
+        flash('Only managers and admins can review deliverables.','err');return;
+      }
+      var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, action=el.dataset.action;
+      var deal=S.deals.filter(function(d){return d._id===dealId;})[0];
+      if(!deal){flash('Deal not found.','err');return;}
+      var dlv=(deal.deliverables||[]).filter(function(x){return x._id===dlvId;})[0];
+      if(!dlv){flash('Deliverable not found.','err');return;}
+
+      // Request Revision requires a reason
+      var reason='';
+      if(action==='Revision Needed'){
+        reason=prompt('What revision is needed for "'+(dlv.name||'this deliverable')+'"?','');
+        if(reason===null) return; // cancelled
+        if(!reason.trim()){flash('A revision reason is required.','err');return;}
+      }
+
+      var actor=S.currentUser.name;
+      var ts=new Date().toISOString();
+      var prevStatus=dlv.reviewStatus||'Draft';
+
+      S.deals=S.deals.map(function(d){
+        if(d._id!==dealId) return d;
+        var dlvs=(d.deliverables||[]).map(function(x){
+          if(x._id!==dlvId) return x;
+          var u=Object.assign({},x,{
+            reviewStatus:action,
+            reviewedAt:ts,
+            reviewedBy:actor
+          });
+          if(action==='Approved'){
+            u.approvedDeliverableAt=ts;
+            u.approvedDeliverableBy=actor;
+            u.revisionReason=''; // clear any prior revision note
+          }
+          if(action==='Revision Needed'){
+            u.revisionReason=reason.trim();
+            u.revisionRequestedAt=ts;
+            u.revisionRequestedBy=actor;
+          }
+          return u;
+        });
+        var upd=Object.assign({},d,{deliverables:dlvs,updatedAt:ts,updatedBy:actor});
+        syncDeal(upd);return upd;
+      });
+
+      // Audit
+      var entry={_id:nextAuditId(),dealRef:dealId,dlvId:dlvId,user:actor,field:'Deliverable Review',prev:prevStatus,next:action+(reason?' — '+reason.trim():''),ts:new Date().toLocaleString()};
+      S.dealAuditLog=S.dealAuditLog.concat([entry]);
+      if(typeof syncAudit==='function') syncAudit(entry);
+
+      var msg=action==='Approved'?'Deliverable approved.':action==='Revision Needed'?'Revision requested.':'Marked under review.';
+      flash(msg);
+      render();
+    });
+  });
+
   document.querySelectorAll('.dlv-pri-sel').forEach(function(el){
     el.addEventListener('change',function(){
       var dealId=el.dataset.dealid,dlvId=el.dataset.dlvid,val=el.value;
