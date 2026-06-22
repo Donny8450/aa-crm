@@ -2027,8 +2027,8 @@ function rLeadForm(){
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
           '</div>'+
           '<div><div class="field-lbl">Source <span style="font-weight:400;font-size:10px;color:#5A7A65">(who made contact with this lead?)</span></div><input name="source" value="'+e(lf.source)+'" placeholder="e.g. John via LinkedIn, referred by Ama..."/></div>'+
-          '<div><div class="field-lbl">Status Priority</div><div style="display:flex;gap:8px;margin-top:4px">'+
-            [['High Priority','#dc2626','#fef2f2','#fecaca'],['Medium','#C8972A','#FDF8EE','#F5E6C3'],['Low','#2D6A4F','#E8F5EE','#C8E6D4']].map(function(p){var on=lf.priority===p[0];return '<button type="button" class="prbtn" data-v="'+e(p[0])+'" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+(on?p[2]:' #C8E6D4')+';background:'+(on?p[2]:'#f8fafc')+';color:'+(on?p[1]:'#5A7A65')+';font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .2s">'+e(p[0])+'</button>';}).join('')+
+          '<div><div class="field-lbl">Priority</div><div role="radiogroup" aria-label="Priority" style="display:inline-flex;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;background:#fff;margin-top:4px;">'+
+            [['High Priority','#991B1B','#FEF2F2','High'],['Medium','#C8972A','#FDF8EE','Medium'],['Low','#475569','#F1F5F9','Low']].map(function(p,idx){var on=lf.priority===p[0];var sep=idx>0?'border-left:1px solid #E2E8F0;':'';return '<button type="button" role="radio" aria-checked="'+on+'" class="prbtn" data-v="'+e(p[0])+'" tabindex="'+(on?'0':'-1')+'" style="display:inline-flex;align-items:center;gap:5px;padding:0 11px;height:28px;border:none;'+sep+'background:'+(on?p[2]:'#fff')+';color:'+(on?p[1]:'#0F172A')+';font-size:12px;font-weight:'+(on?'600':'500')+';font-family:Inter,sans-serif;cursor:pointer;transition:background .12s,color .12s;outline:none;" onmouseover="if(!this.matches([aria-checked=true]))this.style.background=\'#F8FAFC\'" onmouseout="if(this.getAttribute(\'aria-checked\')!==\'true\')this.style.background=\'#fff\'"><span style="width:6px;height:6px;border-radius:50%;background:'+p[1]+';flex-shrink:0;"></span><span>'+e(p[3])+'</span>'+(on?'<span style="margin-left:2px;font-size:11px;color:'+p[1]+';">&#10003;</span>':'')+'</button>';}).join('')+
           '</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Expected Start Date</div><input type="date" name="startDate" value="'+e(lf.startDate)+'"/></div>'+
@@ -2112,8 +2112,8 @@ function rLL(){
             '<div><div class="field-lbl">Email</div><input name="email" value="'+e(lf.email)+'" placeholder="name@co.com"/></div>'+
           '</div>'+
           '<div><div class="field-lbl">Source <span style="font-weight:400;font-size:10px;color:#5A7A65">(who made contact with this lead?)</span></div><input name="source" value="'+e(lf.source)+'" placeholder="e.g. John via LinkedIn, referred by Ama..."/></div>'+
-          '<div><div class="field-lbl">Status Priority</div><div style="display:flex;gap:8px;margin-top:4px">'+
-            [['High Priority','#dc2626','#fef2f2','#fecaca'],['Medium','#C8972A','#FDF8EE','#F5E6C3'],['Low','#2D6A4F','#E8F5EE','#C8E6D4']].map(function(p){var on=lf.priority===p[0];return '<button type="button" class="prbtn" data-v="'+e(p[0])+'" style="flex:1;padding:10px 6px;border-radius:10px;border:2px solid '+(on?p[2]:' #C8E6D4')+';background:'+(on?p[2]:'#f8fafc')+';color:'+(on?p[1]:'#5A7A65')+';font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .2s">'+e(p[0])+'</button>';}).join('')+
+          '<div><div class="field-lbl">Priority</div><div role="radiogroup" aria-label="Priority" style="display:inline-flex;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;background:#fff;margin-top:4px;">'+
+            [['High Priority','#991B1B','#FEF2F2','High'],['Medium','#C8972A','#FDF8EE','Medium'],['Low','#475569','#F1F5F9','Low']].map(function(p,idx){var on=lf.priority===p[0];var sep=idx>0?'border-left:1px solid #E2E8F0;':'';return '<button type="button" role="radio" aria-checked="'+on+'" class="prbtn" data-v="'+e(p[0])+'" tabindex="'+(on?'0':'-1')+'" style="display:inline-flex;align-items:center;gap:5px;padding:0 11px;height:28px;border:none;'+sep+'background:'+(on?p[2]:'#fff')+';color:'+(on?p[1]:'#0F172A')+';font-size:12px;font-weight:'+(on?'600':'500')+';font-family:Inter,sans-serif;cursor:pointer;transition:background .12s,color .12s;outline:none;" onmouseover="if(!this.matches([aria-checked=true]))this.style.background=\'#F8FAFC\'" onmouseout="if(this.getAttribute(\'aria-checked\')!==\'true\')this.style.background=\'#fff\'"><span style="width:6px;height:6px;border-radius:50%;background:'+p[1]+';flex-shrink:0;"></span><span>'+e(p[3])+'</span>'+(on?'<span style="margin-left:2px;font-size:11px;color:'+p[1]+';">&#10003;</span>':'')+'</button>';}).join('')+
           '</div></div>'+
           '<div class="grid2">'+
             '<div><div class="field-lbl">Expected Start Date</div><input type="date" name="startDate" value="'+e(lf.startDate)+'"/></div>'+
@@ -4760,7 +4760,24 @@ function bind(){
   // lead form
   document.querySelectorAll('.lbtn').forEach(function(el){el.addEventListener('click',function(){S.lform=Object.assign({},gLF(),{label:el.dataset.lbl});render();});});
   // Priority buttons
-  document.querySelectorAll('.prbtn').forEach(function(el){el.addEventListener('click',function(){S.lform=Object.assign({},gLF(),{priority:el.dataset.v});render();});});
+  // Priority segmented control — click + keyboard arrows for accessibility
+  var prBtns=document.querySelectorAll('.prbtn');
+  prBtns.forEach(function(el,idx){
+    el.addEventListener('click',function(){S.lform=Object.assign({},gLF(),{priority:el.dataset.v});render();});
+    el.addEventListener('keydown',function(ev){
+      var list=Array.from(document.querySelectorAll('.prbtn'));
+      var i=list.indexOf(el);
+      if(ev.key==='ArrowRight'||ev.key==='ArrowDown'){
+        ev.preventDefault();
+        var nxt=list[(i+1)%list.length];if(nxt){nxt.focus();nxt.click();}
+      } else if(ev.key==='ArrowLeft'||ev.key==='ArrowUp'){
+        ev.preventDefault();
+        var prev=list[(i-1+list.length)%list.length];if(prev){prev.focus();prev.click();}
+      } else if(ev.key===' '||ev.key==='Enter'){
+        ev.preventDefault();el.click();
+      }
+    });
+  });
   // Percentage slider - live update label without full re-render
   var pslider=document.getElementById('pct-slider');
   if(pslider){
