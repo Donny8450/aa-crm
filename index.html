@@ -576,6 +576,14 @@ var S={
   newContactModal:false,
   linkContactModal:null,
   qaActionModal:null,
+  usersTab:'profile',
+  usersSearch:'',
+  usersFilterRole:'All',
+  usersFilterStatus:'All',
+  usersActionMenu:null,
+  showChangePassword:false,
+  nuSendInvite:false,
+  nuDept:'',
   qaActionContact:null,
   qaActionClient:null,
   linkContactSearch:'',
@@ -3469,89 +3477,331 @@ function rUsers(){
   var u=S.currentUser||{};
   var html='<div>';
 
-  // Header
-  html+='<div style="background:linear-gradient(135deg,#1A4731,#2D6A4F);border-radius:16px;padding:28px 32px;margin-bottom:24px">';
-  html+='<div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#F5E6C3;margin-bottom:8px">SETTINGS</div>';
-  html+='<div style="font-size:24px;font-weight:900;color:#fff;margin-bottom:4px">Users & Settings</div>';
-  html+='<div style="font-size:13px;color:rgba(255,255,255,.6)">Manage team access and your account</div>';
+  // Compact page header
+  html+='<div class="page-header"><div class="page-header-left">';
+  html+='<h1>Users and Settings</h1>';
+  html+='<p>Manage your profile, security, team access, and user permissions.</p>';
   html+='</div>';
-
-  // My Account
-  html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
-  html+='<div style="background:#1A4731;padding:14px 18px"><div style="color:#fff;font-size:14px;font-weight:800">&#128100; My Account</div></div>';
-  html+='<div style="padding:20px 24px">';
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">NAME</div><div style="font-size:15px;font-weight:700;color:#1A4731">'+e(u.name||'')+'</div></div>';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">EMAIL</div><div style="font-size:15px;color:#1A4731">'+e(u.email||'')+'</div></div>';
-  html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;letter-spacing:.7px;margin-bottom:4px">ROLE</div><span style="background:'+(u.role==='admin'?'#faf5ff':u.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(u.role==='admin'?'#7c3aed':u.role==='manager'?'#C8972A':'#2D6A4F')+';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700">'+((u.role||'staff').charAt(0).toUpperCase()+(u.role||'staff').slice(1))+'</span></div>';
-  html+='</div>';
-  // Change password
-  html+='<div style="border-top:1px solid #E8F5EE;padding-top:16px">';
-  html+='<div style="font-size:13px;font-weight:700;color:#1A4731;margin-bottom:12px">Change Password</div>';
-  if(S.changePassSuccess) html+='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-size:13px;color:#16a34a;font-weight:600;margin-bottom:12px">'+e(S.changePassSuccess)+'</div>';
-  if(S.changePassError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;font-size:13px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.changePassError)+'</div>';
-  html+='<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
-  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CURRENT PASSWORD</div><input id="cp-cur" type="password" placeholder="Current password" style="width:100%;box-sizing:border-box"/></div>';
-  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">NEW PASSWORD</div><input id="cp-new" type="password" placeholder="New password (min 6 chars)" style="width:100%;box-sizing:border-box"/></div>';
-  html+='<div style="flex:1;min-width:150px"><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:5px">CONFIRM NEW PASSWORD</div><input id="cp-confirm" type="password" placeholder="Confirm new password" style="width:100%;box-sizing:border-box"/></div>';
-  html+='<button id="cp-btn" style="padding:10px 20px;background:#1A4731;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">Update Password</button>';
-  html+='</div></div></div></div>';
-
-  // Sign out
-  html+='<div style="margin-bottom:20px;text-align:right">';
-  html+='<button id="logout-btn" style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">&#128682; Sign Out</button>';
-  html+='</div>';
-
-  // Admin: User Management
+  html+='<div class="page-header-actions">';
   if(isAdmin){
-    html+='<div style="background:#fff;border:1px solid #C8E6D4;border-radius:14px;overflow:hidden;margin-bottom:20px">';
-    html+='<div style="background:#1A4731;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">';
-    html+='<div style="color:#fff;font-size:14px;font-weight:800">&#128101; Team Members ('+S.users.length+')</div>';
-    html+='<button id="add-user-btn" style="background:#F5E6C3;color:#1A4731;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">+ Add User</button>';
+    html+='<button id="users-export-btn" class="btn btn-ghost btn-sm">&#8659; Export Users</button>';
+    html+='<button id="add-user-btn" class="btn btn-sm">+ Add User</button>';
+  }
+  html+='</div></div>';
+
+  // Tab nav
+  var tab=S.usersTab||'profile';
+  var tabs=[
+    ['profile','My Profile'],
+    ['security','Security'],
+    ['team','Team Members'],
+    ['roles','Roles & Permissions'],
+    ['activity','Activity Log']
+  ];
+  html+='<div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:16px;gap:0;">';
+  tabs.forEach(function(t){
+    var on=tab===t[0];
+    html+='<button class="users-tab-btn" data-utab="'+e(t[0])+'" style="padding:8px 16px;font-size:13px;font-weight:'+(on?'600':'500')+';color:'+(on?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(on?'#275F45':'transparent')+';margin-bottom:-1px;font-family:Inter,sans-serif;">'+e(t[1])+'</button>';
+  });
+  html+='</div>';
+
+  // ════════ MY PROFILE ════════
+  if(tab==='profile'){
+    var initials=((u.name||'?').split(' ').map(function(p){return p.charAt(0);}).join('').slice(0,2)||'?').toUpperCase();
+    var roleBadge={admin:['#7c3aed','#F3E8FF'],manager:['#C8972A','#FDF8EE'],staff:['#275F45','#EAF3EE']}[u.role||'staff']||['#5F6B65','#F1F5F9'];
+    html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;">';
+    html+='<div style="display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:start;">';
+    // Avatar
+    html+='<div style="width:64px;height:64px;border-radius:50%;background:#EAF3EE;border:1px solid #C8E6D4;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#275F45;">'+e(initials)+'</div>';
+    // Info grid
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;">';
+    var rows=[
+      ['Full Name', e(u.name||'\u2014')],
+      ['Email Address', e(u.email||'\u2014')],
+      ['Role','<span style="background:'+roleBadge[1]+';color:'+roleBadge[0]+';border:1px solid '+roleBadge[0]+'30;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">'+((u.role||'staff').charAt(0).toUpperCase()+(u.role||'staff').slice(1))+'</span>'],
+      ['Account Status','<span style="background:#ECFDF5;color:#16a34a;border:1px solid #A7F3D0;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">Active</span>'],
+      ['Last Login', u.lastLogin?relTime(u.lastLogin):'<span style="color:#94A3B8;">This session</span>'],
+      ['Account Created', u.created_at?relTime(u.created_at):'<span style="color:#94A3B8;">\u2014</span>']
+    ];
+    rows.forEach(function(r){
+      html+='<div><div style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;">'+r[0]+'</div><div style="font-size:13px;color:#0F172A;">'+r[1]+'</div></div>';
+    });
     html+='</div>';
-    if(S.showAddUser){
-      html+='<div style="padding:20px 24px;background:#fafdfb;border-bottom:1px solid #C8E6D4">';
-      html+='<div style="font-size:13px;font-weight:800;color:#1A4731;margin-bottom:14px">New User</div>';
-      if(S.addUserError) html+='<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:12px;color:#dc2626;font-weight:600;margin-bottom:12px">'+e(S.addUserError)+'</div>';
-      html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">FULL NAME *</div><input id="nu-name" placeholder="e.g. John Mensah" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">EMAIL *</div><input id="nu-email" type="email" placeholder="john@africanaspirations.com" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">TEMPORARY PASSWORD *</div><input id="nu-pass" type="password" placeholder="Min 6 characters" style="width:100%;box-sizing:border-box"/></div>';
-      html+='<div><div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">ROLE *</div><select id="nu-role" style="width:100%;padding:10px;border:1px solid #C8E6D4;border-radius:8px;font-family:inherit"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
+    // Actions
+    html+='<div style="display:flex;flex-direction:column;gap:6px;">';
+    html+='<button class="btn btn-ghost btn-sm" disabled title="Coming soon" style="opacity:.5;cursor:not-allowed;">Edit Profile</button>';
+    html+='<button class="btn btn-ghost btn-sm" disabled title="Coming soon" style="opacity:.5;cursor:not-allowed;">Change Email</button>';
+    html+='</div>';
+    html+='</div></div>';
+  }
+
+  // ════════ SECURITY ════════
+  else if(tab==='security'){
+    html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;max-width:560px;">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#0F172A;">Password</div>';
+    html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">'+(u.passwordChangedAt?'Last changed '+relTime(u.passwordChangedAt):'Set during account creation')+'</div></div>';
+    if(!S.showChangePassword){
+      html+='<button id="show-change-pass" class="btn btn-sm">Change Password</button>';
+    }
+    html+='</div>';
+
+    if(S.showChangePassword){
+      html+='<div style="background:#FAFAFA;border:1px solid #E2E8F0;border-radius:4px;padding:16px;margin-top:8px;">';
+      html+='<div style="margin-bottom:10px;"><div class="field-lbl">Current Password</div><input type="password" id="cp-current" placeholder="Enter your current password" autocomplete="current-password"/></div>';
+      html+='<div style="margin-bottom:10px;"><div class="field-lbl">New Password</div><input type="password" id="cp-new" placeholder="At least 6 characters" autocomplete="new-password"/></div>';
+      html+='<div style="margin-bottom:10px;"><div class="field-lbl">Confirm New Password</div><input type="password" id="cp-confirm" placeholder="Re-type new password" autocomplete="new-password"/></div>';
+      html+='<div style="font-size:11px;color:#64748B;margin-bottom:12px;line-height:1.5;"><strong style="color:#0F172A;">Requirements:</strong> Minimum 6 characters. Use a mix of letters, numbers, and symbols for stronger security.</div>';
+      if(S.changePassError) html+='<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:8px 10px;font-size:11.5px;color:#991B1B;margin-bottom:10px;">'+e(S.changePassError)+'</div>';
+      if(S.changePassSuccess) html+='<div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:4px;padding:8px 10px;font-size:11.5px;color:#16a34a;margin-bottom:10px;">'+e(S.changePassSuccess)+'</div>';
+      html+='<div style="display:flex;gap:6px;justify-content:flex-end;">';
+      html+='<button id="cp-cancel" class="btn btn-ghost btn-sm">Cancel</button>';
+      html+='<button id="cp-save" class="btn btn-sm">Update Password</button>';
       html+='</div>';
-      html+='<div style="display:flex;gap:10px">';
-      html+='<button id="nu-save" style="background:#1A4731;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Create User</button>';
-      html+='<button id="nu-cancel" style="background:#E8F5EE;color:#5A7A65;border:1px solid #C8E6D4;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">Cancel</button>';
-      html+='</div></div>';
+      html+='</div>';
     }
-    if(S.users.length===0){
-      html+='<div style="padding:32px;text-align:center;color:#5A7A65;font-size:13px">No users yet. Add your first team member above.</div>';
-    } else {
-      html+='<div style="overflow-x:auto"><table>';
-      html+='<thead><tr><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>';
-      S.users.forEach(function(usr,i){
-        var isSelf=usr.id===S.currentUser.id;
-        html+='<tr style="background:'+(i%2===0?'#fff':'#fafdfb')+'">';
-        html+='<td style="font-weight:600;color:#1A4731">'+e(usr.name)+(isSelf?'<span style="margin-left:6px;background:#E8F5EE;color:#2D6A4F;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">You</span>':'')+'</td>';
-        html+='<td style="color:#5A7A65">'+e(usr.email)+'</td>';
-        html+='<td><select class="role-sel" data-uid="'+e(usr.id)+'" '+(isSelf?'disabled':'')+' style="padding:5px 8px;border:1px solid #C8E6D4;border-radius:6px;font-family:inherit;font-size:12px;font-weight:600;background:'+(usr.role==='admin'?'#faf5ff':usr.role==='manager'?'#FDF8EE':'#E8F5EE')+';color:'+(usr.role==='admin'?'#7c3aed':usr.role==='manager'?'#C8972A':'#2D6A4F')+'"><option value="staff"'+(usr.role==='staff'?' selected':'')+'>Staff</option><option value="manager"'+(usr.role==='manager'?' selected':'')+'>Manager</option><option value="admin"'+(usr.role==='admin'?' selected':'')+'>Admin</option></select></td>';
-        html+='<td><span style="background:'+(usr.active?'#f0fdf4':'#fef2f2')+';color:'+(usr.active?'#16a34a':'#dc2626')+';border:1px solid '+(usr.active?'#86efac':'#fecaca')+';border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700">'+(usr.active?'Active':'Inactive')+'</span></td>';
-        html+='<td><div style="display:flex;gap:6px">';
-        if(!isSelf){
-          html+='<button class="toggle-user-btn" data-uid="'+e(usr.id)+'" data-active="'+(usr.active?'1':'0')+'" style="background:'+(usr.active?'#fff7ed':'#E8F5EE')+';color:'+(usr.active?'#c2410c':'#2D6A4F')+';border:1px solid '+(usr.active?'#fed7aa':'#C8E6D4')+';border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">'+(usr.active?'Deactivate':'Activate')+'</button>';
-          html+='<button class="reset-pass-btn" data-uid="'+e(usr.id)+'" data-name="'+e(usr.name)+'" style="background:#E8F5EE;color:#2D6A4F;border:1px solid #C8E6D4;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Reset Pass</button>';
-          html+='<button class="del-user-btn" data-uid="'+e(usr.id)+'" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">Delete</button>';
-        }
-        html+='</div></td></tr>';
-      });
-      html+='</tbody></table></div>';
-    }
+    html+='</div>';
+
+    // Sign out card
+    html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:16px 24px;max-width:560px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">';
+    html+='<div><div style="font-size:13px;font-weight:600;color:#0F172A;">Active Session</div>';
+    html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">Sign out of this device and return to the login screen.</div></div>';
+    html+='<button id="signout-btn" class="btn btn-ghost btn-sm" style="color:#991B1B;border:1px solid #FECACA;">Sign Out</button>';
     html+='</div>';
   }
+
+  // ════════ TEAM MEMBERS ════════
+  else if(tab==='team'){
+    if(!isAdmin){
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:36px;text-align:center;">';
+      html+='<div style="font-size:13px;font-weight:600;color:#0F172A;margin-bottom:4px;">Admin access required</div>';
+      html+='<div style="font-size:11px;color:#64748B;">Only administrators can manage team members.</div>';
+      html+='</div>';
+    } else {
+      // Filter bar
+      var allUsers=S.users||[];
+      var q=(S.usersSearch||'').toLowerCase().trim();
+      var filtered=allUsers.filter(function(usr){
+        if(q&&((usr.name||'').toLowerCase().indexOf(q)<0&&(usr.email||'').toLowerCase().indexOf(q)<0)) return false;
+        if(S.usersFilterRole!=='All'&&(usr.role||'staff')!==S.usersFilterRole.toLowerCase()) return false;
+        var st=usr.status||(usr.active===false?'Deactivated':usr.invited?'Invited':'Active');
+        if(S.usersFilterStatus!=='All'&&st!==S.usersFilterStatus) return false;
+        return true;
+      });
+
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+      html+='<div style="position:relative;flex:1;min-width:200px;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:12px;">&#128269;</span>';
+      html+='<input id="users-search" value="'+e(S.usersSearch||'')+'" placeholder="Search users by name or email..." style="padding:6px 10px 6px 30px;font-size:12px;border:1px solid #E2E8F0;border-radius:4px;width:100%;font-family:Inter,sans-serif;outline:none;"/></div>';
+      html+='<select id="users-filter-role" style="font-size:11px;padding:5px 8px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;height:28px;background:#fff;">';
+      ['All','Admin','Manager','Staff'].forEach(function(r){html+='<option'+(S.usersFilterRole===r?' selected':'')+'>'+r+'</option>';});
+      html+='</select>';
+      html+='<select id="users-filter-status" style="font-size:11px;padding:5px 8px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;height:28px;background:#fff;">';
+      ['All','Active','Invited','Deactivated'].forEach(function(s){html+='<option'+(S.usersFilterStatus===s?' selected':'')+'>'+s+'</option>';});
+      html+='</select>';
+      html+='<span style="font-size:11px;color:#64748B;">'+filtered.length+' of '+allUsers.length+'</span>';
+      html+='</div>';
+
+      // Table
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">';
+      html+='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+      html+='<thead><tr style="background:#FAFAFA;border-bottom:1px solid #E2E8F0;">';
+      ['User','Email','Role','Status','Last Active','Date Added',''].forEach(function(h){
+        html+='<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;">'+h+'</th>';
+      });
+      html+='</tr></thead><tbody>';
+
+      if(!filtered.length){
+        html+='<tr><td colspan="7" style="padding:32px;text-align:center;color:#94A3B8;font-size:12px;">No users match the current filters.</td></tr>';
+      } else {
+        filtered.forEach(function(usr){
+          var isMe=S.currentUser&&S.currentUser.id===usr.id;
+          var status=usr.status||(usr.active===false?'Deactivated':usr.invited?'Invited':'Active');
+          var stColors={'Active':['#16a34a','#ECFDF5','#A7F3D0'],'Invited':['#2563eb','#EFF6FF','#BFDBFE'],'Deactivated':['#94A3B8','#F1F5F9','#E2E8F0'],'Suspended':['#D97706','#FFFBEB','#FDE68A']}[status]||['#94A3B8','#F1F5F9','#E2E8F0'];
+          var roleC={admin:['#7c3aed','#F3E8FF'],manager:['#C8972A','#FDF8EE'],staff:['#275F45','#EAF3EE']}[usr.role||'staff']||['#5F6B65','#F1F5F9'];
+          var init=((usr.name||'?').split(' ').map(function(p){return p.charAt(0);}).join('').slice(0,2)||'?').toUpperCase();
+          html+='<tr style="border-bottom:1px solid #F1F5F9;transition:background .12s;" onmouseover="this.style.background=\'#FAFAFA\'" onmouseout="this.style.background=\'#fff\'">';
+          // User
+          html+='<td style="padding:10px 14px;">';
+          html+='<div style="display:flex;align-items:center;gap:8px;">';
+          html+='<div style="width:28px;height:28px;border-radius:50%;background:#EAF3EE;border:1px solid #C8E6D4;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#275F45;flex-shrink:0;">'+e(init)+'</div>';
+          html+='<div><div style="font-size:12.5px;font-weight:600;color:#0F172A;">'+e(usr.name||'Unnamed')+(isMe?' <span style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;border-radius:3px;padding:1px 5px;font-size:8.5px;font-weight:700;margin-left:4px;">You</span>':'')+'</div></div>';
+          html+='</div></td>';
+          // Email
+          html+='<td style="padding:10px 14px;font-size:12px;color:#64748B;">'+e(usr.email||'\u2014')+'</td>';
+          // Role
+          html+='<td style="padding:10px 14px;"><span style="background:'+roleC[1]+';color:'+roleC[0]+';border:1px solid '+roleC[0]+'30;border-radius:3px;padding:2px 8px;font-size:10.5px;font-weight:700;">'+((usr.role||'staff').charAt(0).toUpperCase()+(usr.role||'staff').slice(1))+'</span></td>';
+          // Status
+          html+='<td style="padding:10px 14px;"><span style="background:'+stColors[1]+';color:'+stColors[0]+';border:1px solid '+stColors[2]+';border-radius:3px;padding:2px 8px;font-size:10.5px;font-weight:700;">'+status+'</span></td>';
+          // Last Active
+          html+='<td style="padding:10px 14px;font-size:11px;color:#64748B;">'+(usr.lastLogin?relTime(usr.lastLogin):'\u2014')+'</td>';
+          // Date Added
+          html+='<td style="padding:10px 14px;font-size:11px;color:#64748B;">'+(usr.created_at?relTime(usr.created_at):'\u2014')+'</td>';
+          // Actions menu
+          html+='<td style="padding:10px 14px;text-align:right;position:relative;">';
+          html+='<button class="users-menu-btn" data-uid="'+e(usr.id)+'" style="background:none;border:1px solid transparent;border-radius:4px;padding:2px 8px;font-size:14px;cursor:pointer;color:#64748B;">&#8942;</button>';
+          if(S.usersActionMenu===usr.id){
+            html+='<div class="users-action-menu" style="position:absolute;right:14px;top:36px;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.1);min-width:180px;z-index:50;padding:4px 0;text-align:left;">';
+            // Role change inline (hidden as a sub-menu using existing role-sel class to preserve handler)
+            html+='<div style="padding:6px 12px;border-bottom:1px solid #F1F5F9;">';
+            html+='<div style="font-size:9.5px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Change Role</div>';
+            html+='<select class="role-sel" data-uid="'+e(usr.id)+'" style="width:100%;font-size:11.5px;padding:4px 8px;border:1px solid #E2E8F0;border-radius:3px;font-family:Inter,sans-serif;background:#fff;">';
+            ['admin','manager','staff'].forEach(function(r){html+='<option value="'+r+'"'+(usr.role===r?' selected':'')+'>'+r.charAt(0).toUpperCase()+r.slice(1)+'</option>';});
+            html+='</select></div>';
+            // Reset password
+            html+='<button class="reset-pass-btn um-item" data-uid="'+e(usr.id)+'" data-name="'+e(usr.name||'')+'" style="width:100%;text-align:left;background:none;border:none;padding:7px 12px;font-size:12px;cursor:pointer;color:#0F172A;font-family:Inter,sans-serif;">Reset Password</button>';
+            // Activate/Deactivate
+            if(usr.active===false){
+              html+='<button class="toggle-user-btn um-item" data-uid="'+e(usr.id)+'" data-active="0" style="width:100%;text-align:left;background:none;border:none;padding:7px 12px;font-size:12px;cursor:pointer;color:#16a34a;font-family:Inter,sans-serif;">Reactivate User</button>';
+            } else if(!isMe){
+              html+='<button class="toggle-user-btn um-item" data-uid="'+e(usr.id)+'" data-active="1" style="width:100%;text-align:left;background:none;border:none;padding:7px 12px;font-size:12px;cursor:pointer;color:#D97706;font-family:Inter,sans-serif;">Deactivate User</button>';
+            }
+            // Delete
+            if(!isMe){
+              html+='<div style="border-top:1px solid #F1F5F9;margin-top:4px;padding-top:4px;">';
+              html+='<button class="del-user-btn um-item" data-uid="'+e(usr.id)+'" style="width:100%;text-align:left;background:none;border:none;padding:7px 12px;font-size:12px;cursor:pointer;color:#991B1B;font-family:Inter,sans-serif;">Remove User</button>';
+              html+='</div>';
+            }
+            html+='</div>';
+          }
+          html+='</td>';
+          html+='</tr>';
+        });
+      }
+      html+='</tbody></table></div></div>';
+    }
+  }
+
+  // ════════ ROLES & PERMISSIONS ════════
+  else if(tab==='roles'){
+    var roleDefs=[
+      ['admin','Admin','Full access to users, settings, leads, deals, reports, and all administrative actions.','#7c3aed','#F3E8FF',
+        {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':true,'Deal Pipeline':true,'Deliverables':true,'Reports':true,'User Management':true,'Settings':true}],
+      ['manager','Manager','Can review, approve, assign, and manage operational records across the team.','#C8972A','#FDF8EE',
+        {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':true,'Deal Pipeline':true,'Deliverables':true,'Reports':true,'User Management':false,'Settings':false}],
+      ['staff','Staff','Can create and update records assigned to them. Limited to their own work.','#275F45','#EAF3EE',
+        {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':false,'Deal Pipeline':true,'Deliverables':true,'Reports':false,'User Management':false,'Settings':false}]
+    ];
+
+    html+='<div style="font-size:11px;color:#64748B;margin-bottom:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:4px;padding:8px 12px;">&#9432; Role permissions are managed at the system level. Contact your administrator to request changes.</div>';
+
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:16px;">';
+    roleDefs.forEach(function(rd){
+      var userCount=(S.users||[]).filter(function(usr){return (usr.role||'staff')===rd[0];}).length;
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:14px 16px;">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">';
+      html+='<span style="background:'+rd[4]+';color:'+rd[3]+';border:1px solid '+rd[3]+'30;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">'+rd[1]+'</span>';
+      html+='<span style="font-size:11px;color:#64748B;">'+userCount+' user'+(userCount!==1?'s':'')+'</span>';
+      html+='</div>';
+      html+='<div style="font-size:11.5px;color:#475569;line-height:1.5;margin-bottom:10px;">'+rd[2]+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+
+    // Permission matrix
+    html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">';
+    html+='<div style="padding:12px 16px;border-bottom:1px solid #E2E8F0;font-size:12px;font-weight:700;color:#0F172A;">Permission Matrix</div>';
+    html+='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+    html+='<thead><tr style="background:#FAFAFA;border-bottom:1px solid #E2E8F0;">';
+    html+='<th style="text-align:left;padding:8px 14px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;">Feature</th>';
+    roleDefs.forEach(function(rd){html+='<th style="text-align:center;padding:8px 14px;font-size:10px;font-weight:700;color:'+rd[3]+';text-transform:uppercase;letter-spacing:.5px;">'+rd[1]+'</th>';});
+    html+='</tr></thead><tbody>';
+    var permGroups=['Dashboard','Client Accounts','Contacts','Leads','Lead Approval','Deal Pipeline','Deliverables','Reports','User Management','Settings'];
+    permGroups.forEach(function(pg){
+      html+='<tr style="border-bottom:1px solid #F1F5F9;">';
+      html+='<td style="padding:8px 14px;font-size:12px;color:#0F172A;">'+e(pg)+'</td>';
+      roleDefs.forEach(function(rd){
+        var allowed=rd[5][pg];
+        html+='<td style="padding:8px 14px;text-align:center;font-size:13px;color:'+(allowed?'#16a34a':'#CBD5E1')+';">'+(allowed?'&#10003;':'&mdash;')+'</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table></div></div>';
+  }
+
+  // ════════ ACTIVITY LOG ════════
+  else if(tab==='activity'){
+    // Build activity log from audit log + user-management events
+    var activity=[];
+    (S.users||[]).forEach(function(usr){
+      if(usr.created_at) activity.push({type:'User Created',by:'System',date:usr.created_at,affected:usr.name||usr.email,details:'New '+(usr.role||'staff')+' account created'});
+    });
+    // Include audit events that look like user/security events
+    (S.auditLog||[]).forEach(function(a){
+      var f=(a.field||'').toLowerCase();
+      if(f.indexOf('role')>=0||f.indexOf('password')>=0||f.indexOf('user')>=0||f.indexOf('settings')>=0){
+        activity.push({type:a.field,by:a.user||'\u2014',date:a.ts,affected:a.leadId||'\u2014',details:(a.prev||'')+' \u2192 '+(a.next||'')});
+      }
+    });
+    activity.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+
+    html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">';
+    html+='<div style="padding:12px 16px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">';
+    html+='<div><div style="font-size:13px;font-weight:700;color:#0F172A;">Recent Activity</div>';
+    html+='<div style="font-size:11px;color:#64748B;margin-top:1px;">User account and security events</div></div>';
+    html+='<span style="font-size:11px;color:#64748B;">'+activity.length+' event'+(activity.length!==1?'s':'')+'</span>';
+    html+='</div>';
+    html+='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+    html+='<thead><tr style="background:#FAFAFA;border-bottom:1px solid #E2E8F0;">';
+    ['Activity','Performed By','Date and Time','Affected User','Details'].forEach(function(h){
+      html+='<th style="text-align:left;padding:9px 14px;font-size:10px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.5px;">'+h+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    if(!activity.length){
+      html+='<tr><td colspan="5" style="padding:36px;text-align:center;color:#94A3B8;font-size:12px;">No user activity events recorded yet.</td></tr>';
+    } else {
+      activity.slice(0,50).forEach(function(a){
+        html+='<tr style="border-bottom:1px solid #F1F5F9;">';
+        html+='<td style="padding:9px 14px;font-size:12px;font-weight:600;color:#0F172A;">'+e(a.type)+'</td>';
+        html+='<td style="padding:9px 14px;font-size:12px;color:#64748B;">'+e(a.by)+'</td>';
+        html+='<td style="padding:9px 14px;font-size:11px;color:#64748B;white-space:nowrap;">'+e(a.date?relTime(a.date):'\u2014')+'</td>';
+        html+='<td style="padding:9px 14px;font-size:12px;color:#0F172A;">'+e(a.affected)+'</td>';
+        html+='<td style="padding:9px 14px;font-size:11px;color:#64748B;">'+e(a.details||'')+'</td>';
+        html+='</tr>';
+      });
+    }
+    html+='</tbody></table></div></div>';
+  }
+
+  // ════════ Add User modal ════════
+  if(S.showAddUser){
+    html+='<div id="add-user-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;">';
+    html+='<div style="background:#fff;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.2);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;">';
+    html+='<div style="padding:14px 20px;border-bottom:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:flex-start;">';
+    html+='<div><div style="font-size:14px;font-weight:700;color:#0F172A;">Add New User</div>';
+    html+='<div style="font-size:11px;color:#64748B;margin-top:2px;">Create an account or send an invitation.</div></div>';
+    html+='<button id="nu-close" style="background:none;border:none;font-size:18px;color:#94A3B8;cursor:pointer;">&#10005;</button></div>';
+    html+='<div style="padding:18px 20px;">';
+    if(S.addUserError) html+='<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:4px;padding:8px 12px;font-size:11.5px;color:#991B1B;margin-bottom:12px;">'+e(S.addUserError)+'</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    html+='<div style="grid-column:1/-1;"><div class="field-lbl">Full Name *</div><input id="nu-name" placeholder="e.g. Kwame Mensah"/></div>';
+    html+='<div style="grid-column:1/-1;"><div class="field-lbl">Email Address *</div><input id="nu-email" type="email" placeholder="name@company.com"/></div>';
+    html+='<div><div class="field-lbl">Role</div><select id="nu-role" style="width:100%;padding:7px 10px;border:1px solid #E2E8F0;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;background:#fff;"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
+    html+='<div><div class="field-lbl">Department</div><input id="nu-dept" value="'+e(S.nuDept||'')+'" placeholder="Optional"/></div>';
+    html+='<div style="grid-column:1/-1;"><div class="field-lbl">Initial Password *</div><input id="nu-pass" type="password" placeholder="Minimum 6 characters"/></div>';
+    html+='</div>';
+    // Role descriptions
+    html+='<div style="margin-top:14px;padding:10px 12px;background:#FAFAFA;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;color:#64748B;line-height:1.5;">';
+    html+='<div style="font-weight:700;color:#0F172A;margin-bottom:4px;">Role descriptions</div>';
+    html+='<div><strong style="color:#7c3aed;">Admin:</strong> Full access to users, settings, leads, deals, and reports.</div>';
+    html+='<div><strong style="color:#C8972A;">Manager:</strong> Can review, approve, assign, and manage operational records.</div>';
+    html+='<div><strong style="color:#275F45;">Staff:</strong> Can create and update records based on assigned permissions.</div>';
+    html+='</div>';
+    // Send invitation toggle
+    html+='<label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">';
+    html+='<input type="checkbox" id="nu-invite"'+(S.nuSendInvite?' checked':'')+' style="width:14px;height:14px;cursor:pointer;"/>';
+    html+='<span style="font-size:12px;color:#0F172A;">Mark as <strong>Invited</strong> (user must change password on first login)</span>';
+    html+='</label>';
+    html+='</div>';
+    html+='<div style="padding:12px 20px;border-top:1px solid #E2E8F0;display:flex;justify-content:flex-end;gap:8px;">';
+    html+='<button id="nu-cancel" class="btn btn-ghost btn-sm">Cancel</button>';
+    html+='<button id="nu-save" class="btn btn-sm">Add User</button>';
+    html+='</div>';
+    html+='</div></div>';
+  }
+
   html+='</div>';
   return html;
 }
-
 
 function rDlvReviewPanel(deal, dlv){
   var rs = dlv.reviewStatus||'Draft';
@@ -6347,10 +6597,27 @@ function bRF(){
     if(!name.trim()||!email.trim()||!pass.trim()){S.addUserError='All fields are required.';render();return;}
     if(pass.length<6){S.addUserError='Password must be at least 6 characters.';render();return;}
     if(S.users.some(function(u){return u.email.toLowerCase()===email.trim().toLowerCase();})){S.addUserError='A user with this email already exists.';render();return;}
+    var dept=(document.getElementById('nu-dept')||{}).value||'';
+    var invited=!!S.nuSendInvite;
     hashPassword(pass).then(function(hash){
-      var newUser={id:'USR'+Date.now(),name:name.trim(),email:email.trim().toLowerCase(),password:hash,role:role,active:true,created_at:new Date().toISOString()};
-      S.users=S.users.concat([newUser]);createUser(newUser);
-      S.showAddUser=false;flash('User '+name+' created!');render();
+      var newUser={
+        id:'USR'+Date.now(),
+        name:name.trim(),
+        email:email.trim().toLowerCase(),
+        password:hash,
+        role:role,
+        department:dept.trim(),
+        active:true,
+        invited:invited,
+        status:invited?'Invited':'Active',
+        created_at:new Date().toISOString()
+      };
+      S.users=S.users.concat([newUser]);
+      createUser(newUser);
+      S.showAddUser=false;
+      S.nuSendInvite=false;S.nuDept='';
+      flash(invited?'User '+name+' added and marked as invited.':'User '+name+' created!');
+      render();
     });
   });
   document.querySelectorAll('.role-sel').forEach(function(el){
@@ -6367,7 +6634,8 @@ function bRF(){
   document.querySelectorAll('.toggle-user-btn').forEach(function(el){
     el.addEventListener('click',function(){
       var uid=el.dataset.uid,active=el.dataset.active!=='1';
-      S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{active:active});saveUser(updated);return updated;});
+      S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{active:active,status:active?'Active':'Deactivated'});saveUser(updated);return updated;});
+      S.usersActionMenu=null;
       flash(active?'User activated.':'User deactivated.');render();
     });
   });
@@ -6377,7 +6645,8 @@ function bRF(){
       var newPass=prompt('Enter new temporary password for '+name+':');
       if(!newPass||newPass.length<6){alert('Password must be at least 6 characters.');return;}
       hashPassword(newPass).then(function(hash){
-        S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{password:hash});saveUser(updated);return updated;});
+        S.users=S.users.map(function(u){if(u.id!==uid) return u;var updated=Object.assign({},u,{password:hash,passwordChangedAt:new Date().toISOString()});saveUser(updated);return updated;});
+        S.usersActionMenu=null;
         flash('Password reset for '+name+'!');render();
       });
     });
@@ -6387,7 +6656,9 @@ function bRF(){
       if(!confirm('Delete this user? This cannot be undone.')) return;
       var uid=el.dataset.uid;
       S.users=S.users.filter(function(u){return u.id!==uid;});
-      deleteUserSB(uid);flash('User deleted.','err');render();
+      deleteUserSB(uid);
+      S.usersActionMenu=null;
+      flash('User deleted.','err');render();
     });
   });
   // Deal file downloads
