@@ -3019,18 +3019,24 @@ function closeApprovalModal(){
 }
 
 function confirmApproval(){
-  var u=(document.getElementById('apr-user')||{}).value||'';
-  if(!u.trim()){
-    var errEl=document.getElementById('apr-err');
-    if(errEl){errEl.style.display='block';errEl.textContent='Please enter your name to approve.';}
+  // ── SECURITY: stamp from logged-in user, NEVER from DOM input ──────────────
+  // Server-side role gate (defense-in-depth even with UI restrictions)
+  if(!S.currentUser){
+    var errEl0=document.getElementById('apr-err');
+    if(errEl0){errEl0.style.display='block';errEl0.textContent='You must be signed in to approve.';}
     return;
   }
-  var match={name:u};
+  if(S.currentUser.role!=='manager'&&S.currentUser.role!=='admin'){
+    var errEl1=document.getElementById('apr-err');
+    if(errEl1){errEl1.style.display='block';errEl1.textContent='Only Managers and Admins can approve or reject leads.';}
+    return;
+  }
+  var match={name:S.currentUser.name,role:S.currentUser.role,id:S.currentUser.id};
   var leadId=S.approvalTargetId;
   var ts=new Date().toLocaleString();
   var isReject=S.approvalAction==='reject';
   var aprTs=new Date().toISOString();
-  // ── BLOCKER #5: capture optional reason for reject ────────────────────────
+  // Rejection reason still captured from DOM (it's content, not identity)
   var reason=(document.getElementById('apr-reason')||{}).value||'';
   if(isReject&&!reason.trim()){
     var errEl=document.getElementById('apr-err');
@@ -3043,6 +3049,8 @@ function confirmApproval(){
       ?Object.assign({},l,{
           rejected:true,
           rejectedBy:match.name,
+          rejectedByRole:match.role,
+          rejectedByUserId:match.id,
           rejectedAt:aprTs,
           rejectionReason:reason.trim(),
           leadStatus:'rejected',
@@ -3054,6 +3062,8 @@ function confirmApproval(){
       :Object.assign({},l,{
           approved:true,
           approvedBy:match.name,
+          approvedByRole:match.role,
+          approvedByUserId:match.id,
           approvedAt:aprTs,
           leadStatus:'approved',
           rejected:false,
@@ -3067,7 +3077,7 @@ function confirmApproval(){
   });
   S.auditLog=S.auditLog.concat([{_id:nextAuditId(),leadId:(S.leads.filter(function(l){return l._id===leadId;})[0]||{}).leadId||'n/a',user:match.name,field:'Approval',prev:'Pending',next:(S.approvalAction==='reject'?'Rejected by ':'Approved by ')+match.name,ts:ts}]);
   S.currentApprover=match.name;
-  flash(S.approvalAction==='reject'?('Lead rejected by '+match.name+'.'):('Lead approved by '+match.name+'!'));
+  flash(S.approvalAction==='reject'?('Lead rejected by '+match.name+' ('+match.role+').'):('Lead approved by '+match.name+' ('+match.role+')!'));
   S.approvalModal=false;S.approvalTargetId=null;S.approvalAction=null;
   render();
 }
@@ -3075,23 +3085,47 @@ function confirmApproval(){
 function rApprovalModal(){
   if(!S.approvalModal) return '';
   var lead=S.leads.filter(function(l){return l._id===S.approvalTargetId;})[0]||{};
+  var u=S.currentUser||{name:'Not signed in',role:'-'};
+  var roleLabel=(u.role||'').charAt(0).toUpperCase()+(u.role||'').slice(1);
+  var isReject=S.approvalAction==='reject';
+  var actionLabel=isReject?'Reject Lead':'Approve Lead';
+  var headerLabel=isReject?'&#9940; Reject Lead':'&#10003; Approve Lead';
+  var initials=((u.name||'?').split(' ').map(function(p){return p.charAt(0);}).join('').slice(0,2)).toUpperCase();
+  var roleColor={admin:'#7c3aed',manager:'#C8972A',staff:'#275F45'}[u.role]||'#5F6B65';
+  var roleBg={admin:'#F3E8FF',manager:'#FDF8EE',staff:'#EAF3EE'}[u.role]||'#F1F5F9';
+
   return '<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px">'+
-    '<div style="background:#fff;border-radius:16px;padding:32px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border-top:4px solid #2D6A4F">'+
-      '<div style="font-size:18px;font-weight:800;color:'+(S.approvalAction==='reject'?'#991b1b':'#1A4731')+';margin-bottom:4px">'+(S.approvalAction==='reject'?'&#9940; Reject Lead':'&#128272; Authorisation Required')+'</div>'+
-      '<div style="font-size:13px;color:#5A7A65;margin-bottom:22px;line-height:1.6">This action requires approval from an authorised user. Please enter your credentials to proceed.</div>'+
-      '<div style="background:#E8F5EE;border:1px solid #C8E6D4;border-radius:10px;padding:12px 14px;margin-bottom:18px">'+
-        '<div style="font-size:11px;font-weight:700;color:#5A7A65;margin-bottom:4px">LEAD BEING APPROVED</div>'+
-        '<div style="font-size:14px;font-weight:700;color:#1A4731">'+e(lead.bizName||lead.contactPerson||'Unknown')+'</div>'+
-        '<div style="font-size:12px;color:#5A7A65">'+e(lead.serviceType||'')+'</div>'+
+    '<div style="background:#fff;border-radius:12px;padding:24px 26px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);border-top:3px solid '+(isReject?'#991B1B':'#275F45')+';">'+
+      '<div style="font-size:17px;font-weight:700;color:'+(isReject?'#991B1B':'#1A2A22')+';margin-bottom:4px">'+headerLabel+'</div>'+
+      '<div style="font-size:12px;color:#5F6B65;margin-bottom:18px;line-height:1.5">Your identity is recorded automatically on this decision. Review the lead and confirm.</div>'+
+      // Lead being approved
+      '<div style="background:#F8FAF9;border:1px solid #E2E8F0;border-radius:6px;padding:10px 14px;margin-bottom:12px;">'+
+        '<div style="font-size:10px;font-weight:700;color:#5F6B65;letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px;">Lead being '+(isReject?'rejected':'approved')+'</div>'+
+        '<div style="font-size:14px;font-weight:700;color:#1A2A22;">'+e(lead.bizName||lead.contactPerson||'Unknown')+'</div>'+
+        '<div style="font-size:11.5px;color:#5F6B65;margin-top:2px;">'+e(lead.serviceType||'')+(lead.leadId?' &middot; '+e(lead.leadId):'')+'</div>'+
       '</div>'+
-      '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
-       '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px">'+
-         '<div><div class="field-lbl">Your Name</div><input id="apr-user" placeholder="Enter your name to approve" autocomplete="off"/></div>'+
-         '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600"></div>'+
-       '</div>'+
-      '<div style="display:flex;gap:10px">'+
-        '<button id="apr-cancel" style="flex:1;padding:12px;border-radius:10px;border:1px solid #C8E6D4;background:#E8F5EE;color:#5A7A65;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer">Cancel</button>'+
-        '<button id="apr-confirm" style="flex:2;padding:12px;border-radius:10px;border:none;background:'+(S.approvalAction==='reject'?'#dc2626':'linear-gradient(135deg,#1A4731,#2D6A4F)')+';color:#fff;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer">'+(S.approvalAction==='reject'?'Reject Lead':'&#10003; Approve Lead')+'</button>'+
+      // Approver identity card — read-only, NOT an input field
+      '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">'+
+        '<div style="width:32px;height:32px;border-radius:50%;background:#EAF3EE;border:1px solid #C8E6D4;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#275F45;flex-shrink:0;">'+e(initials)+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:10px;font-weight:700;color:#5F6B65;letter-spacing:.5px;text-transform:uppercase;margin-bottom:1px;">'+(isReject?'Rejecting as':'Approving as')+'</div>'+
+          '<div style="font-size:13px;font-weight:700;color:#1A2A22;">'+e(u.name)+'</div>'+
+        '</div>'+
+        '<span style="background:'+roleBg+';color:'+roleColor+';border:1px solid '+roleColor+'30;border-radius:3px;padding:2px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">'+e(roleLabel||'-')+'</span>'+
+      '</div>'+
+      // Rejection reason (only when rejecting)
+      (isReject?
+        '<div style="margin-bottom:12px;">'+
+          '<div class="field-lbl">Reason for Rejection *</div>'+
+          '<textarea id="apr-reason" placeholder="Why is this lead being rejected? This will be visible to the submitter." style="width:100%;padding:9px 12px;border:1px solid #E2E8F0;border-radius:5px;font-size:13px;font-family:inherit;min-height:70px;resize:vertical;"></textarea>'+
+        '</div>'
+      :'')+
+      // Error slot
+      '<div id="apr-err" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 12px;font-size:12px;color:#dc2626;font-weight:600;margin-bottom:12px;"></div>'+
+      // Footer
+      '<div style="display:flex;gap:8px;">'+
+        '<button id="apr-cancel" style="flex:1;padding:9px 14px;border-radius:5px;border:1px solid #E2E8F0;background:#fff;color:#5F6B65;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">Cancel</button>'+
+        '<button id="apr-confirm" style="flex:2;padding:9px 14px;border-radius:5px;border:none;background:'+(isReject?'#991B1B':'#275F45')+';color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">'+actionLabel+'</button>'+
       '</div>'+
     '</div>'+
   '</div>';
