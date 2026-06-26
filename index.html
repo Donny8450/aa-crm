@@ -6616,9 +6616,22 @@ function bRF(){
     S.showClientForm=false;S.editClientId=null;S.clientForm=null;render();
   });
 
-  // Click client card → view
-  document.querySelectorAll('.client-card').forEach(function(el){
-    el.addEventListener('click',function(){S.clientView=el.dataset.id;render();});
+  // View Client button → open portfolio
+  document.querySelectorAll('.view-account-btn').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      ev.stopPropagation();
+      S.clientView=el.dataset.id;
+      S.preFilterClientId=null;
+      S.preFilterService=null;
+      render();
+    });
+  });
+  // Legacy: clicking a client row also opens portfolio (if any rows use this class)
+  document.querySelectorAll('.client-card,.client-row').forEach(function(el){
+    el.addEventListener('click',function(ev){
+      if(ev.target.closest('button,select,input,a')) return;
+      S.clientView=el.dataset.id;render();
+    });
   });
 
   // Back from client view
