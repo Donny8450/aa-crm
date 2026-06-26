@@ -710,7 +710,8 @@ function bContact(){
 }
 
 window._dealQuick=function(id,field,value){
-  var actor=S.currentUser?S.currentUser.name:'Unknown';
+  var _a=requireActor('edit this deal');if(!_a) return;
+  var actor=_a.name;
   var ts=new Date().toLocaleString();
   S.deals=S.deals.map(function(d){
     if(d._id!==id) return d;
@@ -737,6 +738,26 @@ window._dealQuick=function(id,field,value){
 function canSeeAll(){return !!(S.currentUser&&S.currentUser.role!=='staff');}
 
 // ── Permissions: centralized role checks (additive — existing callers untouched) ──
+// ── Audit identity: single source of truth ───────────────────────────────────
+// Returns {name, role, id} from the logged-in session.
+// Returns null if no session — callers MUST refuse to write in that case.
+function getActor(){
+  if(!S.currentUser||!S.currentUser.name) return null;
+  return {
+    name:S.currentUser.name,
+    role:S.currentUser.role||'staff',
+    id:S.currentUser.id||''
+  };
+}
+function requireActor(actionLabel){
+  var a=getActor();
+  if(!a){
+    flash('You must be signed in to '+(actionLabel||'do this')+'.','err');
+    return null;
+  }
+  return a;
+}
+
 var Permissions={
   isAdmin:function(u){u=u||S.currentUser;return !!(u&&u.role==='admin');},
   isManager:function(u){u=u||S.currentUser;return !!(u&&(u.role==='manager'||u.role==='admin'));},
@@ -2705,10 +2726,11 @@ function nextDealId(serviceType){
 }
 
 function persistDeal(status,msg){
+  var _a=requireActor('save this deal');if(!_a) return;
   S.form=gDF();var f=S.form;
   f.dealStatus=status;
   var ts2=new Date().toLocaleString();
-  var actor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
+  var actor=_a.name;
   if(S.eid!==null){
     var existing=S.deals.filter(function(x){return x._id===S.eid;})[0]||{};
     var liveDelivs=(S.deals.filter(function(x){return x._id===S.eid;})[0]||{}).deliverables||[];
@@ -2774,7 +2796,7 @@ function persistLead(lf, status, msg){
     var old=S.leads.filter(function(x){return x._id===S.leid;})[0]||{};
     var tracked=Object.assign({},lf,{bizStructure:S.biz});
     var changed=Object.keys(FL).filter(function(k){return String(tracked[k]||'')!==String(old[k]||'');});
-    var entries=changed.map(function(k){return {_id:Date.now()+Math.random(),leadId:lf.leadId||'n/a',user:S.auditUser,field:FL[k],prev:String(old[k]||'n/a'),next:String(tracked[k]||'n/a'),ts:ts};});
+    var entries=changed.map(function(k){return {_id:nextAuditId(),leadId:lf.leadId||'n/a',user:actor,userRole:_a.role,userId:_a.id,field:FL[k],prev:String(old[k]||'n/a'),next:String(tracked[k]||'n/a'),ts:ts};});
     if(entries.length>0){S.auditLog=S.auditLog.concat(entries);entries.forEach(function(en){syncAudit(en);});}
     var critical=['bizName','serviceType','ownerContact','salesLead'];
     var wasApproved=!!(old.approved||old.leadStatus==='approved');
@@ -2785,7 +2807,6 @@ function persistLead(lf, status, msg){
       // Only revert if BOTH old and new exist and differ (a real change)
       return oldV&&newV&&oldV!==newV;
     });
-    var actor=S.currentUser?S.currentUser.name:S.auditUser;
     var nowIso=new Date().toISOString();
     var updated=Object.assign({},lf,{_id:S.leid,files:(old.files||[]).concat(S.lfiles),bizStructure:S.biz,createdAt:old.createdAt,createdBy:old.createdBy,updatedAt:nowIso,updatedBy:actor});
     if(_isSubmission){updated.lastSubmittedAt=nowIso;if(!updated.firstSubmittedAt) updated.firstSubmittedAt=old.firstSubmittedAt||old.createdAt||nowIso;}
@@ -2808,9 +2829,9 @@ function persistLead(lf, status, msg){
     flash(msg);S.leid=null;
   } else {
     var nid=nextLeadId(lf.serviceType);
-    var _now=new Date().toISOString();var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:_now,createdBy:S.currentUser?S.currentUser.name:S.auditUser});if(_isSubmission){newLead.lastSubmittedAt=_now;newLead.firstSubmittedAt=_now;}
+    var _now=new Date().toISOString();var newLead=Object.assign({},lf,{_id:'L'+Date.now(),leadId:nid,files:S.lfiles,bizStructure:S.biz,createdAt:_now,createdBy:actor,createdByRole:_a.role,createdByUserId:_a.id});if(_isSubmission){newLead.lastSubmittedAt=_now;newLead.firstSubmittedAt=_now;}
     S.leads=S.leads.concat([newLead]);
-    var auditEntry={_id:nextAuditId(),leadId:nid,user:S.auditUser,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
+    var auditEntry={_id:nextAuditId(),leadId:nid,user:actor,userRole:_a.role,userId:_a.id,field:'n/a',prev:'n/a',next:status==='draft'?'Lead saved as draft':'Lead submitted',ts:ts};
     S.auditLog=S.auditLog.concat([auditEntry]);
     syncLead(newLead);
     syncAudit(auditEntry);
@@ -2844,7 +2865,8 @@ function subLead(){
 }
 
 function revertDealToLead(dealId){
-  if(!S.currentUser||(S.currentUser.role!=='admin'&&S.currentUser.role!=='manager')){
+  var _ra=requireActor('revert a deal');if(!_ra) return;
+  if(_ra.role!=='admin'&&_ra.role!=='manager'){
     flash('Only Managers and Admins can revert a deal.','err');return;
   }
   var d=S.deals.filter(function(x){return x._id===dealId;})[0];
@@ -2860,7 +2882,7 @@ function revertDealToLead(dealId){
   var reason=prompt('Reason for reverting this deal back to a lead?\n(e.g. needs document updates, scope changed)','');
   if(!reason||!reason.trim()){flash('Revert cancelled — reason required.','err');return;}
 
-  var actor=S.currentUser.name;
+  var actor=_ra.name;
   var ts=new Date().toISOString();
 
   // Restore lead: clear converted state, move files back, mark for re-review
@@ -2882,6 +2904,8 @@ function revertDealToLead(dealId){
       revertedFromDealId:d.dealId,
       revertedFromDealAt:ts,
       revertedFromDealBy:actor,
+      revertedFromDealByRole:_ra.role,
+      revertedFromDealByUserId:_ra.id,
       revertReason:reason.trim(),
       lastSubmittedAt:ts,  // treat as fresh submission for SLA
       updatedAt:ts,
@@ -2898,6 +2922,8 @@ function revertDealToLead(dealId){
       archived:true,
       archivedAt:ts,
       archivedBy:actor,
+      archivedByRole:_ra.role,
+      archivedByUserId:_ra.id,
       revertReason:reason.trim(),
       status:'Reverted',
       updatedAt:ts,
@@ -2939,7 +2965,8 @@ function cvt(id){
   if(existing){flash('Lead already linked to deal '+(existing.dealId||existing._id),'err');return;}
 
   var nid=nextDealId(l.serviceType);
-  var convertor=S.currentUser?S.currentUser.name:(S.auditUser||'Unknown');
+  var _actor=requireActor('convert a lead');if(!_actor) return;
+  var convertor=_actor.name;
   var convTs=new Date().toISOString();
 
   // M16: normalize priority vocabulary (lead uses 'High Priority', deals use 'High')
@@ -2960,7 +2987,7 @@ function cvt(id){
     files:l.files||[],
     deliverables:[],
     // Audit lineage
-    createdAt:convTs, createdBy:convertor,
+    createdAt:convTs, createdBy:convertor, createdByRole:_actor.role, createdByUserId:_actor.id,
     convertedFromLeadId:l.leadId||'',
     convertedFromLead:l._id,
     leadCreatedAt:l.createdAt||'',
@@ -2982,6 +3009,8 @@ function cvt(id){
         converted:true,
         convertedAt:convTs,
         convertedBy:convertor,
+        convertedByRole:_actor.role,
+        convertedByUserId:_actor.id,
         convertedToDealId:newDeal2.dealId,
         convertedToDealRef:newDeal2._id,
         leadStatus:'converted',
@@ -5591,7 +5620,8 @@ function bind(){
       if(act==='view'){S.pipeDrawer=id;render();}
       else if(act==='edit'||act==='upload'){S.form=Object.assign({},bDeal(),d);S.eid=d._id;S.dfiles=d.files||[];S.tab='form';render();}
       else if(act==='complete'){
-        S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'Completed',status:'Completed',completedAt:new Date().toISOString(),completedBy:S.currentUser?S.currentUser.name:'Unknown',updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'});syncDeal(u);return u;});
+        var _completionActor=requireActor('mark this deal completed');if(!_completionActor) return;
+        S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{pipelineStage:'Completed',status:'Completed',completedAt:new Date().toISOString(),completedBy:_completionActor.name,completedByRole:_completionActor.role,completedByUserId:_completionActor.id,updatedAt:new Date().toISOString(),updatedBy:_completionActor.name});syncDeal(u);return u;});
         flash('Deal marked completed');render();
       }
       else if(act==='revert'){
@@ -5643,7 +5673,8 @@ function bind(){
     var id=drawerSave.dataset.id;
     var na=(document.getElementById('drawer-nextaction')||{}).value||'';
     var dt=(document.getElementById('drawer-duedate')||{}).value||'';
-    S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{nextAction:na,dueDate:dt,updatedAt:new Date().toISOString(),updatedBy:S.currentUser?S.currentUser.name:'Unknown'});syncDeal(u);return u;});
+    var _naActor=requireActor('update this deal');if(!_naActor) return;
+    S.deals=S.deals.map(function(x){if(x._id!==id)return x;var u=Object.assign({},x,{nextAction:na,dueDate:dt,updatedAt:new Date().toISOString(),updatedBy:_naActor.name});syncDeal(u);return u;});
     flash('Deal updated');render();
   });
 
@@ -5867,7 +5898,7 @@ function bind(){
     el.addEventListener('click',function(){
       var l=S.leads.filter(function(x){return x._id===el.dataset.id;})[0];
       if(l){
-        S.auditLog=S.auditLog.concat([{_id:nextAuditId(),leadId:l.leadId||'n/a',user:S.auditUser,field:'n/a',prev:'n/a',next:'Opened for editing',ts:new Date().toLocaleString()}]);
+        var _opA=getActor();S.auditLog=S.auditLog.concat([{_id:nextAuditId(),leadId:l.leadId||'n/a',user:_opA?_opA.name:'',userRole:_opA?_opA.role:'',userId:_opA?_opA.id:'',field:'n/a',prev:'n/a',next:'Opened for editing',ts:new Date().toLocaleString()}]);
         S.lform=Object.assign({},l);S.leid=l._id;S.lfiles=l.files||[];S.biz=l.bizStructure||'';
         S.leadsView='form';  // switch to form view for editing
         render();
@@ -6038,11 +6069,12 @@ function bind(){
       ev.stopPropagation();
       var note=prompt('What information is needed from the submitter?','');
       if(note===null) return;
-      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var _a=requireActor('request more info');if(!_a) return;
+      var actor=_a.name;
       var ts3=new Date().toLocaleString();
       S.leads=S.leads.map(function(l){
         if(l._id!==el.dataset.id) return l;
-        var u=Object.assign({},l,{leadStatus:'moreinfo',infoRequest:note,infoRequestedBy:actor,infoRequestedAt:new Date().toISOString()});
+        var u=Object.assign({},l,{leadStatus:'moreinfo',infoRequest:note,infoRequestedBy:actor,infoRequestedByRole:_a.role,infoRequestedByUserId:_a.id,infoRequestedAt:new Date().toISOString()});
         syncLead(u);return u;
       });
       var tgt=S.leads.filter(function(l){return l._id===el.dataset.id;})[0]||{};
@@ -6136,7 +6168,8 @@ function bind(){
   document.querySelectorAll('.dlv-status-btn').forEach(function(el){
     el.addEventListener('click',function(){
       var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid, status=el.dataset.status;
-      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var _a=requireActor('update deliverable status');if(!_a) return;
+      var actor=_a.name;
       var ts=new Date().toLocaleString();
       // Guard: require at least one uploaded file before submitting for review
       if(status==='Submitted for Review'){
@@ -6179,7 +6212,8 @@ function bind(){
       if(!el.files||!el.files[0]) return;
       var file=el.files[0];
       var dealId=el.dataset.dealid, dlvId=el.dataset.dlvid;
-      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var _a=requireActor('upload a file');if(!_a) return;
+      var actor=_a.name;
       var ts=new Date().toLocaleString();
       var reader=new FileReader();
       reader.onload=function(ev){
@@ -6249,9 +6283,10 @@ function bind(){
       var text=inp?inp.value.trim():'';
       var attached=(window._pendingChatFiles&&window._pendingChatFiles[dlvId])||[];
       if(!text&&!attached.length){flash('Type a message or attach a file.','err');return;}
-      // Q1=C: anyone logged in can post; role tag preserved for display
-      var actor=S.currentUser?S.currentUser.name:'Unknown';
-      var role=S.currentUser?(S.currentUser.role||'staff'):'';
+      // Strict: anyone logged in can post; refuse if no session
+      var _ca=requireActor('send a message');if(!_ca) return;
+      var actor=_ca.name;
+      var role=_ca.role;
       var ts=new Date().toLocaleString();
       S.deals=S.deals.map(function(d){
         if(d._id!==dealId) return d;
@@ -6372,7 +6407,8 @@ function bind(){
       if(!(dlv.reviewFiles||[]).length){
         flash('Add at least one submission file before sending for review.','err');return;
       }
-      var actor=S.currentUser?S.currentUser.name:'Unknown';
+      var _sa=requireActor('submit deliverable for review');if(!_sa) return;
+      var actor=_sa.name;
       var ts=new Date().toISOString();
       S.deals=S.deals.map(function(d){
         if(d._id!==dealId) return d;
@@ -6382,6 +6418,8 @@ function bind(){
             reviewStatus:'Submitted for Review',
             submittedAt:ts,
             submittedBy:actor,
+            submittedByRole:_sa.role,
+            submittedByUserId:_sa.id,
             // Clear any prior reviewer stamps on resubmission
             reviewedAt:'', reviewedBy:'', revisionReason:''
           });
@@ -6420,7 +6458,8 @@ function bind(){
         if(!reason.trim()){flash('A revision reason is required.','err');return;}
       }
 
-      var actor=S.currentUser.name;
+      var _ma=requireActor('review deliverable');if(!_ma) return;
+      var actor=_ma.name;
       var ts=new Date().toISOString();
       var prevStatus=dlv.reviewStatus||'Draft';
 
@@ -6431,7 +6470,9 @@ function bind(){
           var u=Object.assign({},x,{
             reviewStatus:action,
             reviewedAt:ts,
-            reviewedBy:actor
+            reviewedBy:actor,
+            reviewedByRole:_ma.role,
+            reviewedByUserId:_ma.id
           });
           if(action==='Approved'){
             u.approvedDeliverableAt=ts;
@@ -6900,12 +6941,13 @@ function bRF(){
     var time=(document.getElementById('qam-time')||{}).value||'';
     var svc=(document.getElementById('qam-svc')||{}).value||'';
     var stage=(document.getElementById('qam-stage')||{}).value||'';
-    var actor=S.currentUser?S.currentUser.name:'Unknown';
+    var _qa=requireActor('log this activity');if(!_qa) return;
+    var actor=_qa.name;
     var ts=new Date().toLocaleString();
     var entry={
       id:'ACT'+Date.now(),
       type:kind==='note'?'Note':kind==='meeting'?'Meeting':'Opportunity',
-      user:actor, ts:ts,
+      user:actor, userRole:_qa.role, userId:_qa.id, ts:ts,
       title:title, text:text,
       date:date, time:time, svc:svc, stage:stage
     };
