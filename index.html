@@ -1728,6 +1728,7 @@ function rPipeFilterBanner(){
   return '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:3px solid #1E40AF;border-radius:4px;padding:8px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#1E40AF;"><div>&#128269; Filtered by '+label.join(' &middot; ')+'</div><button id="clear-prefilter" style="background:#fff;border:1px solid #BFDBFE;color:#1E40AF;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Clear filter</button></div>';
 }
 function rPipe(){
+  var _prefilterBanner=rPipeFilterBanner();
   var STAGES=['New Deal','Assigned','Discovery','Document Review','Internal Analysis','Client Follow Up','Manager Review','Finalization','Completed','On Hold','Cancelled'];
   var BLOCKERS=['None','Missing Documents','Waiting on Client','Internal Review','Compliance Check','Manager Approval','Other'];
   var stageCol={'New Deal':'#2563eb','Assigned':'#0E7490','Discovery':'#7C3AED','Document Review':'#D97706','Internal Analysis':'#0E7490','Client Follow Up':'#D97706','Manager Review':'#7C3AED','Finalization':'#275F45','Completed':'#16a34a','On Hold':'#9BA8A2','Cancelled':'#dc2626'};
