@@ -740,7 +740,7 @@ var LMOJI={Hot:'🔥',Warm:'☀️',Cold:'❄️'};
 var SCOL={Lead:'#2563eb',Contacted:'#0284c7',Qualified:'#2D6A4F','Proposal Sent':'#7c3aed',Negotiation:'#C8972A','Closed Won':'#15803d','Closed Lost':'#dc2626','On Hold':'#c2410c'};
 var SBG={Lead:'#eff6ff',Contacted:'#f0f9ff',Qualified:'#E8F5EE','Proposal Sent':'#faf5ff',Negotiation:'#FDF8EE','Closed Won':'#f0fdf4','Closed Lost':'#fef2f2','On Hold':'#fff7ed'};
 var FLD={bizName:'Business Name',serviceType:'Service Type',owner:'Owner',email:'Email',phone:'Phone',source:'Source',status:'Status',projectBrief:'Project Brief',startDate:'Start Date',endDate:'End Date',consultFocus:'Consulting Focus',engagementType:'Engagement Type',consultFee:'Consulting Fee',sessions:'Sessions',consultDeliverables:'Deliverables Overview',txType:'Transaction Type',askingPrice:'Asking Price',annualRevenue:'Annual Revenue',sdeEbitda:'SDE/EBITDA',commission:'Commission %',listingStatus:'Listing Status',bizDescription:'Business Description',yearIncorp:'Year of Incorporation',numEmployees:'No. of Employees',annualSalesBrok:'Annual Sales',sde:'Seller Discretionary Earnings',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',fundingType:'Funding Type',fundingAmount:'Funding Amount',equityOffered:'Equity Offered %',useOfFunds:'Use of Funds',currRevenue:'Current Revenue',fundingStage:'Funding Stage',pitchSummary:'Pitch Summary',dealStatus:'Deal Status'};
-var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Main Business Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'Expected Date to Sign MA',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Lead Owner',serviceType:'Service Type'};
+var FL={bizName:'Business Name',ownershipStructure:'Ownership Structure',serviceType:'Service Type',projectBrief:'Project Brief',ownerContact:'Main Business Contact',phone:'Phone',email:'Email',source:'Source',priority:'Priority',startDate:'Start Date',endDate:'Expected Date to Sign MA',pctComplete:'% Completed',label:'Label',yearIncorp:'Year of Incorp',annualSales:'Annual Sales',sde:'SDE',buyerDown:'Buyer Down Payment',totalSalePrice:'Total Sales Price',numEmployees:'No. of Employees',kickoffMeeting:'Kickoff Meeting',maSigned:'MA Signed',bizStructure:'Business Structure',salesLead:'Business Advisor Responsible',serviceType:'Service Type'};
 
 function fid(p,n){return p+('000'+n).slice(-4);}
 function nextLeadId(serviceType){
@@ -821,6 +821,9 @@ window._dealQuick=function(id,field,value){
 };
 
 function canSeeAll(){return !!(S.currentUser&&S.currentUser.role!=='staff');}
+// Display-only role labels. Internal role keys (admin/manager/staff) are UNCHANGED for
+// logic and stored data; this only maps them to the names shown in the UI.
+function roleName(r){return {admin:'Admin',manager:'Deal Execution Team',staff:'Business Advisor'}[r]||((r||'').charAt(0).toUpperCase()+(r||'').slice(1));}
 
 // ── Permissions: centralized role checks (additive — existing callers untouched) ──
 // ── Audit identity: single source of truth ───────────────────────────────────
@@ -1346,7 +1349,7 @@ function rLogin(){
 
 function rApp(){
   var userName=S.currentUser?e(S.currentUser.name||S.currentUser.email||'User'):'';
-  var userRole=S.currentUser?((S.currentUser.role||'staff').charAt(0).toUpperCase()+(S.currentUser.role||'staff').slice(1)):'';
+  var userRole=S.currentUser?roleName(S.currentUser.role):'';
   var pendingCount=S.leads.filter(function(l){return l.leadStatus==='pending';}).length;
 
   return '<div class="app-shell">'+
@@ -2329,7 +2332,7 @@ function rLeadsPipeline(){
 
       // Summary
       html+='<div style="border-top:1px solid #D8E3DC;padding-top:12px;margin-bottom:14px;">';
-      [['Service Type',dl.serviceType],['Lead Owner',dl.salesLead],['Main Business Contact',dl.ownerContact],['Structure',dl.ownershipStructure],['Priority',dl.priority],['Source',dl.source],['Start Date',dl.startDate]].forEach(function(r){
+      [['Service Type',dl.serviceType],['Business Advisor Responsible',dl.salesLead],['Main Business Contact',dl.ownerContact],['Structure',dl.ownershipStructure],['Priority',dl.priority],['Source',dl.source],['Start Date',dl.startDate]].forEach(function(r){
         html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;text-align:right;max-width:230px;">'+e(r[1]||'\u2014')+'</span></div>';
       });
       html+='</div>';
@@ -2447,7 +2450,7 @@ function rLeadForm(){
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
-          '<div><div class="field-lbl">Lead Owner *</div>'+
+          '<div><div class="field-lbl">Business Advisor Responsible *</div>'+
             '<select name="salesLead" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">'+
               '<option value="">Select a team member...</option>'+
               S.users.map(function(u){return '<option'+(lf.salesLead===u.name?' selected':'')+'>'+e(u.name)+'</option>';}).join('')+
@@ -2532,7 +2535,7 @@ function rLL(){
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
-          '<div><div class="field-lbl">Lead Owner *</div>'+
+          '<div><div class="field-lbl">Business Advisor Responsible *</div>'+
             '<select name="salesLead" style="width:100%;padding:7px 10px;border:1px solid #D8E3DC;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;color:#1A1A1A;background:#fff;outline:none;">'+
               '<option value="">Select a team member...</option>'+
               S.users.map(function(u){return '<option'+(lf.salesLead===u.name?' selected':'')+'>'+e(u.name)+'</option>';}).join('')+
@@ -2951,7 +2954,7 @@ function subLead(){
   var pct=lf.pctComplete||0;lf.label=pct<=35?'Cold':pct<=65?'Warm':'Hot';
   if(!lf.bizName||!lf.bizName.trim()){flash('Business Name is required.','err');return;}
   if(!lf.serviceType){flash('Service Type is required.','err');return;}
-  if(!lf.salesLead||!lf.salesLead.trim()){flash('Lead Owner is required.','err');return;}
+  if(!lf.salesLead||!lf.salesLead.trim()){flash('Business Advisor Responsible is required.','err');return;}
   if(!lf.ownerContact||!lf.ownerContact.trim()){flash('Main Business Contact is required.','err');return;}
   var existingLead=S.leid!==null?S.leads.filter(function(x){return x._id===S.leid;})[0]:null;
   var existingFiles=existingLead?(existingLead.files||[]).length:0;
@@ -3054,7 +3057,7 @@ function cvt(id){
   if(!(l.files&&l.files.length>0)){flash('Cannot convert: required documents are missing.','err');return;}
   if(!l.bizName||!l.bizName.trim()){flash('Cannot convert: business name is missing.','err');return;}
   if(!l.serviceType){flash('Cannot convert: service type is missing.','err');return;}
-  if(!l.salesLead||!l.salesLead.trim()){flash('Cannot convert: Lead Owner is missing.','err');return;}
+  if(!l.salesLead||!l.salesLead.trim()){flash('Cannot convert: Business Advisor Responsible is missing.','err');return;}
   if(!l.ownerContact||!l.ownerContact.trim()){flash('Cannot convert: Main Business Contact is missing.','err');return;}
 
   // ── BLOCKER #7 GUARD: prevent double-convert race ─────────────────────────
@@ -3225,7 +3228,7 @@ function rApprovalModal(){
   if(!S.approvalModal) return '';
   var lead=S.leads.filter(function(l){return l._id===S.approvalTargetId;})[0]||{};
   var u=S.currentUser||{name:'Not signed in',role:'-'};
-  var roleLabel=(u.role||'').charAt(0).toUpperCase()+(u.role||'').slice(1);
+  var roleLabel=roleName(u.role);
   var isReject=S.approvalAction==='reject';
   var actionLabel=isReject?'Reject Lead':'Approve Lead';
   var headerLabel=isReject?'&#9940; Reject Lead':'&#10003; Approve Lead';
@@ -3760,7 +3763,7 @@ function rUsers(){
     var rows=[
       ['Full Name', e(u.name||'\u2014')],
       ['Email Address', e(u.email||'\u2014')],
-      ['Role','<span style="background:'+roleBadge[1]+';color:'+roleBadge[0]+';border:1px solid '+roleBadge[0]+'30;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">'+((u.role||'staff').charAt(0).toUpperCase()+(u.role||'staff').slice(1))+'</span>'],
+      ['Role','<span style="background:'+roleBadge[1]+';color:'+roleBadge[0]+';border:1px solid '+roleBadge[0]+'30;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">'+e(roleName(u.role))+'</span>'],
       ['Account Status','<span style="background:#ECFDF5;color:#16a34a;border:1px solid #A7F3D0;border-radius:3px;padding:2px 8px;font-size:11px;font-weight:700;">Active</span>'],
       ['Last Login', u.lastLogin?relTime(u.lastLogin):'<span style="color:#94A3B8;">This session</span>'],
       ['Account Created', u.created_at?relTime(u.created_at):'<span style="color:#94A3B8;">\u2014</span>']
@@ -3825,7 +3828,7 @@ function rUsers(){
       var q=(S.usersSearch||'').toLowerCase().trim();
       var filtered=allUsers.filter(function(usr){
         if(q&&((usr.name||'').toLowerCase().indexOf(q)<0&&(usr.email||'').toLowerCase().indexOf(q)<0)) return false;
-        if(S.usersFilterRole!=='All'&&(usr.role||'staff')!==S.usersFilterRole.toLowerCase()) return false;
+        if(S.usersFilterRole!=='All'&&(usr.role||'staff')!==S.usersFilterRole) return false;
         var st=usr.status||(usr.active===false?'Deactivated':usr.invited?'Invited':'Active');
         if(S.usersFilterStatus!=='All'&&st!==S.usersFilterStatus) return false;
         return true;
@@ -3835,7 +3838,7 @@ function rUsers(){
       html+='<div style="position:relative;flex:1;min-width:200px;"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:12px;">&#128269;</span>';
       html+='<input id="users-search" value="'+e(S.usersSearch||'')+'" placeholder="Search users by name or email..." style="padding:6px 10px 6px 30px;font-size:12px;border:1px solid #E2E8F0;border-radius:4px;width:100%;font-family:Inter,sans-serif;outline:none;"/></div>';
       html+='<select id="users-filter-role" style="font-size:11px;padding:5px 8px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;height:28px;background:#fff;">';
-      ['All','Admin','Manager','Staff'].forEach(function(r){html+='<option'+(S.usersFilterRole===r?' selected':'')+'>'+r+'</option>';});
+      [['All','All'],['admin',roleName('admin')],['manager',roleName('manager')],['staff',roleName('staff')]].forEach(function(rr){html+='<option value="'+rr[0]+'"'+(S.usersFilterRole===rr[0]?' selected':'')+'>'+e(rr[1])+'</option>';});
       html+='</select>';
       html+='<select id="users-filter-status" style="font-size:11px;padding:5px 8px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;height:28px;background:#fff;">';
       ['All','Active','Invited','Deactivated'].forEach(function(s){html+='<option'+(S.usersFilterStatus===s?' selected':'')+'>'+s+'</option>';});
@@ -3871,7 +3874,7 @@ function rUsers(){
           // Email
           html+='<td style="padding:10px 14px;font-size:12px;color:#64748B;">'+e(usr.email||'\u2014')+'</td>';
           // Role
-          html+='<td style="padding:10px 14px;"><span style="background:'+roleC[1]+';color:'+roleC[0]+';border:1px solid '+roleC[0]+'30;border-radius:3px;padding:2px 8px;font-size:10.5px;font-weight:700;">'+((usr.role||'staff').charAt(0).toUpperCase()+(usr.role||'staff').slice(1))+'</span></td>';
+          html+='<td style="padding:10px 14px;"><span style="background:'+roleC[1]+';color:'+roleC[0]+';border:1px solid '+roleC[0]+'30;border-radius:3px;padding:2px 8px;font-size:10.5px;font-weight:700;">'+e(roleName(usr.role))+'</span></td>';
           // Status
           html+='<td style="padding:10px 14px;"><span style="background:'+stColors[1]+';color:'+stColors[0]+';border:1px solid '+stColors[2]+';border-radius:3px;padding:2px 8px;font-size:10.5px;font-weight:700;">'+status+'</span></td>';
           // Last Active
@@ -3918,9 +3921,9 @@ function rUsers(){
     var roleDefs=[
       ['admin','Admin','Full access to users, settings, leads, deals, reports, and all administrative actions.','#7c3aed','#F3E8FF',
         {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':true,'Deal Pipeline':true,'Deliverables':true,'Reports':true,'User Management':true,'Settings':true}],
-      ['manager','Manager','Can review, approve, assign, and manage operational records across the team.','#C8972A','#FDF8EE',
+      ['manager','Deal Execution Team','Can review, approve, assign, and manage operational records across the team.','#C8972A','#FDF8EE',
         {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':true,'Deal Pipeline':true,'Deliverables':true,'Reports':true,'User Management':false,'Settings':false}],
-      ['staff','Staff','Can create and update records assigned to them. Limited to their own work.','#275F45','#EAF3EE',
+      ['staff','Business Advisor','Can create and update records assigned to them. Limited to their own work.','#275F45','#EAF3EE',
         {'Dashboard':true,'Client Accounts':true,'Contacts':true,'Leads':true,'Lead Approval':false,'Deal Pipeline':true,'Deliverables':true,'Reports':false,'User Management':false,'Settings':false}]
     ];
 
@@ -4089,7 +4092,7 @@ function rUsers(){
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
     html+='<div style="grid-column:1/-1;"><div class="field-lbl">Full Name *</div><input id="nu-name" placeholder="e.g. Kwame Mensah"/></div>';
     html+='<div style="grid-column:1/-1;"><div class="field-lbl">Email Address *</div><input id="nu-email" type="email" placeholder="name@company.com"/></div>';
-    html+='<div><div class="field-lbl">Role</div><select id="nu-role" style="width:100%;padding:7px 10px;border:1px solid #E2E8F0;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;background:#fff;"><option value="staff">Staff</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>';
+    html+='<div><div class="field-lbl">Role</div><select id="nu-role" style="width:100%;padding:7px 10px;border:1px solid #E2E8F0;border-radius:4px;font-size:13px;font-family:Inter,sans-serif;background:#fff;"><option value="staff">Business Advisor</option><option value="manager">Deal Execution Team</option><option value="admin">Admin</option></select></div>';
     html+='<div><div class="field-lbl">Department</div><input id="nu-dept" value="'+e(S.nuDept||'')+'" placeholder="Optional"/></div>';
     html+='<div style="grid-column:1/-1;"><div class="field-lbl">Initial Password *</div><input id="nu-pass" type="password" placeholder="Minimum 6 characters"/></div>';
     html+='</div>';
@@ -4097,8 +4100,8 @@ function rUsers(){
     html+='<div style="margin-top:14px;padding:10px 12px;background:#FAFAFA;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;color:#64748B;line-height:1.5;">';
     html+='<div style="font-weight:700;color:#0F172A;margin-bottom:4px;">Role descriptions</div>';
     html+='<div><strong style="color:#7c3aed;">Admin:</strong> Full access to users, settings, leads, deals, and reports.</div>';
-    html+='<div><strong style="color:#C8972A;">Manager:</strong> Can review, approve, assign, and manage operational records.</div>';
-    html+='<div><strong style="color:#275F45;">Staff:</strong> Can create and update records based on assigned permissions.</div>';
+    html+='<div><strong style="color:#C8972A;">Deal Execution Team:</strong> Can review, approve, assign, and manage operational records.</div>';
+    html+='<div><strong style="color:#275F45;">Business Advisor:</strong> Can create and update records based on assigned permissions.</div>';
     html+='</div>';
     // Send invitation toggle
     html+='<label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;">';
@@ -5608,7 +5611,7 @@ function rApprovals(){
 
       // Summary
       html+='<div style="margin-bottom:14px;">';
-      [['Service Type',al.serviceType],['Structure',al.ownershipStructure],['Lead Owner',al.salesLead],['Main Business Contact',al.ownerContact],['Priority',al.priority],['Temperature',al.label],['Source',al.source]].forEach(function(r){
+      [['Service Type',al.serviceType],['Structure',al.ownershipStructure],['Business Advisor Responsible',al.salesLead],['Main Business Contact',al.ownerContact],['Priority',al.priority],['Temperature',al.label],['Source',al.source]].forEach(function(r){
         html+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F8FAF9;"><span style="font-size:11px;color:#9BA8A2;">'+r[0]+'</span><span style="font-size:12px;font-weight:500;color:#1A1A1A;text-align:right;max-width:240px;">'+e(r[1]||'\u2014')+'</span></div>';
       });
       html+='</div>';
@@ -5637,7 +5640,7 @@ function rApprovals(){
       }
       // Review checklist
       html+='<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:#9BA8A2;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Review Checklist</div>';
-      [['Business name provided',!!(al.bizName)],['Service type selected',!!(al.serviceType)],['Lead Owner assigned',!!(al.salesLead)],['Main Business Contact added',!!(al.ownerContact)],['Documents uploaded',!!(al.files&&al.files.length>0)]].forEach(function(c){
+      [['Business name provided',!!(al.bizName)],['Service type selected',!!(al.serviceType)],['Business Advisor assigned',!!(al.salesLead)],['Main Business Contact added',!!(al.ownerContact)],['Documents uploaded',!!(al.files&&al.files.length>0)]].forEach(function(c){
         html+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;"><div style="width:15px;height:15px;border-radius:50%;background:'+(c[1]?'#16A34A':'#D8E3DC')+';display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;flex-shrink:0;">'+(c[1]?'&#10003;':'')+'</div><span style="font-size:12px;color:'+(c[1]?'#1A1A1A':'#9BA8A2')+';">'+c[0]+'</span></div>';
       });
       html+='<div style="margin-top:8px;"><span style="background:'+ardc+'12;color:'+ardc+';border:1px solid '+ardc+'30;border-radius:3px;padding:3px 10px;font-size:11px;font-weight:700;">'+ardy+'</span></div>';
