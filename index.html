@@ -38,6 +38,13 @@ html,body{height:100%;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-
 .global-search-wrap input{width:100%;padding:6px 10px 6px 30px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:4px;color:#fff;font-size:13px;font-family:'Inter',sans-serif;outline:none;}
 .global-search-wrap input::placeholder{color:rgba(255,255,255,0.55);}
 .global-search-wrap input:focus{background:rgba(255,255,255,0.22);border-color:rgba(255,255,255,0.4);}
+.global-search-results{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #E2E8F0;border-radius:6px;box-shadow:0 10px 28px rgba(15,23,42,.16);max-height:420px;overflow-y:auto;display:none;z-index:400;}
+.gsr-cat{padding:7px 12px 4px;font-size:9.5px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.6px;background:#FAFAFA;border-bottom:1px solid #F1F5F9;}
+.gsr-row{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #F8FAF9;}
+.gsr-row:hover{background:#EAF3EE;}
+.gsr-label{font-size:12.5px;font-weight:600;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gsr-sub{font-size:10.5px;color:#94A3B8;margin-left:auto;white-space:nowrap;}
+.gsr-empty{padding:16px 12px;text-align:center;font-size:11.5px;color:#94A3B8;}
 .gsearch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.6);font-size:13px;pointer-events:none;}
 .nav-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 .nav-user-pill{display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.85);font-size:12px;font-weight:500;}
@@ -1395,7 +1402,8 @@ function rApp(){
         '<div style="width:1px;height:16px;background:rgba(255,255,255,0.2);margin:0 4px;"></div>'+
         '<div class="global-search-wrap">'+
           '<span class="gsearch-icon">&#128269;</span>'+
-          '<input id="global-search-input" type="text" placeholder="Search deals, clients, leads..."/>'+
+          '<input id="global-search-input" type="text" placeholder="Search deals, clients, leads, contacts..." autocomplete="off"/>'+
+          '<div id="global-search-results" class="global-search-results"></div>'+
         '</div>'+
         '<div class="nav-right">'+
           (S.currentUser?'<span style="font-size:12px;color:rgba(255,255,255,0.7);">'+userRole+'</span>':'')+''+
@@ -5823,7 +5831,11 @@ function bind(){
   });
 
   document.querySelectorAll('[data-fs]').forEach(function(el){el.addEventListener('click',function(){S.fstat=el.dataset.fs;render();});});
-  var psr=document.getElementById('psr');if(psr) psr.addEventListener('input',function(){S.srch=psr.value;render();});
+  var psr=document.getElementById('psr');
+  if(psr){
+    psr.addEventListener('input',function(){S.srch=psr.value;render();});
+    psr.addEventListener('keyup',function(){var el=document.getElementById('psr');if(el){el.focus();el.value=S.srch;el.setSelectionRange((S.srch||'').length,(S.srch||'').length);}});
+  }
   document.querySelectorAll('.edl').forEach(function(el){
     el.addEventListener('click',function(ev){ev.stopPropagation();var d=S.deals.filter(function(x){return x._id===el.dataset.id;})[0];if(d){S.form=Object.assign({},bDeal(),d);S.eid=d._id;S.dfiles=d.files||[];S.tab='form';render();}});
   });
@@ -6037,7 +6049,11 @@ function bind(){
   var clb=document.getElementById('clb');if(clb) clb.addEventListener('click',function(){S.leid=null;S.lform=bLead();S.lfiles=[];S.biz='';S.leadsView='pipeline';render();});
   // lead table
   document.querySelectorAll('[data-fl]').forEach(function(el){el.addEventListener('click',function(){S.flbl=el.dataset.fl;render();});});
-  var lsr=document.getElementById('lsr');if(lsr) lsr.addEventListener('input',function(){S.lsrch=lsr.value;render();});
+  var lsr=document.getElementById('lsr');
+  if(lsr){
+    lsr.addEventListener('input',function(){S.lsrch=lsr.value;render();});
+    lsr.addEventListener('keyup',function(){var el=document.getElementById('lsr');if(el){el.focus();el.value=S.lsrch;el.setSelectionRange((S.lsrch||'').length,(S.lsrch||'').length);}});
+  }
   document.querySelectorAll('.ell').forEach(function(el){
     el.addEventListener('click',function(){
       var l=S.leads.filter(function(x){return x._id===el.dataset.id;})[0];
@@ -7385,6 +7401,73 @@ function bRF(){
 
   var hdrLogout=document.getElementById('hdr-logout');
   if(hdrLogout) hdrLogout.addEventListener('click',function(){if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
+
+  // ── Global search (top nav): live results across clients, deals, leads, contacts ──
+  // Updates the dropdown in place — never calls render() on keystroke, so the input
+  // cannot lose focus. Respects staff visibility via visDeals()/visLeads().
+  var gsi=document.getElementById('global-search-input');
+  var gsrBox=document.getElementById('global-search-results');
+  if(gsi&&gsrBox){
+    var gsRun=function(){
+      var q=(gsi.value||'').trim().toLowerCase();
+      if(q.length<2){gsrBox.style.display='none';gsrBox.innerHTML='';window._gsResults=[];return;}
+      var res=[];
+      function m(v){return (v||'').toLowerCase().indexOf(q)>=0;}
+      (S.clients||[]).forEach(function(c){
+        if(m(c.companyName)||m(c.industry)||m(c.email)||m(c.location)){
+          res.push({cat:'Clients',label:c.companyName||'(unnamed client)',sub:c.industry||'',go:function(){S.tab='clients';S.clientSearch=c.companyName||'';}});
+        }
+      });
+      visDeals().forEach(function(d){
+        if(m(d.bizName)||m(d.dealId)||m(d.owner)||m(d.serviceType)){
+          res.push({cat:'Deals',label:(d.bizName||d.dealId||'(deal)'),sub:d.dealId||'',go:function(){S.tab='pipeline';S.srch=d.bizName||d.dealId||'';}});
+        }
+      });
+      visLeads().forEach(function(l){
+        if(m(l.bizName)||m(l.ownerContact)||m(l.leadId)||m(l.salesLead)){
+          res.push({cat:'Leads',label:(l.bizName||l.ownerContact||l.leadId||'(lead)'),sub:l.leadId||'',go:function(){S.tab='leads';S.lsrch=l.bizName||l.ownerContact||l.leadId||'';}});
+        }
+      });
+      (S.individualContacts||[]).forEach(function(ic){
+        var nm=((ic.firstName||'')+' '+(ic.lastName||'')).trim();
+        if(m(nm)||m(ic.email)||m(ic.mobile)||m(ic.org)){
+          res.push({cat:'Contacts',label:nm||ic.email||'(contact)',sub:ic.org||'',go:function(){S.tab='contacts';S.contactSearch=nm||ic.email||'';}});
+        }
+      });
+      // Cap 5 per category, preserve category grouping order
+      var order=['Clients','Deals','Leads','Contacts'];var grouped={};res.forEach(function(r){(grouped[r.cat]=grouped[r.cat]||[]).push(r);});
+      var flat=[];var htmlOut='';
+      order.forEach(function(cat){
+        var rows=(grouped[cat]||[]).slice(0,5);
+        if(!rows.length) return;
+        htmlOut+='<div class="gsr-cat">'+cat+'</div>';
+        rows.forEach(function(r){
+          var i=flat.length;flat.push(r);
+          htmlOut+='<div class="gsr-row" data-gsi="'+i+'"><span class="gsr-label">'+e(r.label)+'</span>'+(r.sub?'<span class="gsr-sub">'+e(r.sub)+'</span>':'')+'</div>';
+        });
+      });
+      if(!flat.length) htmlOut='<div class="gsr-empty">No matches for &ldquo;'+e(gsi.value.trim())+'&rdquo;</div>';
+      window._gsResults=flat;
+      gsrBox.innerHTML=htmlOut;
+      gsrBox.style.display='block';
+      gsrBox.querySelectorAll('.gsr-row').forEach(function(row){
+        row.addEventListener('mousedown',function(ev){
+          ev.preventDefault(); // fire before input blur
+          var item=(window._gsResults||[])[parseInt(row.dataset.gsi,10)];
+          if(!item) return;
+          gsrBox.style.display='none';gsrBox.innerHTML='';gsi.value='';
+          item.go();render();
+        });
+      });
+    };
+    gsi.addEventListener('input',gsRun);
+    gsi.addEventListener('focus',function(){if((gsi.value||'').trim().length>=2) gsRun();});
+    gsi.addEventListener('keydown',function(ev){
+      if(ev.key==='Escape'){gsrBox.style.display='none';gsrBox.innerHTML='';gsi.blur();}
+      if(ev.key==='Enter'){var first=gsrBox.querySelector('.gsr-row');if(first) first.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));}
+    });
+    gsi.addEventListener('blur',function(){setTimeout(function(){var b=document.getElementById('global-search-results');if(b) b.style.display='none';},150);});
+  }
   var logoutBtn=document.getElementById('logout-btn');
   if(logoutBtn) logoutBtn.addEventListener('click',function(){if(_autoLogoutTimer) clearTimeout(_autoLogoutTimer);S.currentUser=null;sessionStorage.removeItem('aa_crm_user');render();});
   // ── Users & Settings: tab switching ───────────────────────────────────────
