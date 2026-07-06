@@ -452,9 +452,10 @@ function loadFromSupabase(){
     if(Array.isArray(audit)) S.auditLog = audit.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(clients)) S.clients = clients.map(function(r){return Object.assign({_id:r.id},r.data);});
     if(Array.isArray(indContacts)) S.individualContacts = indContacts.map(function(r){return Object.assign({_id:r.id},r.data);});
-    // Load deal audit from same table (dealId field distinguishes them)
-    S.dealAuditLog = S.auditLog.filter(function(e){return e.dealId;});
-    S.auditLog = S.auditLog.filter(function(e){return e.leadId&&!e.dealId;});
+    // Load deal audit from same table. Deal entries carry dealId and/or dealRef
+    // (deliverable submit/review entries use dealRef only); lead entries carry leadId.
+    S.dealAuditLog = S.auditLog.filter(function(e){return e.dealId||e.dealRef;});
+    S.auditLog = S.auditLog.filter(function(e){return e.leadId&&!e.dealId&&!e.dealRef;});
     SB_CONNECTED = true; SB_ERROR = '';
     S.SB_LOADING = false;
     loadUsers();
@@ -505,6 +506,75 @@ function syncDeal(deal){
     console.error('Deal sync failed:',err);
     flash('Deal NOT saved to database: '+(err&&err.message?err.message:'unknown error'),'err');
   });
+}
+// Persist a single deliverable comment against the FRESHEST server copy of the deal,
+// so a stale local snapshot cannot overwrite comments other users added in the meantime.
+// This shrinks the last-write-wins window from "however long the page has been open" to
+// the read->write round-trip. On ANY failure it falls back to syncDeal(localDeal), which
+// is the previous behaviour exactly — so this can only improve on, never regress, the old path.
+function appendDlvComment(dealId, dlvId, newComment, localDeal){
+  function fallback(){ syncDeal(localDeal); }
+  sbReq('GET','deals',null,'?select=id,data&id=eq.'+encodeURIComponent(dealId))
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!Array.isArray(rows)||!rows.length||!rows[0].data){ fallback(); return; }
+      var serverDeal=Object.assign({_id:rows[0].id},rows[0].data);
+      var found=false;
+      var dlvs=(serverDeal.deliverables||[]).map(function(dlv){
+        if(dlv._id!==dlvId) return dlv;
+        found=true;
+        return Object.assign({},dlv,{comments:(dlv.comments||[]).concat([newComment])});
+      });
+      if(!found){ fallback(); return; }
+      var merged=Object.assign({},serverDeal,{deliverables:dlvs});
+      sbUpsert('deals', merged._id, merged).catch(function(err){
+        console.error('Comment merge upsert failed:',err); fallback();
+      });
+    })
+    .catch(function(err){ console.error('Comment merge read failed:',err); fallback(); });
+}
+// Admin-managed per-record access grant/revoke (Settings > Record Access).
+// Adds/removes a user id on the record's sharedWith list against the FRESHEST server copy
+// (same read-merge pattern as appendDlvComment) so a stale snapshot can't clobber other
+// fields. Falls back to the local copy on any failure, and writes an audit entry.
+function setRecordShare(table, recordId, userId, grant){
+  var _a=requireActor(grant?'grant record access':'revoke record access'); if(!_a) return;
+  var localRec=(table==='deals'?S.deals:S.leads).filter(function(r){return r._id===recordId;})[0];
+  function applyShare(rec){
+    var cur=Array.isArray(rec.sharedWith)?rec.sharedWith.slice():[];
+    var idx=cur.indexOf(userId);
+    if(grant){ if(idx<0) cur.push(userId); } else { if(idx>=0) cur.splice(idx,1); }
+    return Object.assign({},rec,{sharedWith:cur});
+  }
+  function reflectLocal(updated){
+    if(table==='deals') S.deals=S.deals.map(function(r){return r._id===recordId?updated:r;});
+    else S.leads=S.leads.map(function(r){return r._id===recordId?updated:r;});
+  }
+  function fallback(){
+    if(!localRec) return;
+    var updated=applyShare(localRec); reflectLocal(updated);
+    sbUpsert(table, recordId, updated).catch(function(err){_surfaceSyncError(table,err);});
+  }
+  sbReq('GET',table,null,'?select=id,data&id=eq.'+encodeURIComponent(recordId))
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!Array.isArray(rows)||!rows.length||!rows[0].data){ fallback(); return; }
+      var serverRec=Object.assign({_id:rows[0].id},rows[0].data);
+      var updated=applyShare(serverRec); reflectLocal(updated);
+      sbUpsert(table, recordId, updated).catch(function(err){_surfaceSyncError(table,err);});
+    })
+    .catch(function(err){ console.error('Share read failed:',err); fallback(); });
+  // Audit (fire-and-forget, same as other audit sites)
+  var uName=((S.users||[]).filter(function(u){return u.id===userId;})[0]||{}).name||userId;
+  var entry;
+  if(table==='deals'){
+    entry={_id:nextAuditId(),dealRef:recordId,dealId:(localRec&&localRec.dealId)||'',user:_a.name,field:'Record Access',prev:'',next:(grant?'Granted to ':'Revoked from ')+uName,ts:new Date().toLocaleString()};
+    S.dealAuditLog=S.dealAuditLog.concat([entry]);
+  } else {
+    entry={_id:nextAuditId(),leadId:recordId,user:_a.name,field:'Record Access',prev:'',next:(grant?'Granted to ':'Revoked from ')+uName,ts:new Date().toLocaleString()};
+    S.auditLog=S.auditLog.concat([entry]);
+  }
+  if(typeof syncAudit==='function') syncAudit(entry);
 }
 function syncLead(lead){
   sbUpsert('leads', lead._id, lead).catch(function(err){
@@ -777,20 +847,22 @@ var Permissions={
   canEditAfterApproval:function(u){return Permissions.isManager(u);}
 };
 
+// Explicit per-record grants (admin-managed in Settings > Record Access). Keyed on user id.
+function hasSharedAccess(rec){
+  return !!(S.currentUser&&Array.isArray(rec.sharedWith)&&rec.sharedWith.indexOf(S.currentUser.id)>=0);
+}
 function visLeads(){
   if(canSeeAll()) return S.leads;
   var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
-  if(!n) return [];
   return S.leads.filter(function(l){
-    return (l.createdBy||'').toLowerCase().trim()===n||(l.salesLead||'').toLowerCase().trim()===n||(l.updatedBy||'').toLowerCase().trim()===n;
+    return (n&&((l.createdBy||'').toLowerCase().trim()===n||(l.salesLead||'').toLowerCase().trim()===n||(l.updatedBy||'').toLowerCase().trim()===n))||hasSharedAccess(l);
   });
 }
 function visDeals(){
   if(canSeeAll()) return S.deals;
   var n=(S.currentUser&&S.currentUser.name||'').toLowerCase().trim();
-  if(!n) return [];
   return S.deals.filter(function(d){
-    return (d.createdBy||'').toLowerCase().trim()===n||(d.owner||'').toLowerCase().trim()===n||(d.convertedBy||'').toLowerCase().trim()===n;
+    return (n&&((d.createdBy||'').toLowerCase().trim()===n||(d.owner||'').toLowerCase().trim()===n||(d.convertedBy||'').toLowerCase().trim()===n))||hasSharedAccess(d);
   });
 }
 
@@ -3004,6 +3076,7 @@ function cvt(id){
     priority:normPriority,
     files:l.files||[],
     deliverables:[],
+    sharedWith:(l.sharedWith||[]),  // inherit per-record access grants from the lead
     // Audit lineage
     createdAt:convTs, createdBy:convertor, createdByRole:_actor.role, createdByUserId:_actor.id,
     convertedFromLeadId:l.leadId||'',
@@ -3606,12 +3679,65 @@ function rUsers(){
     ['activity','Activity Log'],
     ['backup','Backup']
   ];
+  if(isAdmin) tabs.push(['access','Record Access']);
   html+='<div style="display:flex;border-bottom:1px solid #E2E8F0;margin-bottom:16px;gap:0;">';
   tabs.forEach(function(t){
     var on=tab===t[0];
     html+='<button class="users-tab-btn" data-utab="'+e(t[0])+'" style="padding:8px 16px;font-size:13px;font-weight:'+(on?'600':'500')+';color:'+(on?'#275F45':'#5F6B65')+';border:none;background:transparent;cursor:pointer;border-bottom:2px solid '+(on?'#275F45':'transparent')+';margin-bottom:-1px;font-family:Inter,sans-serif;">'+e(t[1])+'</button>';
   });
   html+='</div>';
+
+  // ════════ RECORD ACCESS (admin only) ════════
+  if(tab==='access'){
+    if(!isAdmin){
+      html+='<div class="card" style="padding:48px;text-align:center;"><div style="font-size:32px;margin-bottom:12px;">&#128274;</div><div style="font-size:15px;font-weight:600;color:#1A1A1A;">Access Restricted</div><div style="font-size:13px;color:#5F6B65;margin-top:6px;">Record access management is available to Admins only.</div></div>';
+    } else {
+      var shType=S.shareType||'deal';
+      var grantees=(S.users||[]).filter(function(us){return us.active!==false;});
+      // Grant panel
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;padding:20px 24px;margin-bottom:16px;">';
+      html+='<div style="font-size:13px;font-weight:700;color:#0F172A;margin-bottom:4px;">Grant record access</div>';
+      html+='<div style="font-size:12px;color:#64748B;margin-bottom:16px;">Give a team member view + edit access to a specific deal or lead. Managers and admins already see all records; post-approval edits remain manager-only.</div>';
+      html+='<div style="display:grid;grid-template-columns:1fr 130px 1fr auto;gap:12px;align-items:end;">';
+      html+='<div><div style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">User</div>';
+      html+='<select id="share-user" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;"><option value="">Select a user...</option>';
+      grantees.forEach(function(us){ html+='<option value="'+e(us.id)+'">'+e(us.name||us.email||us.id)+' ('+e(us.role||'staff')+')</option>'; });
+      html+='</select></div>';
+      html+='<div><div style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Record type</div>';
+      html+='<select id="share-type" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;"><option value="deal"'+(shType==='deal'?' selected':'')+'>Deal</option><option value="lead"'+(shType==='lead'?' selected':'')+'>Lead</option></select></div>';
+      html+='<div><div style="font-size:10px;font-weight:600;color:#94A3B8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">'+(shType==='deal'?'Deal':'Lead')+'</div>';
+      html+='<select id="share-record" style="width:100%;padding:7px 9px;font-size:13px;border:1px solid #E2E8F0;border-radius:4px;font-family:Inter,sans-serif;"><option value="">Select a '+shType+'...</option>';
+      if(shType==='deal'){ S.deals.forEach(function(d){ html+='<option value="'+e(d._id)+'">'+e(d.bizName||d.dealId||d._id)+(d.dealId?' \\u2014 '+e(d.dealId):'')+'</option>'; }); }
+      else { S.leads.forEach(function(l){ html+='<option value="'+e(l._id)+'">'+e(l.bizName||l.ownerContact||l.leadId||l._id)+'</option>'; }); }
+      html+='</select></div>';
+      html+='<button id="share-grant" class="btn btn-sm" style="height:34px;">Grant access</button>';
+      html+='</div></div>';
+      // Current grants table
+      html+='<div style="background:#fff;border:1px solid #E2E8F0;border-radius:6px;overflow:hidden;">';
+      html+='<div style="padding:14px 20px;border-bottom:1px solid #E2E8F0;font-size:13px;font-weight:700;color:#0F172A;">Current grants</div>';
+      var grantRows=[];
+      S.deals.forEach(function(d){ (d.sharedWith||[]).forEach(function(uid){ grantRows.push({table:'deals',rid:d._id,label:(d.bizName||d.dealId||d._id),type:'Deal',uid:uid}); }); });
+      S.leads.forEach(function(l){ (l.sharedWith||[]).forEach(function(uid){ grantRows.push({table:'leads',rid:l._id,label:(l.bizName||l.ownerContact||l.leadId||l._id),type:'Lead',uid:uid}); }); });
+      if(!grantRows.length){
+        html+='<div style="padding:24px 20px;text-align:center;color:#94A3B8;font-size:12px;">No access grants yet. Use the panel above to share a deal or lead.</div>';
+      } else {
+        html+='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="background:#FAFAFA;">';
+        ['USER','TYPE','RECORD',''].forEach(function(h){ html+='<th style="text-align:left;padding:8px 20px;font-size:10px;font-weight:700;color:#94A3B8;letter-spacing:.5px;">'+h+'</th>'; });
+        html+='</tr></thead><tbody>';
+        grantRows.forEach(function(r){
+          var uName=((S.users||[]).filter(function(u){return u.id===r.uid;})[0]||{}).name||r.uid;
+          html+='<tr style="border-top:1px solid #F1F5F9;">';
+          html+='<td style="padding:9px 20px;color:#0F172A;font-weight:500;">'+e(uName)+'</td>';
+          html+='<td style="padding:9px 20px;color:#64748B;">'+r.type+'</td>';
+          html+='<td style="padding:9px 20px;color:#0F172A;">'+e(r.label)+'</td>';
+          html+='<td style="padding:9px 20px;text-align:right;"><button class="share-revoke btn btn-ghost btn-xs" data-table="'+e(r.table)+'" data-rid="'+e(r.rid)+'" data-uid="'+e(r.uid)+'" style="color:#dc2626;">Revoke</button></td>';
+          html+='</tr>';
+        });
+        html+='</tbody></table>';
+      }
+      html+='</div>';
+    }
+  }
 
   // ════════ MY PROFILE ════════
   if(tab==='profile'){
@@ -6306,16 +6432,20 @@ function bind(){
       var actor=_ca.name;
       var role=_ca.role;
       var ts=new Date().toLocaleString();
+      var newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',userRole:role,text:text,ts:ts,files:attached};
+      var mergedLocal=null;
       S.deals=S.deals.map(function(d){
         if(d._id!==dealId) return d;
         var dlvs=(d.deliverables||[]).map(function(dlv){
           if(dlv._id!==dlvId) return dlv;
-          var newComment={user:actor,userId:S.currentUser?S.currentUser.id:'',userRole:role,text:text,ts:ts,files:attached};
           return Object.assign({},dlv,{comments:(dlv.comments||[]).concat([newComment])});
         });
         var updated=Object.assign({},d,{deliverables:dlvs});
-        syncDeal(updated);return updated;
+        mergedLocal=updated;
+        return updated;
       });
+      // Persist against the freshest server copy so a concurrent comment can't clobber this one
+      if(mergedLocal) appendDlvComment(dealId, dlvId, newComment, mergedLocal);
       // Clear pending attachments
       if(window._pendingChatFiles) delete window._pendingChatFiles[dlvId];
       flash('Message sent');render();
@@ -7266,6 +7396,28 @@ function bRF(){
       S.showChangePassword=false;
       S.changePassError='';S.changePassSuccess='';
       render();
+    });
+  });
+
+  // ── Record Access (Settings): grant / revoke ──────────────────────────────
+  var shTypeSel=document.getElementById('share-type');
+  if(shTypeSel) shTypeSel.addEventListener('change',function(){ S.shareType=shTypeSel.value; render(); });
+  var shGrant=document.getElementById('share-grant');
+  if(shGrant) shGrant.addEventListener('click',function(){
+    if(!(S.currentUser&&S.currentUser.role==='admin')){flash('Only admins can grant access.','err');return;}
+    var uid=(document.getElementById('share-user')||{}).value||'';
+    var rid=(document.getElementById('share-record')||{}).value||'';
+    var typ=(document.getElementById('share-type')||{}).value||'deal';
+    if(!uid){flash('Select a user.','err');return;}
+    if(!rid){flash('Select a '+typ+'.','err');return;}
+    setRecordShare(typ==='deal'?'deals':'leads', rid, uid, true);
+    flash('Access granted.');render();
+  });
+  document.querySelectorAll('.share-revoke').forEach(function(el){
+    el.addEventListener('click',function(){
+      if(!(S.currentUser&&S.currentUser.role==='admin')){flash('Only admins can revoke access.','err');return;}
+      setRecordShare(el.dataset.table, el.dataset.rid, el.dataset.uid, false);
+      flash('Access revoked.');render();
     });
   });
 
