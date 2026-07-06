@@ -388,6 +388,14 @@ function sbReq(method, table, body, query){
   });
 }
 
+
+// Surface sync errors so pilot users see failures instead of silent data loss
+function _surfaceSyncError(table, err){
+  var msg = (err && err.message) ? err.message : 'unknown error';
+  console.error('Sync error ['+table+']:', err);
+  flash('Failed to save to '+table+': '+msg, 'err');
+}
+
 function sbUpsert(table, id, data){
   return sbReq('POST', table, {id:id, data:data});
 }
@@ -1562,7 +1570,7 @@ function rDealForm(){
   /* Common fields block reused in each service form */
   var commonFields=
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">'+
-      '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(f.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
+      '<div style="grid-column:1/-1"><div class="field-lbl">Client Account <span style="color:#991B1B;">*</span></div><select name="clientId" required><option value="">— Select a client account —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(f.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
       '<div style="grid-column:1/-1"><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(f.bizName)+'" placeholder="e.g. Mensah Holdings Ltd."/></div>'+
       '<div><div class="field-lbl">Owner / Main Contact</div><input name="owner" value="'+e(f.owner)+'" placeholder="e.g. Kwame Mensah"/></div>'+
       '<div><div class="field-lbl">Email</div><input name="email" value="'+e(f.email)+'" placeholder="contact@company.com"/></div>'+
@@ -2355,7 +2363,7 @@ function rLeadForm(){
       '<button class="shdr'+(S.sec.ov?' on':'')+'" data-sec="ov"><span style="font-weight:800">&#128100; Customer Overview</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.ov?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.ov?' on':'')+'">'+
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
-          '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
+          '<div style="grid-column:1/-1"><div class="field-lbl">Client Account <span style="color:#991B1B;">*</span></div><select name="clientId" required><option value="">— Select a client account —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
@@ -2440,7 +2448,7 @@ function rLL(){
       '<button class="shdr'+(S.sec.ov?' on':'')+'" data-sec="ov"><span style="font-weight:800">&#128100; Customer Overview</span><span style="font-size:12px;color:#5A7A65">'+(S.sec.ov?'&#9662;':'&#9656;')+'</span></button>'+
       '<div class="sbody'+(S.sec.ov?' on':'')+'">'+
         '<form id="lf1"><div style="display:flex;flex-direction:column;gap:13px">'+
-          '<div style="grid-column:1/-1"><div class="field-lbl">Client (optional)</div><select name="clientId"><option value="">— No client linked —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
+          '<div style="grid-column:1/-1"><div class="field-lbl">Client Account <span style="color:#991B1B;">*</span></div><select name="clientId" required><option value="">— Select a client account —</option>'+S.clients.map(function(c){return '<option value="'+e(c._id)+'"'+(lf.clientId===c._id?' selected':'')+'>'+e(c.companyName)+' ('+e(c.clientId||'')+')</option>';}).join('')+'</select></div>'+
           '<div><div class="field-lbl">Business Name *</div><input name="bizName" value="'+e(lf.bizName)+'" placeholder="Enter business name..."/></div>'+
           '<div><div class="field-lbl">Business Ownership Structure</div><select name="ownershipStructure"><option value="">Select ownership structure...</option><option'+(lf.ownershipStructure==="Sole Ownership"?' selected':'')+'>Sole Ownership</option><option'+(lf.ownershipStructure==="Limited Liability"?' selected':'')+'>Limited Liability</option></select></div>'+
           '<div><div class="field-lbl">Service Type *</div><select name="serviceType"><option value="">Select service type...</option>'+LSVCS.map(function(s){return '<option'+(s===lf.serviceType?' selected':'')+'>'+e(s)+'</option>';}).join('')+'</select></div>'+
@@ -2788,6 +2796,14 @@ function mvStage(){
 }
 
 function persistLead(lf, status, msg){
+  // GATE: Client Account required for all leads (workflow rule)
+  if(!lf.clientId){
+    flash('Please select a Client Account before saving the lead.','err');
+    return;
+  }
+  // Identity-locked: no anonymous lead saves
+  var _a=requireActor(status==='pending'?'submit a lead':'save a lead');if(!_a) return;
+  var actor=_a.name;
   // #14: track lastSubmittedAt on submission
   // B4: treat both 'submitted' and 'pending' as a submission event
   var _isSubmission=(status==='submitted'||status==='pending');
@@ -2975,6 +2991,7 @@ function cvt(id){
   var newDeal2=Object.assign({},bDeal(),{
     _id:'D'+Date.now(),
     dealId:nid,
+    clientId:l.clientId||'',  // Preserve client link for portfolio filtering
     bizName:l.bizName||l.ownerContact||'',
     priority:(l.priority||'').replace(' Priority','')||'',  // M16: normalize for deal model
     serviceType:l.serviceType||'',
@@ -7524,6 +7541,22 @@ if(S.currentUser){
 }
 render();
 loadFromSupabase();
+
+// Auto-fill business name when client is selected on lead form
+document.addEventListener('change', function(ev){
+  var t = ev.target;
+  if(t && t.tagName === 'SELECT' && t.name === 'clientId'){
+    var picked = S.clients.filter(function(c){return c._id === t.value;})[0];
+    if(picked){
+      var bizInput = document.querySelector('#lf input[name="bizName"], input[name="bizName"]');
+      if(bizInput && !bizInput.value){
+        bizInput.value = picked.companyName;
+        if(S.lform) S.lform.bizName = picked.companyName;
+      }
+    }
+  }
+});
+
 </script>
 </body>
 </html>
